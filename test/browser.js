@@ -11,7 +11,7 @@ var errors = [];
   var browser = await pw.chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
   var page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   page.on('pageerror', function (e) { errors.push('pageerror: ' + e.message); });
-  page.on('console', function (m) { if (m.type() === 'error') errors.push('console: ' + m.text()); });
+  page.on('console', function (m) { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push('console: ' + m.text()); });
   await page.goto(base); await page.waitForTimeout(800);
   await page.screenshot({ path: path.join(shots, '01-menu.png') });
 

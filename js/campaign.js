@@ -77,7 +77,7 @@
     var pts = Math.round(actDef.pts[0] + (actDef.pts[1] - actDef.pts[0]) * t);
     // scale a little with the player's own strength so the run stays fair
     var own = A.armyCost(camp.army);
-    pts = Math.round(pts * 0.65 + Math.min(own * 0.85, pts * 1.5) * 0.35);
+    pts = Math.round(pts * 0.7 + Math.min(own * 0.8, pts * 1.5) * 0.3);
     var type = kind || node.type, fids = Object.keys(SOVL.FACTION_DATA), fid;
     if (type === 'small') { pts = Math.round(pts * 0.6); }
     if (type === 'undead') { fid = 'dead_nations'; pts = Math.round(pts * 0.9); }

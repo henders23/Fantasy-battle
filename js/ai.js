@@ -235,15 +235,32 @@
     if (mv.ok && mv.pivots > 0) b.applyMove(u.uid, mv);
   };
   P.advanceToward = function (u, p, maxDist) {
-    var b = this.b, guard = 0;
+    var b = this.b, guard = 0, self = this;
     while (guard++ < 4 && u.moveLeft > 0.3 && maxDist > 0.3) {
       var ang = Math.atan2(p.y - u.y, p.x - u.x), dist = Math.min(maxDist, G.dist(u, p));
       var tgt = { x: u.x + Math.cos(ang) * dist, y: u.y + Math.sin(ang) * dist };
       var mv = b.previewMove(u.uid, tgt, false);
+      // steer around obstacles (terrain, friends) when the direct line is blocked
+      if (!mv.ok || mv.advance < Math.min(1.5, u.moveLeft * 0.5)) {
+        var alt = this.steer(u, p, ang, dist);
+        if (alt && (!mv.ok || alt.advance > mv.advance + 0.5)) mv = alt;
+      }
       if (!mv.ok || (mv.advance < 0.3 && mv.pivots === 0)) break;
       b.applyMove(u.uid, mv); maxDist -= mv.advance;
       if (mv.advance < 0.3) break;
     }
+  };
+  // Try alternative headings; pick the one that ends closest to p while actually moving.
+  P.steer = function (u, p, ang, dist) {
+    var b = this.b, best = null, bestScore = Infinity, offs = [0.5, -0.5, 0.9, -0.9, 1.3, -1.3, 1.6, -1.6];
+    for (var i = 0; i < offs.length; i++) {
+      var a = ang + offs[i], tgt = { x: u.x + Math.cos(a) * dist, y: u.y + Math.sin(a) * dist };
+      var mv = b.previewMove(u.uid, tgt, false);
+      if (!mv.ok || mv.advance < 1) continue;
+      var end = G.dist({ x: mv.x, y: mv.y }, p) + Math.abs(offs[i]) * 0.8;
+      if (end < bestScore) { bestScore = end; best = mv; }
+    }
+    return best;
   };
   P.retreatFrom = function (u, enemy) {
     var b = this.b, ang = Math.atan2(u.y - enemy.y, u.x - enemy.x), d = Math.max(2, u.moveLeft - 2 * u.typeInfo.pivot * 2);
