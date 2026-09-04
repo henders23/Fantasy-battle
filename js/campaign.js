@@ -82,7 +82,8 @@
     if (type === 'small') { pts = Math.round(pts * 0.6); }
     if (type === 'undead') { fid = 'dead_nations'; pts = Math.round(pts * 0.9); }
     if (type === 'elite') pts = Math.round(pts * actDef.elitePts);
-    if (type === 'boss') { pts = Math.max(actDef.boss.pts, Math.round(own * 1.0)); fid = camp.act === 2 ? 'dead_nations' : null; }
+    if (type === 'boss') { pts = Math.round(Math.min(actDef.boss.pts, Math.max(actDef.boss.pts * 0.6, own * 1.25))); fid = camp.act === 2 ? 'dead_nations' : null; }
+    else pts = Math.min(pts, Math.round(own * 1.4 + 50)); // never wildly larger than the player's own army
     if (!fid) { var others = fids.filter(function (f) { return f !== camp.faction; }); fid = R.rng() < 0.85 ? R.pick(others) : camp.faction; }
     var army = A.randomArmy({ faction: fid, pts: Math.max(150, pts), boss: type === 'boss', name: type === 'boss' ? actDef.boss.name : undefined });
     army.pts = pts; army.kind = type;
