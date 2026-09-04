@@ -9,7 +9,7 @@
 
   var UI = {
     playerSide: 0, aiSide: 1, screen: 'menu', battle: null, ai: null, renderer: null, sel: null, inspect: null, hover: null,
-    mode: 'move', spell: null, ability: null, targets: [], preview: null, aiTimer: null, busy: false, campaign: null, setup: {}, deploySel: null, dragging: null
+    mode: 'move', spell: null, ability: null, targets: [], preview: null, aiTimer: null, busy: false, campaign: null, setup: {}, deploySel: null, dragging: null, aiDelay: 420
   };
   SOVL.UI = UI;
 
@@ -25,7 +25,7 @@
     $('modal').classList.add('active'); UI.modalOpen = true;
     return body;
   };
-  UI.closeModal = function () { $('modal').classList.remove('active'); UI.modalOpen = false; };
+  UI.closeModal = function () { $('modal').classList.remove('active'); UI.modalOpen = false; if (UI.screen === 'battle' && UI.battle && UI.battle.phase !== 'end') setTimeout(UI.pumpAI, 50); };
   function statsRow(s, cls) {
     var d = el('div', cls || 'statline');
     STAT_NAMES.forEach(function (p) { d.appendChild(el('div', 'stat', '<span>' + p[1] + '</span><b>' + s[p[0]] + '</b>')); });
@@ -87,7 +87,7 @@
         card.onclick = function () { UI.setup.commander = c.id; renderCommanders(); };
         box.appendChild(card);
       });
-      $('setup-name').value = R.pick(SOVL.COMMANDER_NAMES[UI.setup.faction]);
+      if (!$('setup-name').value || UI.setup.nameFaction !== UI.setup.faction) { $('setup-name').value = R.pick(SOVL.COMMANDER_NAMES[UI.setup.faction]); UI.setup.nameFaction = UI.setup.faction; }
     }
     renderCommanders();
     $('setup-next').onclick = function () {
@@ -233,7 +233,7 @@
     if (UI.screen === 'battle' && UI.battle) {
       var st = { playerSide: UI.playerSide, selected: UI.sel || UI.inspect, hover: UI.hover, targets: UI.targets, preview: UI.preview, mode: UI.mode, spell: UI.spell, hideSide: UI.battle.phase === 'deploy' ? UI.aiSide : null };
       var b = UI.battle;
-      if (st.hideSide != null) { var saved = b.units; b.units = b.units.filter(function (u) { return u.side !== st.hideSide; }); UI.renderer.draw(b, st, now); b.units = saved; }
+      if (st.hideSide != null) { var saved = b.units; b.units = b.units.filter(function (u) { return u.side !== st.hideSide; }); try { UI.renderer.draw(b, st, now); } finally { b.units = saved; } }
       else UI.renderer.draw(b, st, now);
     }
     requestAnimationFrame(UI.frame);
@@ -248,9 +248,9 @@
       var tip = $('tip');
       if (u) { tip.innerHTML = UI.unitTip(u); tip.style.display = 'block'; UI.canvasTip = true; positionTip(e.clientX, e.clientY); }
       else if (UI.canvasTip) { tip.style.display = 'none'; UI.canvasTip = false; }
-      if (b.phase === 'deploy' && UI.dragging) { var d = UI.dragging; var rect = { x: p.x - d.dx, y: p.y - d.dy, a: d.u.a, w: d.u.w, d: d.u.d }; if (b.placementValid(d.u, rect, [])) { d.u.x = rect.x; d.u.y = rect.y; } return; }
+      if (b.phase === 'deploy' && UI.dragging) { var d = UI.dragging; var rect = { x: p.x - d.dx, y: p.y - d.dy, a: d.u.a, w: d.u.w, d: d.u.d }; if (b.placementValid(d.u, rect, [])) { d.u.x = rect.x; d.u.y = rect.y; d.u.placed = true; } return; }
       if (b.phase === 'strategic' && UI.sel && b.activeUnit === UI.sel && UI.mode === 'move' && !u) {
-        var su = b.unit(UI.sel); UI.preview = su && su.moveLeft > 0 ? b.previewMove(UI.sel, p, e.shiftKey) : null;
+        var su = b.unit(UI.sel); UI.preview = su && (su.moveLeft > 0 || su.typeInfo.pivot === 0) ? b.previewMove(UI.sel, p, e.shiftKey || su.moveLeft <= 0) : null;
       } else UI.preview = null;
     });
     cv.addEventListener('mouseleave', function () { UI.hover = null; UI.preview = null; $('tip').style.display = 'none'; UI.canvasTip = false; });
@@ -268,9 +268,10 @@
       if (UI.screen !== 'battle' || UI.modalOpen) return;
       var b = UI.battle; if (!b) return;
       if (e.key === 'x' || e.key === 'X') { if (e.shiftKey) r.showRanges = !r.showRanges; else r.showArcs = !r.showArcs; UI.updateToggles(); }
-      if (e.key === 'Escape') { UI.mode = 'move'; UI.targets = []; UI.updateHud(); }
+      if (e.key === 'Escape') { UI.mode = 'move'; UI.targets = []; if (b.phase === 'charge') UI.sel = null; UI.preview = null; UI.updateHud(); }
       if (b.phase === 'deploy' && UI.deploySel) { var du = b.unit(UI.deploySel); if (du && (e.key === 'q' || e.key === 'Q')) UI.rotateDeploy(du, -1); if (du && (e.key === 'e' || e.key === 'E')) UI.rotateDeploy(du, 1); }
-      if (b.phase === 'strategic' && UI.sel && b.activeUnit === UI.sel) { if (e.key === 'q' || e.key === 'Q') { b.pivot(UI.sel, -1); UI.updateHud(); } if (e.key === 'e' || e.key === 'E') { b.pivot(UI.sel, 1); UI.updateHud(); } if (e.key === 'Enter' || e.key === ' ') { UI.endActivation(); } }
+      if (b.phase === 'strategic' && UI.sel && b.activeUnit === UI.sel) { if (e.key === 'q' || e.key === 'Q') { if (!b.pivot(UI.sel, -1)) UI.hint('Cannot pivot: no movement left or no room.'); UI.updateHud(); } if (e.key === 'e' || e.key === 'E') { if (!b.pivot(UI.sel, 1)) UI.hint('Cannot pivot: no movement left or no room.'); UI.updateHud(); } }
+      if (b.phase === 'strategic' && b.active === UI.playerSide && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); UI.endActivation(); }
       if (b.phase === 'charge' && (e.key === 'Enter' || e.key === ' ') && b.active === UI.playerSide) UI.passCharge();
     });
     $('tog-arcs').onclick = function () { r.showArcs = !r.showArcs; UI.updateToggles(); };
@@ -278,7 +279,7 @@
     $('tog-zoom').onclick = function () { r.zoom = r.zoom > 1.01 ? 1 : 1.6; r.panX = 0; r.panY = 0; };
   };
   UI.updateToggles = function () { $('tog-arcs').className = 'small' + (UI.renderer.showArcs ? ' primary' : ''); $('tog-ranges').className = 'small' + (UI.renderer.showRanges ? ' primary' : ''); };
-  UI.rotateDeploy = function (u, dir) { var b = UI.battle, a = u.a + dir * Math.PI / 4, rect = { x: u.x, y: u.y, a: a, w: u.w, d: u.d }; if (b.placementValid(u, rect, [])) u.a = a; };
+  UI.rotateDeploy = function (u, dir) { var b = UI.battle, a = u.a + dir * Math.PI / 4, rect = { x: u.x, y: u.y, a: a, w: u.w, d: u.d }; if (b.placementValid(u, rect, [])) u.a = a; else UI.hint('No room to rotate ' + u.name + ' here. Move it first.'); };
   UI.unitTip = function (u) {
     var b = UI.battle, s = SOVL.effStats(u, b), mv = SOVL.moveAllowance(u, b);
     var lines = ['<b>' + esc(u.name) + '</b> <span class="muted">' + esc(u.type) + (u.side === UI.playerSide ? '' : ' · enemy') + '</span>'];
@@ -313,7 +314,7 @@
       tray.appendChild(d);
     });
     var row2 = el('div', 'row'); row2.style.marginTop = '10px';
-    var auto = el('button', null, 'Auto-deploy'); auto.onclick = function () { b.unitsOf(UI.playerSide).forEach(function (u) { u.placed = false; }); b.autoDeploy(UI.playerSide); b.units.forEach(function (u) { if (u.side === UI.playerSide) { u._rx = u.x; u._ry = u.y; u._ra = u.a; } }); UI.renderDeployTray(); };
+    var auto = el('button', null, 'Auto-deploy'); auto.onclick = function () { b.unitsOf(UI.playerSide).forEach(function (u) { u.placed = false; u.x = -1000; u.y = -1000; }); b.autoDeploy(UI.playerSide); b.units.forEach(function (u) { if (u.side === UI.playerSide) { u._rx = u.x; u._ry = u.y; u._ra = u.a; } }); UI.renderDeployTray(); };
     var go = el('button', 'primary', 'Begin Battle'); go.disabled = !b.allPlaced(UI.playerSide);
     go.onclick = function () { UI.beginBattle(); };
     row2.appendChild(auto); row2.appendChild(go); tray.appendChild(row2);
@@ -359,8 +360,8 @@
       if (u) { UI.inspect = u.uid; UI.updateHud(); return; }
       // ground click: move
       if (UI.sel && b.activeUnit === UI.sel) {
-        var su = b.unit(UI.sel); if (su.moveLeft <= 0) { UI.hint('No movement left.'); return; }
-        var mv = b.previewMove(UI.sel, p, e.shiftKey);
+        var su = b.unit(UI.sel); if (su.moveLeft <= 0 && su.typeInfo.pivot > 0) { UI.hint('No movement left.'); return; }
+        var mv = b.previewMove(UI.sel, p, e.shiftKey || su.moveLeft <= 0);
         if (mv.ok) { b.applyMove(UI.sel, mv); UI.preview = null; UI.processEvents(); UI.updateHud(); } else UI.hint(mv.reason || 'Cannot move there.');
       }
     }
@@ -383,7 +384,7 @@
   UI.pumpAI = function () {
     var b = UI.battle; if (!b || b.phase === 'end') { if (b && b.phase === 'end') UI.onEnd(); return; }
     if (UI.aiTimer) return;
-    if (b.active !== UI.aiSide || UI.modalOpen) return;
+    if (b.active !== UI.aiSide) return;
     UI.aiTimer = setTimeout(function () {
       UI.aiTimer = null;
       if (UI.modalOpen || UI.screen !== 'battle') { setTimeout(UI.pumpAI, 300); return; }
@@ -392,7 +393,7 @@
       UI.processEvents(); UI.updateHud();
       if (b.phase === 'end') { UI.onEnd(); return; }
       if (b.active === UI.aiSide) UI.pumpAI();
-    }, 420);
+    }, UI.aiDelay);
   };
 
   // Animation and log events from the engine
@@ -425,9 +426,10 @@
   }
   UI.renderLog = function () {
     var b = UI.battle, box = $('battle-log');
-    if (UI.logCount > b.log.length) { box.innerHTML = ''; UI.logCount = 0; }
+    if (UI.logBattle !== b) { box.innerHTML = ''; UI.logCount = 0; UI.logBattle = b; }
     var atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
-    for (var i = UI.logCount; i < b.log.length; i++) {
+    var total = b.logSeq || 0, start = Math.max(0, b.log.length - (total - UI.logCount));
+    for (var i = start; i < b.log.length; i++) {
       var l = b.log[i], d = el('div', 'l ' + l.kind, esc(l.text));
       if (l.data) {
         if (l.data.hitDice) d.innerHTML += diceHtml(l.data.hitDice, l.data.hitTarget, 'hit');
@@ -437,7 +439,8 @@
       }
       box.appendChild(d);
     }
-    UI.logCount = b.log.length;
+    UI.logCount = total;
+    while (box.children.length > 600) box.removeChild(box.firstChild);
     if (atBottom) box.scrollTop = box.scrollHeight;
   };
   UI.showCombatReports = function (reports) {
@@ -458,7 +461,7 @@
       });
       box.appendChild(d);
     });
-    var ok = el('button', 'primary', 'Continue'); ok.onclick = function () { UI.closeModal(); if (b.phase === 'end') UI.onEnd(); else UI.pumpAI(); };
+    var ok = el('button', 'primary', 'Continue'); ok.onclick = function () { UI.closeModal(); if (b.phase === 'end' || UI.pendingEnd) UI.onEnd(); else UI.pumpAI(); };
     box.appendChild(ok);
     UI.modalDismissable = false; UI.modal(box);
   };
@@ -490,9 +493,9 @@
         if (u.fleeing) { var br = el('button', 'primary', 'Rally (Discipline test)'); br.onclick = function () { var r = b.rally(u.uid); UI.sel = null; UI.afterPlayerAction(); }; act.appendChild(br); }
         else {
           act.appendChild(el('div', 'muted', 'Movement left: <b>' + u.moveLeft.toFixed(1) + '"</b>' + (b.isEngaged(u) ? ' (engaged)' : '') + '. Click the ground to move; <kbd>Shift</kbd>-click to only pivot; <kbd>Q</kbd>/<kbd>E</kbd> pivot 45°.'));
-          if (u.ranged && !u.usedRanged && !b.isEngaged(u)) { var bs = el('button', UI.mode === 'shoot' && !UI.shootCommander ? 'primary' : '', 'Shoot: ' + u.ranged); bs.onclick = function () { UI.enterTargetMode('shoot', null, false); }; act.appendChild(bs); }
-          if (u.commander && u.commander.alive && u.commander.ranged && !u.usedSpell && !b.isEngaged(u)) { var bcs = el('button', '', u.commander.name + ' shoots: ' + u.commander.ranged); bcs.onclick = function () { UI.enterTargetMode('shoot', null, true); }; act.appendChild(bcs); }
-          if (b.canCast(u)) u.commander.spells.forEach(function (sp) { if (u.spellsCastThisTurn[sp]) return; var n = b.spellTargets(u, sp).length; var bsp = el('button', UI.mode === 'spell' && UI.spell === sp ? 'primary' : '', 'Cast ' + sp + (n ? '' : ' (no target)')); bsp.setAttribute('data-tip', esc(SOVL.SPELLS[sp].desc) + ' Casting value ' + SOVL.SPELLS[sp].cv + '.'); bsp.disabled = !n; bsp.onclick = function () { UI.enterTargetMode('spell', sp); }; act.appendChild(bsp); });
+          if (b.rangedWeaponOf(u, false) && !u.usedRanged && !u.usedAbility && !b.isEngaged(u)) { var bs = el('button', UI.mode === 'shoot' && !UI.shootCommander ? 'primary' : '', 'Shoot: ' + u.ranged); bs.onclick = function () { UI.enterTargetMode('shoot', null, false); }; act.appendChild(bs); }
+          if (b.rangedWeaponOf(u, true) && !u.usedSpell && !b.isEngaged(u)) { var bcs = el('button', '', u.commander.name + ' shoots: ' + u.commander.ranged); bcs.onclick = function () { UI.enterTargetMode('shoot', null, true); }; act.appendChild(bcs); }
+          if (b.canCast(u)) u.commander.spells.forEach(function (sp) { if (u.spellsCastThisTurn[sp]) return; var n = b.spellTargets(u, sp).length; var bsp = el('button', UI.mode === 'spell' && UI.spell === sp ? 'primary' : '', 'Cast ' + sp + (n ? '' : ' (no target)')); bsp.setAttribute('data-tip', esc(SOVL.SPELLS[sp].desc) + ' Casting value ' + SOVL.SPELLS[sp].cv + '.'); bsp.disabled = !n; bsp.onclick = function () { var ts = b.spellTargets(u, sp); if (ts.length === 1 && ts[0] === u) { var r = b.cast(u.uid, sp, u.uid); if (!r.ok) UI.hint(r.reason); UI.processEvents(); UI.updateHud(); if (b.phase === 'end') UI.onEnd(); } else UI.enterTargetMode('spell', sp); }; act.appendChild(bsp); });
           b.unitAbilities(u).concat(b.commanderAbilities(u)).forEach(function (ab) {
             var used = ab.level === 'unit' ? (u.usedAbility || u.usedRanged) : u.usedSpell; if (used) return;
             var n = b.abilityTargets(u, ab.id).length; var bab = el('button', UI.mode === 'ability' && UI.ability === ab.id ? 'primary' : '', ab.name); bab.setAttribute('data-tip', esc(ab.desc)); bab.disabled = !n;
@@ -542,16 +545,18 @@
     return box;
   };
   UI.onEnd = function () {
-    var b = UI.battle; if (!b || UI.endShown === b) return; UI.endShown = b;
+    var b = UI.battle; if (!b || UI.endShown === b) return;
     if (UI.aiTimer) { clearTimeout(UI.aiTimer); UI.aiTimer = null; }
     UI.processEvents(); UI.updateHud();
+    if (UI.modalOpen) { UI.pendingEnd = true; return; } // let the player read the final combat report first
+    UI.endShown = b; UI.pendingEnd = false;
     setTimeout(function () { if (UI.battleOpts.onEnd) UI.battleOpts.onEnd(b); }, 600);
   };
   UI.confirmLeaveBattle = function () {
     UI.modalDismissable = true;
     UI.modal('<h2>Leave battle?</h2><div class="text">The battle will be abandoned' + (UI.campaign && UI.battleOpts && UI.battleOpts.campaign ? ' and counts as a defeat for the campaign' : '') + '.</div><div class="choices"><button id="m-stay">Keep fighting</button><button class="danger" id="m-leave">Abandon battle</button></div>');
     $('m-stay').onclick = UI.closeModal;
-    $('m-leave').onclick = function () { UI.closeModal(); if (UI.aiTimer) { clearTimeout(UI.aiTimer); UI.aiTimer = null; } if (UI.battleOpts && UI.battleOpts.campaign) { UI.campaign.over = true; C.save(UI.campaign); UI.show('menu'); } else UI.show('menu'); UI.battle = null; };
+    $('m-leave').onclick = function () { UI.closeModal(); if (UI.aiTimer) { clearTimeout(UI.aiTimer); UI.aiTimer = null; } if (UI.battleOpts && UI.battleOpts.campaign) { UI.campaign.over = true; UI.campaign.pendingBattle = null; UI.campaign.log.push('The army abandoned the field. The trail ends here.'); C.save(UI.campaign); UI.battle = null; UI.showCampaign(); } else { UI.show('menu'); UI.battle = null; } };
   };
   UI.showResult = function (b, opts) {
     var res = b.result, won = res.winner === UI.playerSide, box = el('div');
@@ -578,6 +583,11 @@
     UI.show('campaign');
     if (camp.over) { UI.showRunOver(); return; }
     UI.renderCampaign();
+    if (camp.pendingBattle && camp.nodeIndex != null) {
+      // a battle was started but never resolved (page reloaded mid-fight): it must be fought
+      var node = C.nodeAt(camp, camp.layer, camp.nodeIndex);
+      if (node) UI.campaignBattle(node, camp.pendingBattle.kind || undefined);
+    }
   };
   UI.renderCampaign = function () {
     var camp = UI.campaign, act = C.currentAct(camp);
@@ -651,11 +661,12 @@
     UI.modalDismissable = false; UI.modal(body);
     $('m-fight').onclick = function () {
       UI.closeModal();
+      camp.pendingBattle = { layer: camp.layer, idx: camp.nodeIndex, kind: kind || null }; C.save(camp);
       var terrain = A.randomTerrain({}), army = C.battleArmy(camp);
       UI.startBattle({ armies: [army, enemy], terrain: terrain, scenario: 'pitched', names: [camp.commanderName, node.type === 'boss' ? act.boss.name : ef.name], aggression: node.type === 'boss' ? 0.7 : 0.5, campaign: true, onEnd: function (b) {
         var r = C.applyBattleResult(camp, b, node, enemy);
         var extra = el('div', 'text', r.lines.map(esc).join('<br>'));
-        C.save(camp);
+        camp.pendingBattle = null; C.save(camp);
         UI.showResult(b, { extra: extra, label: r.won ? (r.draw ? 'Withdraw' : 'Continue the trail') : 'The trail ends', onDone: function () {
           UI.show('campaign');
           if (!r.won) { UI.showRunOver(); return; }
@@ -704,10 +715,10 @@
   };
   UI.campaignMerchant = function (node) {
     var camp = UI.campaign, stock = node.stock || (node.stock = C.merchantStock(camp));
-    function render() {
+    function render(err) {
       var box = el('div');
       box.appendChild(el('h2', null, 'Merchant'));
-      box.appendChild(el('div', 'text', 'A trader\'s camp. Recruits, relics and reinforcements — for a price. Gold: <span class="gold">' + camp.gold + '</span>'));
+      box.appendChild(el('div', 'text', 'A trader\'s camp. Recruits, relics and reinforcements — for a price. Gold: <span class="gold">' + camp.gold + '</span>' + (err ? '<br><span class="danger">' + esc(err) + '</span>' : '')));
       stock.forEach(function (o) {
         var d = el('div', 'shop-item' + (o.sold ? ' sold' : '')), desc;
         if (o.kind === 'unit') { var def = SOVL.findUnitDef(camp.faction, o.entry.id); desc = '<b>' + o.entry.models + ' ' + esc(def.name) + '</b> <span class="muted">' + esc(o.section) + '</span><br><span class="muted">Sk ' + def.stats[0] + ' Pw ' + def.stats[1] + ' Df ' + def.stats[2] + ' At ' + def.stats[3] + ' Wd ' + def.stats[4] + ' Ds ' + def.stats[5] + ' · ' + esc(o.entry.weapon) + (o.entry.ranged ? ', ' + esc(o.entry.ranged) : '') + '</span>'; }
@@ -715,14 +726,14 @@
         else desc = '<b>' + esc(o.banner.name) + '</b> <span class="muted">magic banner</span><br><span class="muted">' + esc(o.banner.desc) + '</span>';
         d.innerHTML = '<div class="desc">' + desc + '</div>';
         var btn = el('button', 'small primary', o.price + ' g'); btn.disabled = o.sold || camp.gold < o.price;
-        btn.onclick = function () { var err = C.buy(camp, o); if (err) UI.hint(err); else camp.log.push('Bought ' + (o.kind === 'unit' ? o.entry.models + ' ' + SOVL.findUnitDef(camp.faction, o.entry.id).name : o.kind === 'item' ? o.item.name : o.banner.name) + ' for ' + o.price + ' gold.'); C.save(camp); UI.renderCampaign(); render(); if (err) { var m = $('modal-body').appendChild(el('div', 'danger', esc(err))); } };
+        btn.onclick = function () { var err = C.buy(camp, o); if (!err) camp.log.push('Bought ' + (o.kind === 'unit' ? o.entry.models + ' ' + SOVL.findUnitDef(camp.faction, o.entry.id).name : o.kind === 'item' ? o.item.name : o.banner.name) + ' for ' + o.price + ' gold.'); C.save(camp); UI.renderCampaign(); render(err); };
         d.appendChild(btn); box.appendChild(d);
       });
       box.appendChild(el('h3', null, 'Reinforce'));
       box.appendChild(UI.rosterList(camp, function (e) {
         var cost = C.reinforceCost(camp, e); if (cost == null) return null;
         var b = el('button', 'small', '+1 model — ' + cost + ' g'); b.disabled = camp.gold < cost; b.style.marginTop = '4px';
-        b.onclick = function () { var err = C.reinforce(camp, e); if (err) UI.hint(err); C.save(camp); UI.renderCampaign(); render(); };
+        b.onclick = function () { var err = C.reinforce(camp, e); C.save(camp); UI.renderCampaign(); render(err); };
         return b;
       }));
       var leave = el('button', 'primary', 'Leave'); leave.style.marginTop = '10px'; leave.onclick = function () { UI.closeModal(); C.save(camp); UI.renderCampaign(); };

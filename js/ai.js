@@ -78,7 +78,12 @@
       if (cc && dealt >= taken * 0.9) { return b.declareCounterCharge(u.uid); }
       var dealtStanding = this.expectedMelee(u, charger, false, 'front');
       var incoming = this.expectedMelee(charger, u, true, inc[0].side);
-      if (cf && (u.ranged || u.type === 'War Machine' || incoming > dealtStanding * 2 + 2) && incoming > u.models * 0.25) { return b.declareFlee(u.uid); }
+      if (cf && (u.ranged || u.type === 'War Machine' || incoming > dealtStanding * 2 + 2) && incoming > u.models * 0.25) {
+        // fleeing is only worth it with room to run and a real chance to outpace the pursuit
+        var edge = Math.min(u.x, u.y, SOVL.TABLE.w - u.x, SOVL.TABLE.h - u.y), nDice = Math.max(1, Math.floor(u.typeInfo.move / 4));
+        var expFlight = nDice * 3.5, pursuit = b.chargeRange(charger) - inc[0].dist;
+        if (edge > nDice * 6 + 1 && expFlight > pursuit + 2) return b.declareFlee(u.uid);
+      }
     }
     for (var j = 0; j < mine.length; j++) {
       var c = mine[j]; if (!b.canDeclareCharge(c)) continue;

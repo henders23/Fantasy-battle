@@ -64,8 +64,8 @@
   // Damage saves: n saves at target; poison forces re-roll of 6s; rerollFail lets defender re-roll failures; halberd caps at 4+.
   R.rollSaves = function (n, target, opts) {
     opts = opts || {};
-    if (opts.halberd && target < 4) target = 4;
     if (opts.saveBonus) target = Math.max(2, target - opts.saveBonus);
+    if (opts.halberd && target < 4) target = 4;
     var dice = [], saved = 0;
     for (var i = 0; i < n; i++) {
       var v = R.d6(), ok = v >= target;

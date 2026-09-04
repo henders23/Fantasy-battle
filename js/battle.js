@@ -50,10 +50,10 @@
       files: entry.files || Math.min(type.files, entry.models || def.size[0]),
       woundsOnCurrent: 0, killed: 0,
       commander: null,
-      x: 0, y: 0, a: -Math.PI / 2, w: 1, d: 1,
+      x: -1000, y: -1000, a: -Math.PI / 2, w: 1, d: 1,
       fleeing: false, activated: false, declaredCharge: false, chargedThisTurn: false, chargeTargetOf: null,
       effects: [], usedOnce: {}, usedAbility: false, usedRanged: false, usedSpell: false, spellsCastThisTurn: {},
-      moveLeft: 0, inDifficultAtStart: false, combatRounds: 0, cost: entry.cost || 0,
+      moveLeft: 0, inDifficultAtStart: false, combatRounds: 0, cost: entry.cost || 0, discMod: entry.discMod || 0,
       campaignRef: entry.ref || null, isRetinue: !!entry.isRetinue
     };
     if (isSingle(def.type)) { u.files = 1; }
@@ -146,7 +146,7 @@
     }
     if (u.banner) { var be = u.banner.effect; s.df += be.defense || 0; s.pw += be.power || 0; s.ds += be.discipline || 0; }
     s.ds += vetBonus(u.vet, 'discipline'); s.sk += vetBonus(u.vet, 'skill'); s.pw += vetBonus(u.vet, 'power');
-    s.ds += itemBonus(u, 'retinueDiscipline');
+    s.ds += itemBonus(u, 'retinueDiscipline') + (u.discMod || 0);
     s.sk += effectSum(u, 'skill'); s.pw += effectSum(u, 'power'); s.df += effectSum(u, 'defense'); s.at += effectSum(u, 'attacks');
     if (battle) { var ae = battle.armyEffects[u.side]; s.df += ae.defense || 0; s.pw += ae.power || 0; }
     if (commanderOnly(u)) { var c = effCmdStats(u, battle); return c; }
@@ -235,6 +235,7 @@
   BP.enemiesOf = function (side) { return this.units.filter(function (u) { return u.side !== side; }); };
   BP.addLog = function (text, kind, data) {
     var e = { turn: this.turn, phase: this.phase, text: text, kind: kind || 'info', data: data || null };
+    this.logSeq = (this.logSeq || 0) + 1;
     this.log.push(e); if (this.log.length > 400) this.log.shift(); return e;
   };
   BP.emit = function (ev) { this.events.push(ev); };
@@ -263,7 +264,7 @@
   // collision with units and impassable terrain
   BP.collides = function (u, rect, ignoreUids, strict) {
     for (var i = 0; i < this.units.length; i++) {
-      var o = this.units[i]; if (o === u || ignoreUids.indexOf(o.uid) >= 0) continue;
+      var o = this.units[i]; if (o === u || ignoreUids.indexOf(o.uid) >= 0 || o.x < -500) continue;
       if (G.rectsOverlap(rect, o, strict ? -0.02 : -0.05)) return o;
     }
     if (!isFlying(u)) for (var j = 0; j < this.terrain.length; j++) {
@@ -335,8 +336,16 @@
     back.forEach(function (u) { tryPlace(u, bx + u.w / 2, rearY + (top ? u.d / 2 : -u.d / 2)); bx += u.w + gap; });
     var mx = 6;
     machines.forEach(function (u, i) { tryPlace(u, i % 2 === 0 ? mx + i * 3 : TABLE.w - mx - i * 3, rearY + (top ? u.d / 2 : -u.d / 2)); });
-    // anything still unplaced: brute force
-    units.forEach(function (u) { if (!u.placed) { for (var yy = zone.y + 0.5; yy < zone.y + zone.h && !u.placed; yy += 0.5) for (var xx = 1; xx < TABLE.w - 1 && !u.placed; xx += 0.5) { var rr = { x: xx, y: yy, a: facing, w: u.w, d: u.d }; if (self.placementValid(u, rr, [])) { u.x = xx; u.y = yy; u.a = facing; u.placed = true; } } } });
+    // anything still unplaced: brute force inside the zone, then (last resort) anywhere on our half
+    units.forEach(function (u) {
+      if (u.placed) return;
+      for (var yy = zone.y + 0.5; yy < zone.y + zone.h && !u.placed; yy += 0.5) for (var xx = 1; xx < TABLE.w - 1 && !u.placed; xx += 0.5) { var rr = { x: xx, y: yy, a: facing, w: u.w, d: u.d }; if (self.placementValid(u, rr, [])) { u.x = xx; u.y = yy; u.a = facing; u.placed = true; } }
+      if (u.placed) return;
+      var half = self.halfZone(side), ys = [];
+      for (var y2 = half.y + 0.5; y2 < half.y + half.h; y2 += 0.5) ys.push(y2);
+      if (!top) ys.reverse();
+      for (var yi = 0; yi < ys.length && !u.placed; yi++) for (var x2 = 1; x2 < TABLE.w - 1 && !u.placed; x2 += 0.5) { var r2 = { x: x2, y: ys[yi], a: facing, w: u.w, d: u.d }; if (G.rectInsideTable(r2, TABLE.w, TABLE.h, 0) && self.rectInZone(r2, half) && !self.collides(u, r2, [], true)) { u.x = x2; u.y = ys[yi]; u.a = facing; u.placed = true; } }
+    });
     this.deployed[side] = true;
     return placedAny;
   };
@@ -400,7 +409,7 @@
   BP.chargeBy = function (u) { for (var i = 0; i < this.charges.length; i++) if (this.charges[i].charger === u.uid) return this.charges[i]; return null; };
 
   // ---------- Charges ----------
-  BP.chargeRange = function (u) { return isFlying(u) ? 20 : moveAllowance(u, this); };
+  BP.chargeRange = function (u) { return moveAllowance(u, this); };
   BP.canDeclareCharge = function (u) {
     if (!unitAlive(u) || u.fleeing || this.isEngaged(u) || u.declaredCharge) return false;
     if (hasProp(u, 'Crewed Weapon') || hasEffect(u, 'rooted')) return false;
@@ -423,6 +432,11 @@
     var f = G.fwd(charger.a), v = { x: sd.c.x - fc.x, y: sd.c.y - fc.y }, ang = Math.acos(G.clamp((f.x * v.x + f.y * v.y) / (G.len(v.x, v.y) || 1), -1, 1));
     if (ang > Math.PI / 4 + 1e-6) { res.reason = 'Target outside the 45° line of sight arc'; return res; }
     if (!isFlying(charger) && this.losBlocked(fc, sd.c)) { res.reason = 'Line of sight blocked by terrain'; return res; }
+    if (!isFlying(charger)) {
+      var path = this.chargePathTerrain(charger, sd.c);
+      if (path.impassable) { res.reason = 'Impassable terrain in the way'; return res; }
+      if (path.difficult && !hasProp(charger, 'Scout')) { range -= 2; if (dist > range) { res.reason = 'Difficult terrain slows the charge (' + dist.toFixed(1) + ' > ' + range + ')'; return res; } res.difficult = true; }
+    }
     if (target.fleeing) { res.ok = true; res.runDown = true; res.priority = chargePriority(side, dist); return res; }
     if (this.sideEngaged(target, side)) { res.reason = 'That side is already engaged'; return res; }
     if (this.sideTargeted(target, side)) { res.reason = 'That side already has a charge declared against it'; return res; }
@@ -434,10 +448,25 @@
       if (chargePriority(side, dist) <= theirP) { res.reason = 'Target has declared its own charge with higher priority'; return res; }
       res.intercept = true;
     }
-    var pos = this.chargePosition(charger, target, side, []);
-    if (!pos) { res.reason = 'No room to reach base contact'; return res; }
-    res.ok = true; res.pos = pos; res.priority = chargePriority(side, dist);
+    if (!opts.counter) {
+      var pos = this.chargePosition(charger, target, side, []);
+      if (!pos) { res.reason = 'No room to reach base contact'; return res; }
+      res.pos = pos;
+    }
+    res.ok = true; res.priority = chargePriority(side, dist);
     return res;
+  };
+  // Terrain crossed by a straight charge from the charger's front corners to point p
+  BP.chargePathTerrain = function (charger, p) {
+    var c = G.corners(charger), out = { impassable: false, difficult: false }, self = this;
+    var starts = [c[0], c[1], G.frontCenter(charger)];
+    this.terrain.forEach(function (t) {
+      var T = SOVL.TERRAIN_TYPES[t.kind]; if (!T.impassable && !T.difficult) return;
+      var crosses = false;
+      for (var i = 0; i < starts.length; i++) { if (G.pointInAabb(starts[i], t)) { if (T.difficult) out.difficult = true; continue; } if (G.segHitsAabb(starts[i], p, t)) crosses = true; }
+      if (crosses) { if (T.impassable) out.impassable = true; else out.difficult = true; }
+    });
+    return out;
   };
   BP.chargePosition = function (charger, target, side, ignore) {
     var sd = G.side(target, side), a = Math.atan2(-sd.n.y, -sd.n.x);
@@ -551,10 +580,13 @@
     this.charges.filter(function (c) { return c.flee; }).forEach(function (c) {
       var u = self.unit(c.charger), ch = self.unit(c.target); if (!u || !ch) return;
       var away = Math.atan2(u.y - ch.y, u.x - ch.x);
-      var fm = self.flightMove(u, away, 'flees from the charge');
       u.fleeing = true;
+      var fm = self.flightMove(u, away, 'flees from the charge');
+      // the charger's own charge is spent either way
+      self.charges = self.charges.filter(function (x) { return !(x.charger === ch.uid && x.target === u.uid); });
+      ch.activated = true;
       if (!unitAlive(u) || u.removed) return;
-      // charger pursues its full move
+      // charger pursues its full move (once)
       self.pursue(ch, u);
     });
     // 2. counter charges, 3. others by priority
@@ -572,8 +604,14 @@
         return;
       }
       var side = c.side;
-      if (self.sideEngaged(t, side)) { side = G.SIDES.filter(function (s) { return !self.sideEngaged(t, s); })[0]; }
-      if (!side) return;
+      if (self.sideEngaged(t, side)) {
+        // declared side taken by an earlier charge: only switch sides if the new side is still a legal charge
+        var alt = G.SIDES.filter(function (s2) { return !self.sideEngaged(t, s2) && !self.sideTargeted(t, s2); })[0];
+        if (!alt) { u.activated = true; return; }
+        var fc2 = G.frontCenter(u), sd2 = G.side(t, alt), d2 = G.dist(fc2, sd2.c);
+        if (d2 > self.chargeRange(u) || !self.inArc(u, sd2.c)) { self.addLog(u.name + ' cannot reach ' + t.name + ' and stumbles to a halt.', 'charge'); u.activated = true; self.moveToward(u, sd2.c, Math.max(0, self.chargeRange(u) - 1), 1.0); return; }
+        side = alt;
+      }
       self.resolveSingleCharge(u, t, side);
     });
     this.charges = [];
@@ -585,6 +623,7 @@
     if (!pos) {
       // failed charge: move toward target, stop short
       this.addLog(u.name + ' cannot reach ' + t.name + ' and stumbles to a halt.', 'charge');
+      u.activated = true;
       this.moveToward(u, G.side(t, side).c, Math.max(0, this.chargeRange(u) - 1), 1.0);
       return false;
     }
@@ -680,32 +719,28 @@
     return { ok: true };
   };
   BP.endActivation = function () {
-    var u = this.unit(this.activeUnit); if (!u) return;
-    u.activated = true; u.moveStarted = false; u.moveLeft = 0; this.activeUnit = null;
-    this.passed[this.active] = false;
-    this.active = 1 - this.active;
-    this.checkStrategicAutoPass();
+    var u = this.unit(this.activeUnit);
+    if (u) { u.activated = true; u.moveStarted = false; u.moveLeft = 0; }
+    this.activeUnit = null;
+    this.advanceStrategic(1 - this.active);
   };
+  // A side that passes stays passed for the rest of the phase; the other side keeps activating.
   BP.passStrategic = function () {
-    if (this.activeUnit) this.endActivation();
+    if (this.activeUnit) { var u = this.unit(this.activeUnit); if (u) { u.activated = true; u.moveStarted = false; u.moveLeft = 0; } this.activeUnit = null; }
     this.passed[this.active] = true;
-    if (this.passed[0] && this.passed[1]) { this.endStrategicPhase(); return; }
-    this.active = 1 - this.active;
-    this.checkStrategicAutoPass();
+    this.advanceStrategic(1 - this.active);
   };
-  BP.checkStrategicAutoPass = function () {
-    var guard = 0;
-    while (guard++ < 3 && this.phase === 'strategic' && this.activatable(this.active).length === 0) {
-      this.passed[this.active] = true;
-      if (this.passed[0] && this.passed[1]) { this.endStrategicPhase(); return; }
-      this.active = 1 - this.active;
-    }
+  BP.advanceStrategic = function (prefer) {
+    if (this.phase !== 'strategic') return;
+    for (var k = 0; k < 2; k++) { var s = (prefer + k) % 2; if (!this.passed[s] && this.activatable(s).length) { this.active = s; return; } }
+    this.endStrategicPhase();
   };
+  BP.checkStrategicAutoPass = function () { this.advanceStrategic(this.active); };
   // Movement preview: pivot toward point p then advance. pivotOnly: face p without advancing.
   BP.previewMove = function (uid, p, pivotOnly) {
     var u = this.unit(uid);
     var res = { ok: false, x: u.x, y: u.y, a: u.a, cost: 0, advance: 0, pivots: 0, reason: '' };
-    if (u.moveLeft <= 0 && !(pivotCost(u) === 0)) { res.reason = 'No movement left'; return res; }
+    if (u.moveLeft <= 0 && pivotCost(u) > 0) { res.reason = 'No movement left'; return res; }
     var want = Math.atan2(p.y - u.y, p.x - u.x), diff = G.angleDiff(u.a, want);
     var pc = pivotCost(u), pivots = Math.ceil((Math.abs(diff) - 1e-6) / (Math.PI / 4)); if (pivots < 0) pivots = 0;
     var budget = u.moveLeft, pivCost = pivots * pc;
@@ -713,7 +748,9 @@
     var maxRot = pivots * Math.PI / 4, rot = G.clamp(diff, -maxRot, maxRot);
     var a = u.a + rot, left = budget - pivCost;
     res.a = a; res.pivots = pivots; res.cost = pivCost;
-    if (pivotOnly || left <= 0) { res.ok = pivots > 0 || pivotOnly; res.x = u.x; res.y = u.y; if (!res.ok) res.reason = 'Not enough movement to pivot'; return res; }
+    var rotRect = { x: u.x, y: u.y, a: a, w: u.w, d: u.d };
+    if (pivots > 0 && (!G.rectInsideTable(rotRect, TABLE.w, TABLE.h, 0) || this.collides(u, rotRect, [], false))) { res.ok = false; res.a = u.a; res.reason = 'No room to pivot here'; return res; }
+    if (pivotOnly || left <= 0) { res.ok = pivots > 0 || pivotOnly; res.x = u.x; res.y = u.y; if (!res.ok) res.reason = pivots === 0 && pc > 0 ? 'Not enough movement to pivot' : 'Already facing that way'; return res; }
     var f = G.fwd(a), target = G.toLocal({ x: u.x, y: u.y, a: a }, p).y; // forward distance to reach p
     var dist = G.clamp(target, 0, left), step = 0.25, best = 0, inDiff = u.inDifficultAtStart, extra = 0;
     var flying = isFlying(u), scout = hasProp(u, 'Scout');
@@ -780,7 +817,7 @@
     if (!w) { res.reason = 'No ranged weapon'; return res; }
     if (u.fleeing) { res.reason = 'Fleeing'; return res; }
     if (this.isEngaged(u)) { res.reason = 'Engaged in combat'; return res; }
-    if (commander ? u.usedSpell : u.usedRanged) { res.reason = 'Already used this activation'; return res; }
+    if (commander ? u.usedSpell : (u.usedRanged || u.usedAbility)) { res.reason = 'Already used an ability or ranged attack this activation'; return res; }
     if (t.side === u.side || !unitAlive(t)) { res.reason = 'Not an enemy'; return res; }
     if (this.isEngaged(t)) { res.reason = 'Target is engaged in combat'; return res; }
     if (hasEffect(t, 'shrouded')) { res.reason = 'Target is Shrouded'; return res; }
@@ -850,7 +887,7 @@
     if (wounds > 0 && t.commander && t.commander.alive) {
       var c = t.commander;
       while (wounds > 0 && c.alive) {
-        var d2 = (opts.lethal && c.maxWounds > 1) ? 2 : 1;
+        var d2 = (opts.lethal && c.maxWounds > 1) ? Math.min(2, c.maxWounds - c.wounds) : 1;
         c.wounds += d2; res.wounds += d2; res.commanderWounds += d2; wounds--;
         if (c.wounds >= c.maxWounds) { c.alive = false; res.commanderKilled = true; this.addLog(c.name + ' has been slain!', 'kill'); this.emit({ type: 'commanderDeath', uid: t.uid }); }
       }
@@ -915,7 +952,14 @@
         last = r;
       }
       if (last && (escaped || !this.collides(u, last, [], false))) { final = last; final.escaped = escaped; placed = true; }
-      else if (last && i === tried.length - 1) { final = last; final.escaped = escaped; placed = true; }
+    }
+    if (!placed) {
+      // every heading collides at full distance: take the first heading and slide back until clear
+      var f0 = G.fwd(ang);
+      for (var s0 = dist; s0 >= 0 && !placed; s0 -= 0.5) {
+        var r0 = { x: from.x + f0.x * s0, y: from.y + f0.y * s0, a: ang, w: u.w, d: u.d };
+        if (G.rectInsideTable(r0, TABLE.w, TABLE.h, 0) && !this.collides(u, r0, [], false)) { final = r0; final.escaped = false; placed = true; }
+      }
     }
     if (!final) final = { x: from.x, y: from.y, a: ang, escaped: false };
     u.x = final.x; u.y = final.y; u.a = final.a;
@@ -959,7 +1003,7 @@
     var lvl = u.commander.caster + itemBonus(u, 'casting'), dice = R.dice(2), total = R.sum(dice) + lvl, ok = total >= sp.cv;
     var miscast = dice[0] === 1 && dice[1] === 1;
     var txt = u.commander.name + ' casts ' + spellName + ' (needs ' + sp.cv + '): rolls ' + dice.join('+') + ' + ' + lvl + ' = ' + total + ' — ';
-    if (miscast) { txt += 'MISCAST! The caster is wracked by the winds of magic.'; this.addLog(txt, 'fail', { dice: dice }); this.applyWounds(u, 1, {}); this.emit({ type: 'spell', from: u.uid, to: t.uid, spell: spellName, ok: false }); return { ok: true, cast: false, miscast: true }; }
+    if (miscast) { txt += 'MISCAST! The caster is wracked by the winds of magic.'; this.addLog(txt, 'fail', { dice: dice }); this.woundCommander(u, 1); this.emit({ type: 'spell', from: u.uid, to: t.uid, spell: spellName, ok: false }); return { ok: true, cast: false, miscast: true }; }
     if (!ok) { txt += 'the spell fizzles.'; this.addLog(txt, 'fail', { dice: dice }); this.emit({ type: 'spell', from: u.uid, to: t.uid, spell: spellName, ok: false }); return { ok: true, cast: false }; }
     txt += 'success!'; this.addLog(txt, 'spell', { dice: dice });
     var result = { ok: true, cast: true };
@@ -982,6 +1026,11 @@
     this.emit({ type: 'spell', from: u.uid, to: t.uid, spell: spellName, ok: true });
     return result;
   };
+  BP.woundCommander = function (u, n) {
+    var c = u.commander; if (!c || !c.alive) return;
+    c.wounds += n;
+    if (c.wounds >= c.maxWounds) { c.alive = false; this.addLog(c.name + ' has been slain!', 'kill'); this.emit({ type: 'commanderDeath', uid: u.uid }); if (!unitAlive(u)) this.destroyUnit(u, 'destroyed'); }
+  };
   BP.healUnit = function (t, wounds) {
     var W = t.base.wd;
     while (wounds > 0) {
@@ -989,7 +1038,13 @@
       if (t.models < t.maxModels) { t.models++; wounds -= 1; t.woundsOnCurrent = W - 1; if (t.woundsOnCurrent < 0) t.woundsOnCurrent = 0; if (W === 1) t.woundsOnCurrent = 0; continue; }
       break;
     }
+    var before = { x: t.x, y: t.y, d: t.d, models: t.models };
     refreshFootprint(t, true);
+    if (t.d > before.d + 1e-9 && this.collides(t, t, [], false)) {
+      // the deeper block would overlap something: shift it forward by the growth if possible, else keep the old rear
+      var f = G.fwd(t.a), grow = t.d - before.d, r2 = { x: t.x + f.x * grow, y: t.y + f.y * grow, a: t.a, w: t.w, d: t.d };
+      if (G.rectInsideTable(r2, TABLE.w, TABLE.h, 0) && !this.collides(t, r2, [], false)) { t.x = r2.x; t.y = r2.y; }
+    }
   };
   BP.summonUnit = function (caster, unitId, count) {
     var nu = makeUnit(caster.side, caster.faction, { id: unitId, models: count, cost: 0 });
@@ -1068,7 +1123,6 @@
       var dl = u.x, dr = TABLE.w - u.x, dt = u.y, db = TABLE.h - u.y, m = Math.min(dl, dr, dt, db), ang = m === dl ? Math.PI : m === dr ? 0 : m === dt ? -Math.PI / 2 : Math.PI / 2;
       self.flightMove(u, ang, 'keeps fleeing');
     });
-    this.updateObjectives();
     this.beginCombatPhase();
   };
 
@@ -1130,14 +1184,16 @@
     }
     if (u.commander && u.commander.alive) {
       var cs = effCmdStats(u, this), cw = SOVL.WEAPONS[u.commander.weapon] || SOVL.WEAPONS.Unarmed, cpow = cs.pw + (charged ? (cw.chargePow || 0) : 0);
-      var c1 = cons.filter(function (c) { return c.side !== 'rear'; })[0] || cons[0];
+      var c1 = cons.filter(function (c) { return c.side !== 'rear'; })[0];
       if (c1) out.push({ target: c1.enemy, dice: cs.at, skill: cs.sk, power: cpow, halberd: !!cw.halberd, lethal: cs.lethal, rerollMiss: rerollMiss || hasEffect(u, 'rerollMiss'), who: u.commander.name, commander: true });
     }
     return out;
   };
   BP.resolveCombat = function () {
     var self = this, reports = [];
-    var groups = this.engagements();
+    var groups = this.engagements(), inCombat = {};
+    groups.forEach(function (g) { g.forEach(function (u) { inCombat[u.uid] = true; }); });
+    this.units.forEach(function (u) { if (!inCombat[u.uid]) u.combatRounds = 0; });
     groups.forEach(function (group) {
       var report = { units: group.map(function (u) { return u.uid; }), rounds: [], score: [0, 0], breakTests: [], names: group.map(function (u) { return u.name; }) };
       self.addLog('Engagement: ' + group.map(function (u) { return u.name; }).join(' vs ') + '.', 'combat');
@@ -1218,6 +1274,7 @@
       if (ae.powerUntil != null && ae.powerUntil <= this.turn) { delete ae.power; delete ae.powerUntil; }
       if (ae.goblinsUntil != null && ae.goblinsUntil <= this.turn) { delete ae.goblinsFearless; delete ae.goblinsUntil; }
     }
+    this.updateObjectives();
     this.emit({ type: 'endTurn', turn: this.turn });
     // victory check: all of one side destroyed or fleeing
     var stand = [false, false];
@@ -1229,7 +1286,7 @@
     if (this.scenario !== 'objectives' || this.turn <= 1) return;
     var self = this, control = [0, 0];
     this.objectives.forEach(function (o) {
-      var near = [false, false];
+      var near = [false, false]; o.contested = false;
       self.units.forEach(function (u) { if (u.fleeing || isSingle(u.type) || commanderOnly(u)) return; if (G.dist(u, o) <= 5 + Math.max(u.w, u.d) / 2) near[u.side] = true; });
       if (near[0] && !near[1]) o.owner = 0; else if (near[1] && !near[0]) o.owner = 1; else if (near[0] && near[1]) o.contested = true;
       if (o.owner != null) control[o.owner]++;
