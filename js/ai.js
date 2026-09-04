@@ -55,6 +55,9 @@
     score += (us.ds + rb - 9) * 0.15;
     if (u.commander && u.commander.alive && dealt < taken) score -= 1.5;
     score += (this.aggression - 0.5) * 2;
+    // time pressure: an army that never engages cannot win on points
+    if (this.b.turn >= 5) score += 1.0;
+    if (this.b.armyStrength(u.side) >= this.b.armyStrength(t.side) * 1.2) score += 0.8;
     return score;
   };
 
@@ -211,10 +214,12 @@
     }
     // melee: approach, preferring to stop outside enemy charge range unless we can charge next turn
     var dist = G.dist(G.frontCenter(u), enemy), ourRange = b.chargeRange(u), theirRange = b.chargeRange(enemy);
-    var late = b.turn >= 4 || this.aggression > 0.7;
+    var strength = b.armyStrength(this.side), theirs = b.armyStrength(1 - this.side);
+    var pressing = strength >= theirs * 0.9 || b.turn >= 3 || this.aggression > 0.7;
     var moveMax = u.moveLeft;
     var stopAt = null;
-    if (!late && theirRange >= ourRange && dist - moveMax < theirRange + 1 && dist > theirRange + 1) stopAt = theirRange + 1.5;
+    // only hang back while clearly weaker, early in the battle, against a faster enemy
+    if (!pressing && theirRange >= ourRange && dist - moveMax < theirRange + 1 && dist > theirRange + 1) stopAt = theirRange + 1.5;
     // flank seeking: if enemy is engaged with a friend, try to aim at its flank
     var target = { x: enemy.x, y: enemy.y };
     if (b.isEngaged(enemy)) {

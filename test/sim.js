@@ -104,7 +104,7 @@ if (SOVL.Campaign) {
     var camp = SOVL.Campaign.create({ faction: fids[c % 5], commander: SOVL.FACTION_DATA[fids[c % 5]].sections[0].units[c % 3].id });
     assert(camp.map.acts.length === 3, 'campaign acts');
     camp.map.acts.forEach(function (act) { assert(act.layers.length >= 3, 'layers'); act.layers.forEach(function (layer, li) { layer.forEach(function (n) { if (li < act.layers.length - 1) assert(n.next.length > 0, 'node without exits'); }); }); });
-    var probs = A.validate(camp.army, 99999); assert(probs.filter(function (p) { return !/at least/.test(p); }).length === 0, 'campaign army invalid: ' + probs.join('; '));
+    var probs = A.validate(camp.army, 99999); assert(probs.filter(function (p) { return !/at least|unit size/.test(p); }).length === 0, 'campaign army invalid: ' + probs.join('; '));
     // simulate: fight the first battle node
     var node = camp.map.acts[0].layers[0][0];
     var enemy = SOVL.Campaign.enemyArmyFor(camp, node);

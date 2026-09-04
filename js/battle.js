@@ -206,6 +206,7 @@
     this.scenario = opts.scenario || 'pitched'; this.objectives = []; this.objectiveScore = [0, 0];
     this.activeUnit = null; this.winner = null; this.result = null; this.deployed = [false, false];
     this.names = opts.names || ['Player', 'Enemy']; this.sides = opts.sides || ['bottom', 'top'];
+    this.scoreMode = opts.scoreMode || 'points'; // 'points' or 'ratio' (share of enemy army value destroyed)
     if (opts.seed != null) R.setSeed(opts.seed);
     for (var s = 0; s < 2; s++) this.buildArmy(s, opts.armies[s]);
     // disambiguate duplicate unit names within a side
@@ -1247,14 +1248,19 @@
     });
     return pts + this.objectiveScore[side];
   };
+  BP.armyValue = function (side) { return this.units.concat(this.dead).filter(function (u) { return u.side === side; }).reduce(function (s, u) { return s + (u.cost || 0) + (u.commander ? (u.commander.costPts || 0) : 0); }, 0); };
   BP.endGame = function (why) {
     this.phase = 'end';
     var s0 = this.scoreFor(0), s1 = this.scoreFor(1), winner = null;
-    if (why === 'rout0') winner = 1; else if (why === 'rout1') winner = 0; else if (s0 !== s1) winner = s0 > s1 ? 0 : 1;
-    this.result = { why: why, score: [s0, s1], winner: winner, turn: this.turn };
+    var v0 = Math.max(1, this.armyValue(0)), v1 = Math.max(1, this.armyValue(1));
+    var p0 = Math.round(100 * (s0 - this.objectiveScore[0]) / v1) + this.objectiveScore[0] / 10, p1 = Math.round(100 * (s1 - this.objectiveScore[1]) / v0) + this.objectiveScore[1] / 10;
+    if (why === 'rout0') winner = 1; else if (why === 'rout1') winner = 0;
+    else if (this.scoreMode === 'ratio') { if (p0 !== p1) winner = p0 > p1 ? 0 : 1; }
+    else if (s0 !== s1) winner = s0 > s1 ? 0 : 1;
+    this.result = { why: why, score: [s0, s1], pct: [p0, p1], winner: winner, turn: this.turn };
     this.winner = winner;
     this.addLog(why === 'turns' ? 'The battle ends after ' + this.maxTurns + ' turns.' : why === 'mutual' ? 'Both armies have broken.' : (why === 'rout0' ? this.names[0] : this.names[1]) + '\'s army is destroyed or fleeing!', 'phase');
-    this.addLog('Final score — ' + this.names[0] + ': ' + s0 + ', ' + this.names[1] + ': ' + s1 + '. ' + (winner == null ? 'A draw.' : this.names[winner] + ' wins!'), 'phase');
+    this.addLog('Final score — ' + this.names[0] + ': ' + s0 + (this.scoreMode === 'ratio' ? ' (' + p0 + '% of the enemy army)' : '') + ', ' + this.names[1] + ': ' + s1 + (this.scoreMode === 'ratio' ? ' (' + p1 + '%)' : '') + '. ' + (winner == null ? 'A draw.' : this.names[winner] + ' wins!'), 'phase');
     this.emit({ type: 'end', result: this.result });
   };
   BP.armyStrength = function (side) { return this.unitsOf(side).reduce(function (s, u) { return s + (u.fleeing ? 0 : u.models * (u.base.wd) + (u.commander && u.commander.alive ? 3 : 0)); }, 0); };

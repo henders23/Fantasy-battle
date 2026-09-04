@@ -77,12 +77,12 @@
     var pts = Math.round(actDef.pts[0] + (actDef.pts[1] - actDef.pts[0]) * t);
     // scale a little with the player's own strength so the run stays fair
     var own = A.armyCost(camp.army);
-    pts = Math.round(pts * 0.6 + Math.min(own, pts * 1.6) * 0.4);
+    pts = Math.round(pts * 0.65 + Math.min(own * 0.85, pts * 1.5) * 0.35);
     var type = kind || node.type, fids = Object.keys(SOVL.FACTION_DATA), fid;
     if (type === 'small') { pts = Math.round(pts * 0.6); }
     if (type === 'undead') { fid = 'dead_nations'; pts = Math.round(pts * 0.9); }
     if (type === 'elite') pts = Math.round(pts * actDef.elitePts);
-    if (type === 'boss') { pts = Math.max(actDef.boss.pts, Math.round(own * 1.1)); fid = camp.act === 2 ? 'dead_nations' : null; }
+    if (type === 'boss') { pts = Math.max(actDef.boss.pts, Math.round(own * 1.0)); fid = camp.act === 2 ? 'dead_nations' : null; }
     if (!fid) { var others = fids.filter(function (f) { return f !== camp.faction; }); fid = R.rng() < 0.85 ? R.pick(others) : camp.faction; }
     var army = A.randomArmy({ faction: fid, pts: Math.max(150, pts), boss: type === 'boss', name: type === 'boss' ? actDef.boss.name : undefined });
     army.pts = pts; army.kind = type;
@@ -97,20 +97,20 @@
 
   // Apply a battle result to the campaign army. battle: finished Battle; playerSide: 0
   C.applyBattleResult = function (camp, battle, node, enemyArmy) {
-    var won = battle.result.winner === 0, refs = {}, cmdAlive = true;
+    var won = battle.result.winner === 0, draw = battle.result.winner == null && battle.result.why !== 'mutual', refs = {}, cmdAlive = true;
     battle.units.concat(battle.dead).filter(function (u) { return u.side === 0; }).forEach(function (u) {
       if (u.campaignRef) refs[u.campaignRef] = u;
       if (u.commander && !u.commander.alive) cmdAlive = false;
     });
     camp.battles++;
     var lines = [];
-    if (!won || !cmdAlive) {
+    if ((!won && !draw) || !cmdAlive) {
       camp.over = true;
       lines.push(cmdAlive ? 'The battle is lost. The trail ends here.' : camp.commanderName + ' has fallen. The trail ends here.');
       camp.log = camp.log.concat(lines);
       return { won: false, lines: lines };
     }
-    camp.wins++;
+    if (won) camp.wins++; else lines.push('A bloody stalemate. Both armies withdraw; there is no plunder, but the trail goes on.');
     // casualties: half of lost models return (wounded); destroyed units are gone; routed units return at half
     var newEntries = [];
     camp.army.entries.forEach(function (e) {
@@ -134,11 +134,12 @@
       newEntries.push(e);
     });
     camp.army.entries = newEntries;
-    var gold = C.goldReward(camp, enemyArmy, node);
-    camp.gold += gold; lines.push('Plunder: +' + gold + ' gold.');
+    var gold = won ? C.goldReward(camp, enemyArmy, node) : 0;
+    if (gold) { camp.gold += gold; lines.push('Plunder: +' + gold + ' gold.'); }
     battle.dead.filter(function (u) { return u.side === 1; }).forEach(function (u) { camp.kills += u.killed; });
+    if (!won && node && node.type === 'boss') { camp.over = true; lines.push('A stalemate is not enough against ' + (SOVL.CAMPAIGN.acts[camp.act].boss.name) + '. The trail ends here.'); camp.log = camp.log.concat(lines); return { won: false, lines: lines }; }
     camp.log = camp.log.concat(lines);
-    return { won: true, lines: lines, gold: gold };
+    return { won: true, draw: draw, lines: lines, gold: gold };
   };
 
   C.moveTo = function (camp, idx) {

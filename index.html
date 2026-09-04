@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SOVL — Fantasy Warfare (browser replica)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/sovl.css">
+</head>
+<body>
+
+<div id="screen-menu" class="screen active">
+  <h1>SOVL</h1>
+  <div class="sub">FANTASY WARFARE — BROWSER REPLICA</div>
+  <div class="menu">
+    <button class="primary" id="btn-campaign">New Campaign — Trail of Death</button>
+    <button id="btn-continue" style="display:none">Continue Campaign</button>
+    <button id="btn-skirmish">Skirmish Battle</button>
+    <button id="btn-rules">How to Play</button>
+  </div>
+  <div class="credit">An unofficial fan re-implementation of the open SOVL tabletop ruleset (SOVL: Fantasy Warfare by Dalen Studios). All art here is original; rules text follows the public rules document. Everything runs locally in your browser.</div>
+</div>
+
+<div id="screen-setup" class="screen"><div class="page">
+  <div class="topbar"><h2 id="setup-title">Skirmish</h2><div class="spacer"></div><button id="setup-back">← Menu</button></div>
+  <div class="body" style="flex-direction:column; overflow:auto">
+    <h3>Choose your faction</h3>
+    <div class="factions" id="setup-factions"></div>
+    <div id="setup-skirmish-opts" class="row" style="gap:18px">
+      <label>Army size <select id="setup-size"></select></label>
+      <label>Opponent <select id="setup-enemy"></select></label>
+      <label>Scenario <select id="setup-scenario"><option value="pitched">Pitched Battle</option><option value="objectives">Scoring Objectives</option></select></label>
+      <label>AI aggression <select id="setup-aggr"><option value="0.35">Cautious</option><option value="0.5" selected>Balanced</option><option value="0.8">Reckless</option></select></label>
+    </div>
+    <div id="setup-campaign-opts" class="col" style="display:none">
+      <h3>Choose your commander</h3>
+      <div id="setup-commanders" class="row" style="align-items:stretch"></div>
+      <div class="row"><label>Commander's name <input type="text" id="setup-name" maxlength="18"></label></div>
+      <p class="muted" style="max-width:720px;line-height:1.6">You begin with your commander, a small retinue and two supporting units, and 120 gold. Fight along the trail, recruit and upgrade, survive three acts and defeat the Deathless Host. Losing a battle, or your commander, ends the run.</p>
+    </div>
+    <div class="row"><button class="primary" id="setup-next">Continue →</button></div>
+  </div>
+</div></div>
+
+<div id="screen-builder" class="screen"><div class="page">
+  <div class="topbar"><h2 id="builder-title">Army Builder</h2><span id="builder-points" class="accent"></span><div class="spacer"></div><button id="builder-auto">Auto-fill</button><button id="builder-clear">Clear</button><button id="builder-back">← Back</button><button class="primary" id="builder-go">To Battle →</button></div>
+  <div class="body">
+    <div class="panel" style="flex:1" id="builder-catalog"></div>
+    <div class="panel" style="width:460px" id="builder-list"></div>
+  </div>
+</div></div>
+
+<div id="screen-battle" class="screen">
+  <div id="battle-top">
+    <span class="phase" id="battle-phase">DEPLOYMENT</span>
+    <span id="battle-turn" class="muted"></span>
+    <span class="who" id="battle-who"></span>
+    <div class="spacer"></div>
+    <span id="battle-score" class="muted"></span>
+    <button id="battle-menu" class="small">Menu</button>
+  </div>
+  <div id="battle-main">
+    <div id="battle-left">
+      <div class="unitinfo" id="battle-unitinfo"></div>
+      <div class="actions" id="battle-actions"></div>
+    </div>
+    <div id="battle-canvas-wrap">
+      <canvas id="battle-canvas"></canvas>
+      <div id="battle-toggles"><button class="small" id="tog-arcs" title="Show charge arcs (X)">Arcs</button><button class="small" id="tog-ranges" title="Show weapon ranges (Shift+X)">Ranges</button><button class="small" id="tog-zoom">Zoom</button></div>
+      <div id="battle-hint"></div>
+    </div>
+    <div id="battle-right">
+      <div id="deploy-tray" style="display:none"></div>
+      <div id="battle-log"></div>
+    </div>
+  </div>
+</div>
+
+<div id="screen-campaign" class="screen"><div class="page">
+  <div class="topbar"><h2 id="camp-title">Trail of Death</h2><span id="camp-act" class="muted"></span><div class="spacer"></div><span>Gold: <span class="gold" id="camp-gold"></span></span><button id="camp-menu">Menu</button></div>
+  <div class="body">
+    <div id="camp-map"></div>
+    <div id="camp-side">
+      <div class="panel" id="camp-roster" style="flex:1"></div>
+      <div class="panel" id="camp-log" style="height:150px;font-size:11px;line-height:1.5"></div>
+    </div>
+  </div>
+</div></div>
+
+<div id="screen-rules" class="screen"><div class="page">
+  <div class="topbar"><h2>How to Play</h2><div class="spacer"></div><button id="rules-back">← Back</button></div>
+  <div class="panel rules" id="rules-body" style="flex:1"></div>
+</div></div>
+
+<div id="modal" class="modal-bg"><div class="modal" id="modal-body"></div></div>
+<div id="tip" class="tip"></div>
+
+<script src="js/data.js"></script>
+<script src="js/data_units.js"></script>
+<script src="js/geom.js"></script>
+<script src="js/rules.js"></script>
+<script src="js/battle.js"></script>
+<script src="js/army.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/campaign.js"></script>
+<script src="js/render.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>

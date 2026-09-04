@@ -177,11 +177,11 @@ SOVL.COMMANDER_NAMES = {
 
 // ---- Campaign: Trail of Death ----
 SOVL.CAMPAIGN = {
-  startGold: 120,
+  startGold: 150,
   acts: [
-    { name: 'Act I — The Borderlands', layers: 6, pts: [220, 420], elitePts: 1.35, boss: { name: 'The Warlord of the Marches', pts: 650 } },
-    { name: 'Act II — The Blackwater', layers: 7, pts: [500, 800], elitePts: 1.35, boss: { name: 'The Drowned Court', pts: 1000 } },
-    { name: 'Act III — The Trail\'s End', layers: 7, pts: [850, 1200], elitePts: 1.3, boss: { name: 'The Deathless Host', pts: 1500, final: true } }
+    { name: 'Act I — The Borderlands', layers: 6, pts: [170, 340], elitePts: 1.3, boss: { name: 'The Warlord of the Marches', pts: 520 } },
+    { name: 'Act II — The Blackwater', layers: 7, pts: [420, 700], elitePts: 1.3, boss: { name: 'The Drowned Court', pts: 900 } },
+    { name: 'Act III — The Trail\'s End', layers: 7, pts: [750, 1100], elitePts: 1.25, boss: { name: 'The Deathless Host', pts: 1400, final: true } }
   ],
   // veterancy thresholds (battles survived)
   veteran: [
