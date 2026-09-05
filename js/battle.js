@@ -207,6 +207,9 @@
     this.activeUnit = null; this.winner = null; this.result = null; this.deployed = [false, false];
     this.names = opts.names || ['Player', 'Enemy']; this.sides = opts.sides || ['bottom', 'top'];
     this.scoreMode = opts.scoreMode || 'points'; // 'points' or 'ratio' (share of enemy army value destroyed)
+    // The browser pauses at each melee so the player can choose an engagement.
+    // Headless simulations retain the original automatic resolution by default.
+    this.interactiveCombat = !!opts.interactiveCombat; this.pendingCombats = [];
     if (opts.seed != null) R.setSeed(opts.seed);
     for (var s = 0; s < 2; s++) this.buildArmy(s, opts.armies[s]);
     // disambiguate duplicate unit names within a side
@@ -1131,8 +1134,34 @@
     this.phase = 'combat'; this.activeUnit = null;
     this.addLog('— Turn ' + this.turn + ': Combat Phase —', 'phase');
     this.emit({ type: 'phase', phase: 'combat', turn: this.turn });
-    this.combatReports = this.resolveCombat();
+    if (this.interactiveCombat) {
+      this.combatReports = [];
+      this.pendingCombats = this.engagements().map(function (g) { return g.map(function (u) { return u.uid; }); });
+      var inCombat = {};
+      this.pendingCombats.forEach(function (g) { g.forEach(function (id) { inCombat[id] = true; }); });
+      this.units.forEach(function (u) { if (!inCombat[u.uid]) u.combatRounds = 0; });
+      if (!this.pendingCombats.length) this.finishCombatPhase();
+    } else {
+      this.combatReports = this.resolveCombat();
+      this.endTurn();
+    }
+  };
+  BP.resolveEngagement = function (uid) {
+    if (!this.interactiveCombat || this.phase !== 'combat') return { ok: false, reason: 'Not choosing a combat.' };
+    var index = this.pendingCombats.findIndex(function (g) { return g.indexOf(uid) >= 0; });
+    if (index < 0) return { ok: false, reason: 'That engagement has already fought.' };
+    var self = this, ids = this.pendingCombats.splice(index, 1)[0];
+    var group = ids.map(function (id) { return self.unit(id); }).filter(Boolean);
+    var reports = group.length > 1 ? this.resolveCombat([group]) : [];
+    this.combatReports = this.combatReports.concat(reports);
+    this.emit({ type: 'engagementResolved', report: reports[0] || null, remaining: this.pendingCombats.length });
+    return { ok: true, report: reports[0] || null };
+  };
+  BP.finishCombatPhase = function () {
+    if (this.phase !== 'combat' || this.pendingCombats.length) return false;
+    if (this.interactiveCombat) this.contacts.forEach(function (c) { c.age++; });
     this.endTurn();
+    return true;
   };
   BP.engagements = function () {
     // connected components of contacts
@@ -1189,13 +1218,13 @@
     }
     return out;
   };
-  BP.resolveCombat = function () {
+  BP.resolveCombat = function (selectedGroups) {
     var self = this, reports = [];
-    var groups = this.engagements(), inCombat = {};
+    var groups = selectedGroups || this.engagements(), inCombat = {};
     groups.forEach(function (g) { g.forEach(function (u) { inCombat[u.uid] = true; }); });
-    this.units.forEach(function (u) { if (!inCombat[u.uid]) u.combatRounds = 0; });
+    if (!selectedGroups) this.units.forEach(function (u) { if (!inCombat[u.uid]) u.combatRounds = 0; });
     groups.forEach(function (group) {
-      var report = { units: group.map(function (u) { return u.uid; }), rounds: [], score: [0, 0], breakTests: [], names: group.map(function (u) { return u.name; }) };
+      var report = { turn: self.turn, units: group.map(function (u) { return u.uid; }), rounds: [], score: [0, 0], breakTests: [], names: group.map(function (u) { return u.name; }) };
       self.addLog('Engagement: ' + group.map(function (u) { return u.name; }).join(' vs ') + '.', 'combat');
       // 1. everyone rolls (simultaneous): compute all attacks before applying wounds
       var pending = [];
@@ -1253,7 +1282,7 @@
       });
       reports.push(report);
     });
-    this.contacts.forEach(function (c) { c.age++; });
+    if (!selectedGroups) this.contacts.forEach(function (c) { c.age++; });
     return reports;
   };
 

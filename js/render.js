@@ -42,11 +42,14 @@
     this.resize();
     var ctx = this.ctx, dpr = this.dpr, dt = Math.min(0.05, (now - this.lastT) / 1000 || 0.016); this.lastT = now;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = '#1a1c17'; ctx.fillRect(0, 0, this.cw, this.ch);
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    ctx.fillStyle = '#0b1420'; ctx.fillRect(0, 0, this.cw, this.ch);
     if (!this.grass) this.makeGrass();
     ctx.save(); ctx.translate(this.ox, this.oy); ctx.scale(this.scale, this.scale);
     // table
-    ctx.save(); ctx.scale(1 / 12, 1 / 12); ctx.fillStyle = this.grass; ctx.fillRect(0, 0, TABLE.w * 12, TABLE.h * 12); ctx.restore();
+    if (this.groundImage && this.groundImage.complete && this.groundImage.naturalWidth) ctx.drawImage(this.groundImage, 0, 0, TABLE.w, TABLE.h);
+    else { ctx.save(); ctx.scale(1 / 12, 1 / 12); ctx.fillStyle = this.grass; ctx.fillRect(0, 0, TABLE.w * 12, TABLE.h * 12); ctx.restore(); }
+    ctx.fillStyle = 'rgba(11,29,36,0.15)'; ctx.fillRect(0, 0, TABLE.w, TABLE.h);
     // deployment zones
     if (battle) {
       for (var s = 0; s < 2; s++) {
@@ -71,10 +74,11 @@
       ctx.fillStyle = '#e8d27a'; ctx.beginPath(); ctx.moveTo(o.x, o.y - 1); ctx.lineTo(o.x + 0.8, o.y + 0.6); ctx.lineTo(o.x - 0.8, o.y + 0.6); ctx.closePath(); ctx.fill();
     });
     // terrain
-    battle.terrain.forEach(function (t) { drawTerrain(ctx, t); });
+    battle.terrain.forEach(function (t) { if (!this.drawTerrainSprite || !this.drawTerrainSprite(ctx, t)) drawTerrain(ctx, t); }, this);
     var self = this;
     // ranges / arcs for the selected unit
     var sel = st.selected ? battle.unit(st.selected) : null;
+    if (this.drawTacticalOverlays) this.drawTacticalOverlays(battle, st, now);
     if (sel && (this.showArcs || st.mode === 'charge' || battle.phase === 'charge')) this.drawArc(sel, battle.chargeRange(sel), 'rgba(255,220,80,0.12)', 'rgba(255,220,80,0.6)');
     if (sel && (this.showRanges || st.mode === 'shoot') && sel.ranged && SOVL.RANGED[sel.ranged]) this.drawArc(sel, SOVL.RANGED[sel.ranged].range, 'rgba(120,200,255,0.08)', 'rgba(120,200,255,0.5)', true);
     if (sel && st.mode === 'spell' && st.spell) { var sp = SOVL.SPELLS[st.spell]; ctx.beginPath(); ctx.arc(sel.x, sel.y, sp.range || 1, 0, Math.PI * 2); ctx.fillStyle = 'rgba(200,120,255,0.08)'; ctx.fill(); ctx.strokeStyle = 'rgba(200,120,255,0.5)'; ctx.lineWidth = 0.1; ctx.stroke(); }
@@ -89,9 +93,9 @@
     // units: animate render positions
     battle.units.forEach(function (u) {
       if (u._rx == null) { u._rx = u.x; u._ry = u.y; u._ra = u.a; }
-      var k = 1 - Math.pow(0.001, dt);
+      var k = this.reduceMotion ? 1 : 1 - Math.pow(0.001, dt);
       u._rx += (u.x - u._rx) * k; u._ry += (u.y - u._ry) * k; u._ra += G.angleDiff(u._ra, u.a) * k;
-    });
+    }, this);
     var order = battle.units.slice().sort(function (a, b) { return (a.uid === st.selected ? 1 : 0) - (b.uid === st.selected ? 1 : 0); });
     order.forEach(function (u) { self.drawUnit(u, battle, st, now); });
     // move preview ghost
@@ -155,8 +159,11 @@
         ctx.save(); ctx.translate(cx, cy); ctx.rotate(r.a + Math.PI / 2);
         var isFront = j === 0;
         ctx.fillStyle = isFront ? color : shade(color, -0.18);
+        if (this.unitAtlas && this.unitAtlas.complete && this.unitAtlas.naturalWidth) ctx.globalAlpha = 0.25;
         roundRect(ctx, -bw / 2 + 0.03, -bd / 2 + 0.03, bw - 0.06, bd - 0.06, 0.08); ctx.fill();
         ctx.strokeStyle = 'rgba(0,0,0,0.45)'; ctx.lineWidth = 0.03; ctx.stroke();
+        ctx.globalAlpha = 1;
+        if (!this.drawModelSprite || !this.drawModelSprite(ctx, u, bw, bd)) {
         // figure: a dot body + weapon tick
         var figR = Math.min(bw, bd) * 0.22;
         ctx.fillStyle = shade(color, 0.35); ctx.beginPath(); ctx.arc(0, 0, figR, 0, Math.PI * 2); ctx.fill();
@@ -164,6 +171,7 @@
         if (u.ranged && !single) { ctx.strokeStyle = '#f5e9c8'; ctx.lineWidth = 0.035; ctx.beginPath(); ctx.arc(figR * 0.9, 0, figR * 0.9, -Math.PI * 0.6, Math.PI * 0.6); ctx.stroke(); }
         else if (!single) { ctx.strokeStyle = '#e8e8e8'; ctx.lineWidth = 0.04; ctx.beginPath(); ctx.moveTo(figR * 0.8, figR * 0.6); ctx.lineTo(figR * 0.8, -figR * 1.6); ctx.stroke(); }
         if (single) drawMonsterGlyph(ctx, u, bw, bd, info);
+        }
         // commander marker in the middle of the front rank
         if (u.commander && u.commander.alive && isFront && k === Math.floor(files / 2)) {
           ctx.fillStyle = '#ffd24a'; drawStar(ctx, 0, 0, Math.min(bw, bd) * 0.32); ctx.strokeStyle = '#3a2a00'; ctx.lineWidth = 0.03; ctx.stroke();
@@ -188,7 +196,7 @@
     if (u.fleeing) { ctx.fillStyle = '#fff'; ctx.font = '0.8px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('⚑', r.x, r.y + 0.3); ctx.textAlign = 'left'; }
     if (u.activated && battle.phase === 'strategic' && mine && battle.activeUnit !== u.uid) { ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.moveTo(c[0].x, c[0].y); for (var q = 1; q < 4; q++) ctx.lineTo(c[q].x, c[q].y); ctx.closePath(); ctx.fill(); }
     // label
-    if (this.scale > 9 || selected || hovered) {
+    if (!this.drawRegimentLabels && (this.scale > 9 || selected || hovered)) {
       var label = (SOVL.commanderOnly(u) ? u.commander.name : u.name) + (u.models > 0 && !single ? ' ×' + u.models : ''), lp = { x: r.x, y: r.y };
       ctx.font = '0.55px "IBM Plex Mono", monospace'; ctx.textAlign = 'center';
       var tw = ctx.measureText(label).width;

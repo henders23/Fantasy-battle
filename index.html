@@ -9,19 +9,28 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/sovl.css">
+<link rel="stylesheet" href="css/experience.css">
+<meta name="description" content="Command five fantasy armies in an interactive rank-and-flank wargame. Fight a skirmish or lead your warband through the Trail of Death.">
 </head>
 <body>
 
 <div id="screen-menu" class="screen active">
+  <div class="menu-art" aria-hidden="true"></div>
+  <div class="menu-content">
+  <div class="eyebrow">A RANK-AND-FLANK WARGAME</div>
   <h1>SOVL</h1>
-  <div class="sub">FANTASY WARFARE — BROWSER REPLICA</div>
+  <div class="sub">FANTASY WARFARE</div>
+  <p class="menu-intro">The field is yours to command.</p>
   <div class="menu">
-    <button class="primary" id="btn-campaign">New Campaign — Trail of Death</button>
+    <button class="primary" id="btn-quick"><span>Take the field</span><small>A ready-made army. Your first battle.</small><b aria-hidden="true">↗</b></button>
     <button id="btn-continue" style="display:none">Continue Campaign</button>
-    <button id="btn-skirmish">Skirmish Battle</button>
-    <button id="btn-rules">How to Play</button>
+    <button id="btn-campaign"><span>Trail of Death</span><small>Lead a warband through three acts.</small></button>
+    <button id="btn-skirmish"><span>Custom battle</span><small>Choose your faction and build an army.</small></button>
+    <div class="menu-utilities"><button id="btn-rules">Field manual</button><button id="btn-settings">Settings</button></div>
   </div>
-  <div class="credit">An unofficial fan re-implementation of the open SOVL tabletop ruleset (SOVL: Fantasy Warfare by Dalen Studios). All art here is original; rules text follows the public rules document. Everything runs locally in your browser.</div>
+  </div>
+  <div class="menu-caption"><span>THE TRAIL OF DEATH</span><p>Beyond the pass, the dead are gathering.</p></div>
+  <div class="credit">Unofficial fan game · SOVL: Fantasy Warfare by Dalen Studios · Original artwork</div>
 </div>
 
 <div id="screen-setup" class="screen"><div class="page">
@@ -60,8 +69,11 @@
     <span class="who" id="battle-who"></span>
     <div class="spacer"></div>
     <span id="battle-score" class="muted"></span>
+    <button id="battle-help" class="small" aria-label="Show battle guide">Guide</button>
+    <button id="battle-settings" class="small">Settings</button>
     <button id="battle-menu" class="small">Menu</button>
   </div>
+  <div id="phase-track" aria-label="Battle phases"></div>
   <div id="battle-main">
     <div id="battle-left">
       <div class="unitinfo" id="battle-unitinfo"></div>
@@ -70,13 +82,18 @@
     <div id="battle-canvas-wrap">
       <canvas id="battle-canvas"></canvas>
       <div id="battle-toggles"><button class="small" id="tog-arcs" title="Show charge arcs (X)">Arcs</button><button class="small" id="tog-ranges" title="Show weapon ranges (Shift+X)">Ranges</button><button class="small" id="tog-zoom">Zoom</button></div>
+      <div id="phase-banner" aria-live="polite"></div>
+      <div id="target-preview"></div>
+      <div id="engagement-panel" hidden></div>
       <div id="battle-hint"></div>
     </div>
     <div id="battle-right">
+      <div class="dock-head"><span id="dock-title">Deploy your army</span><button id="close-log" class="small" aria-label="Close chronicle">×</button></div>
       <div id="deploy-tray" style="display:none"></div>
       <div id="battle-log"></div>
     </div>
   </div>
+  <div id="army-strip"><div class="army-strip-label">YOUR ARMY<span id="army-ready"></span></div><div id="battle-roster" aria-label="Your regiments"></div><button id="toggle-log">Chronicle</button></div>
 </div>
 
 <div id="screen-campaign" class="screen"><div class="page">
@@ -108,5 +125,7 @@
 <script src="js/campaign.js"></script>
 <script src="js/render.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/visuals.js"></script>
+<script src="js/experience.js"></script>
 </body>
 </html>

@@ -215,7 +215,7 @@
   UI.startBattle = function (opts) {
     if (UI.aiTimer) { clearTimeout(UI.aiTimer); UI.aiTimer = null; }
     R.setSeed(null);
-    var b = new SOVL.Battle({ armies: opts.armies, terrain: opts.terrain, scenario: opts.scenario, names: opts.names, sides: ['bottom', 'top'], scoreMode: opts.campaign ? 'ratio' : 'points' });
+    var b = new SOVL.Battle({ armies: opts.armies, terrain: opts.terrain, scenario: opts.scenario, names: opts.names, sides: ['bottom', 'top'], scoreMode: opts.campaign ? 'ratio' : 'points', interactiveCombat: true });
     UI.battle = b; UI.battleOpts = opts; UI.ai = new SOVL.AI(b, UI.aiSide, { aggression: opts.aggression || 0.5 });
     UI.sel = null; UI.inspect = null; UI.hover = null; UI.mode = 'move'; UI.targets = []; UI.preview = null; UI.busy = false; UI.deploySel = null;
     UI.ai.deploy(); // simultaneous deployment: hidden until the player is done
@@ -231,7 +231,7 @@
   };
   UI.frame = function (now) {
     if (UI.screen === 'battle' && UI.battle) {
-      var st = { playerSide: UI.playerSide, selected: UI.sel || UI.inspect, hover: UI.hover, targets: UI.targets, preview: UI.preview, mode: UI.mode, spell: UI.spell, hideSide: UI.battle.phase === 'deploy' ? UI.aiSide : null };
+      var st = { playerSide: UI.playerSide, selected: UI.sel || UI.inspect || UI.deploySel, hover: UI.hover, targets: UI.targets, preview: UI.preview, mode: UI.mode, spell: UI.spell, hideSide: UI.battle.phase === 'deploy' ? UI.aiSide : null };
       var b = UI.battle;
       if (st.hideSide != null) { var saved = b.units; b.units = b.units.filter(function (u) { return u.side !== st.hideSide; }); try { UI.renderer.draw(b, st, now); } finally { b.units = saved; } }
       else UI.renderer.draw(b, st, now);
@@ -266,6 +266,7 @@
     cv.addEventListener('click', function (e) { if (UI.dragging) return; var p = r.toWorld(e.offsetX, e.offsetY); UI.canvasClick(p, e); });
     window.addEventListener('keydown', function (e) {
       if (UI.screen !== 'battle' || UI.modalOpen) return;
+      if (/INPUT|SELECT|TEXTAREA|BUTTON/.test(e.target.tagName)) return;
       var b = UI.battle; if (!b) return;
       if (e.key === 'x' || e.key === 'X') { if (e.shiftKey) r.showRanges = !r.showRanges; else r.showArcs = !r.showArcs; UI.updateToggles(); }
       if (e.key === 'Escape') { UI.mode = 'move'; UI.targets = []; if (b.phase === 'charge') UI.sel = null; UI.preview = null; UI.updateHud(); }
@@ -331,7 +332,9 @@
   // Canvas click routing
   UI.canvasClick = function (p, e) {
     var b = UI.battle, r = UI.renderer; if (!b || UI.modalOpen) return;
+    e = e || {};
     var u = r.unitAt(b, p); if (u && b.phase === 'deploy' && u.side === UI.aiSide) u = null;
+    if (b.phase === 'combat') { if (u && UI.selectEngagement) UI.selectEngagement(u.uid); return; }
     if (b.phase === 'deploy') {
       if (u && u.side === UI.playerSide) { UI.deploySel = u.uid; UI.renderDeployTray(); return; }
       if (UI.deploySel) { var du = b.unit(UI.deploySel); var a = du.placed ? du.a : b.facingFor(UI.playerSide); if (b.placeUnit(du.uid, p.x, p.y, a)) { du._rx = du.x; du._ry = du.y; du._ra = du.a; UI.renderDeployTray(); } else UI.hint('That position is outside your deployment zone or overlaps something.'); }
@@ -383,11 +386,14 @@
   // AI pacing: one action per tick so the player can follow along
   UI.pumpAI = function () {
     var b = UI.battle; if (!b || b.phase === 'end') { if (b && b.phase === 'end') UI.onEnd(); return; }
+    if (b.phase === 'combat' || UI.combatAnimating) return;
     if (UI.aiTimer) return;
     if (b.active !== UI.aiSide) return;
     UI.aiTimer = setTimeout(function () {
       UI.aiTimer = null;
-      if (UI.modalOpen || UI.screen !== 'battle') { setTimeout(UI.pumpAI, 300); return; }
+      if (UI.battle !== b || UI.screen !== 'battle') return;
+      if (UI.modalOpen) return; // closing a modal resumes the pump
+      if (b.phase === 'combat') return;
       var phaseBefore = b.phase, logBefore = b.log.length;
       if (b.active === UI.aiSide && b.phase !== 'end') UI.ai.step();
       UI.processEvents(); UI.updateHud();
@@ -411,7 +417,7 @@
         case 'commanderDeath': { var cd = b.unit(ev.uid) || findDead(ev.uid); if (cd) r.addFloater(cd.x, cd.y - 2, 'COMMANDER SLAIN', '#ff6b6b'); break; }
         case 'rundown': break;
         case 'summon': { var su = b.unit(ev.uid); if (su) { su._rx = su.x; su._ry = su.y; su._ra = su.a; r.addFlash(su.x, su.y, 3, '#9060ff'); } break; }
-        case 'endTurn': if (b.combatReports && b.combatReports.length) showCombat = true; break;
+        case 'endTurn': if (!b.interactiveCombat && b.combatReports && b.combatReports.length) showCombat = true; break;
         case 'phase': if (ev.phase === 'charge') UI.hint('Turn ' + ev.turn + ' — Charge Phase. Select a unit and click an enemy within its arc to declare a charge, or Pass.'); if (ev.phase === 'strategic') UI.hint('Strategic Phase. Click one of your units to activate it, click the ground to move, or use the action buttons.'); break;
       }
     });
