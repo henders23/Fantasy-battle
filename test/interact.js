@@ -43,10 +43,12 @@ function expect(c, msg) { checks++; if (!c) { errors.push('CHECK FAILED: ' + msg
   // play a few turns with mouse
   var t0 = Date.now(), didMove = false, didCharge = false, didShoot = false, didEnd = false;
   while (Date.now() - t0 < 400000) {
-    var st = await page.evaluate(function () { var UI = SOVL.UI, b = UI.battle; return { phase: b.phase, active: b.active, turn: b.turn, modal: UI.modalOpen, activeUnit: b.activeUnit }; });
+    var st = await page.evaluate(function () { var UI = SOVL.UI, b = UI.battle; return { phase: b.phase, active: b.active, turn: b.turn, modal: UI.modalOpen, activeUnit: b.activeUnit, animating: UI.combatAnimating }; });
     if (st.phase === 'end') break;
     if (st.modal) { var btn = await page.$('#modal-body button.primary'); if (btn) await btn.click(); await page.waitForTimeout(100); continue; }
+    if (st.phase === 'combat') { if (!st.animating) await page.click('#engagement-panel button.primary'); await page.waitForTimeout(180); continue; }
     if (st.active !== 0) { await page.waitForTimeout(150); continue; }
+    box = await page.$eval('#battle-canvas', function (c) { var r = c.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
     if (st.phase === 'charge') {
       // find a unit with valid targets; click it then the target
       var pair = await page.evaluate(function () { var UI = SOVL.UI, b = UI.battle, r = UI.renderer; var us = b.unitsOf(0); for (var i = 0; i < us.length; i++) { if (!b.canDeclareCharge(us[i])) continue; var ts = b.validChargeTargets(us[i]); if (ts.length) { var p = r.toScreen(us[i].x, us[i].y), q = r.toScreen(ts[0].unit.x, ts[0].unit.y); return { ux: p.x, uy: p.y, tx: q.x, ty: q.y, uid: us[i].uid, tid: ts[0].unit.uid }; } } return null; });

@@ -102,6 +102,7 @@ async function playBattle(page, tag) {
       var UI = SOVL.UI, b = UI.battle; if (!b) return { done: true };
       if (UI.modalOpen) return { modal: true, phase: b.phase };
       if (b.phase === 'end') return { done: true, phase: b.phase };
+      if (b.phase === 'combat') return { combat: true, animating: UI.combatAnimating, report: !!UI.combatReport, turn: b.turn };
       if (b.active !== UI.playerSide) return { waiting: true, phase: b.phase, turn: b.turn };
       if (!UI.playerAI) UI.playerAI = new SOVL.AI(b, UI.playerSide, { aggression: 0.55 });
       if (UI.playerAI.b !== b) UI.playerAI = new SOVL.AI(b, UI.playerSide, { aggression: 0.55 });
@@ -111,6 +112,7 @@ async function playBattle(page, tag) {
       return { acted: true, phase: b.phase, turn: b.turn };
     });
     if (st.done) return;
+    if (st.combat) { if (!st.animating) await page.click('#engagement-panel button.primary'); await page.waitForTimeout(180); continue; }
     if (st.modal) { var btn = await page.$('#modal-body button.primary'); if (btn) { if (!shotTaken && st.phase !== 'end') { await page.screenshot({ path: path.join('/tmp/sovl-shots', '07-combat-' + tag + '.png') }); shotTaken = true; } await btn.click(); } await page.waitForTimeout(150); continue; }
     if (st.turn === 3 && st.phase === 'strategic' && !shotTaken) { await page.screenshot({ path: path.join('/tmp/sovl-shots', '08-midbattle-' + tag + '.png') }); shotTaken = true; }
     await page.waitForTimeout(st.waiting ? 200 : 60);
