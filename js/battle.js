@@ -208,6 +208,8 @@
     this.names = opts.names || ['Player', 'Enemy']; this.sides = opts.sides || ['bottom', 'top'];
     this.scoreMode = opts.scoreMode || 'points'; // 'points' or 'ratio' (share of enemy army value destroyed)
     this.interactive = !!opts.interactive; this.autoRoll = false; this.pendingRoll = null; this.lastRoll = null;
+    // Interactive combat: the browser pauses so the player can choose which engagement fights next.
+    this.interactiveCombat = !!opts.interactiveCombat; this.pendingCombats = []; this.engagementBusy = false;
     if (opts.seed != null) R.setSeed(opts.seed);
     for (var s = 0; s < 2; s++) this.buildArmy(s, opts.armies[s]);
     // disambiguate duplicate unit names within a side
@@ -1208,7 +1210,41 @@
     this.addLog('— Turn ' + this.turn + ': Combat Phase —', 'phase');
     this.emit({ type: 'phase', phase: 'combat', turn: this.turn });
     this.combatReports = [];
-    this.resolveCombat(function (reports) { self.combatReports = reports; self.endTurn(); });
+    if (this.interactiveCombat) {
+      this.pendingCombats = this.engagements().map(function (g) { return g.map(function (u) { return u.uid; }); });
+      var inCombat = {};
+      this.pendingCombats.forEach(function (g) { g.forEach(function (id) { inCombat[id] = true; }); });
+      this.units.forEach(function (u) { if (!inCombat[u.uid]) u.combatRounds = 0; });
+      this.engagementBusy = false;
+      if (!this.pendingCombats.length) this.finishCombatPhase();
+    } else {
+      this.resolveCombat(function (reports) { self.combatReports = reports; self.endTurn(); });
+    }
+  };
+  // Fight the pending engagement that contains unit `uid`. The dice may pause the fight in interactive play;
+  // an 'engagementResolved' event is emitted when it is complete (synchronously when rolls are automatic).
+  BP.resolveEngagement = function (uid) {
+    if (!this.interactiveCombat || this.phase !== 'combat') return { ok: false, reason: 'Not choosing a combat.' };
+    if (this.engagementBusy || this.pendingRoll) return { ok: false, reason: 'An engagement is still being fought.' };
+    var index = this.pendingCombats.findIndex(function (g) { return g.indexOf(uid) >= 0; });
+    if (index < 0) return { ok: false, reason: 'That engagement has already fought.' };
+    var self = this, ids = this.pendingCombats.splice(index, 1)[0];
+    var group = ids.map(function (id) { return self.unit(id); }).filter(Boolean);
+    var result = { ok: true, report: null, pending: false };
+    if (group.length < 2) { this.emit({ type: 'engagementResolved', report: null, remaining: this.pendingCombats.length }); return result; }
+    this.engagementBusy = true;
+    this.runEngagement(group, function (report) {
+      self.combatReports.push(report); self.engagementBusy = false; result.report = report; result.pending = false;
+      self.emit({ type: 'engagementResolved', report: report, remaining: self.pendingCombats.length });
+    });
+    result.pending = this.engagementBusy;
+    return result;
+  };
+  BP.finishCombatPhase = function () {
+    if (this.phase !== 'combat' || this.pendingCombats.length || this.engagementBusy) return false;
+    if (this.interactiveCombat) this.contacts.forEach(function (c) { c.age++; });
+    this.endTurn();
+    return true;
   };
   BP.engagements = function () {
     // connected components of contacts
@@ -1273,12 +1309,12 @@
     var gi = 0;
     var nextGroup = function () {
       if (gi >= groups.length) { self.contacts.forEach(function (c) { c.age++; }); done(reports); return; }
-      self.resolveEngagement(groups[gi++], function (report) { reports.push(report); nextGroup(); });
+      self.runEngagement(groups[gi++], function (report) { reports.push(report); nextGroup(); });
     };
     nextGroup();
   };
   // One engagement: attacks are simultaneous (dice counts fixed up front), then combat score, then break tests.
-  BP.resolveEngagement = function (group, done) {
+  BP.runEngagement = function (group, done) {
     var self = this;
     var report = { units: group.map(function (u) { return u.uid; }), rounds: [], score: [0, 0], breakTests: [], names: group.map(function (u) { return u.name; }), turn: this.turn };
     this.addLog('Engagement: ' + group.map(function (u) { return u.name; }).join(' vs ') + '.', 'combat');

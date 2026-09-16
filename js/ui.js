@@ -215,7 +215,7 @@
   UI.startBattle = function (opts) {
     if (UI.aiTimer) { clearTimeout(UI.aiTimer); UI.aiTimer = null; }
     R.setSeed(null);
-    var b = new SOVL.Battle({ armies: opts.armies, terrain: opts.terrain, scenario: opts.scenario, names: opts.names, sides: ['bottom', 'top'], scoreMode: opts.campaign ? 'ratio' : 'points', interactive: true });
+    var b = new SOVL.Battle({ armies: opts.armies, terrain: opts.terrain, scenario: opts.scenario, names: opts.names, sides: ['bottom', 'top'], scoreMode: opts.campaign ? 'ratio' : 'points', interactive: true, interactiveCombat: true });
     UI.dice = { title: '', sub: '', rows: [], pending: null, banner: null }; UI.diceSeqId = 0; UI.deployDone = false; UI.renderDice(); $('dice-panel').classList.remove('on');
     UI.battle = b; UI.battleOpts = opts; UI.ai = new SOVL.AI(b, UI.aiSide, { aggression: opts.aggression || 0.5 });
     UI.sel = null; UI.inspect = null; UI.hover = null; UI.mode = 'move'; UI.targets = []; UI.preview = null; UI.busy = false; UI.deploySel = null;
@@ -232,7 +232,7 @@
   };
   UI.frame = function (now) {
     if (UI.screen === 'battle' && UI.battle) {
-      var st = { playerSide: UI.playerSide, selected: UI.sel || UI.inspect, hover: UI.hover, targets: UI.targets, preview: UI.preview, mode: UI.mode, spell: UI.spell, hideSide: UI.battle.phase === 'deploy' ? UI.aiSide : null };
+      var st = { playerSide: UI.playerSide, selected: UI.sel || UI.inspect || UI.deploySel, hover: UI.hover, targets: UI.targets, preview: UI.preview, mode: UI.mode, spell: UI.spell, hideSide: UI.battle.phase === 'deploy' ? UI.aiSide : null };
       var b = UI.battle;
       if (st.hideSide != null) { var saved = b.units; b.units = b.units.filter(function (u) { return u.side !== st.hideSide; }); try { UI.renderer.draw(b, st, now); } finally { b.units = saved; } }
       else UI.renderer.draw(b, st, now);
@@ -267,6 +267,7 @@
     cv.addEventListener('click', function (e) { if (UI.dragging) return; var p = r.toWorld(e.offsetX, e.offsetY); UI.canvasClick(p, e); });
     window.addEventListener('keydown', function (e) {
       if (UI.screen !== 'battle' || UI.modalOpen) return;
+      if (/INPUT|SELECT|TEXTAREA|BUTTON/.test(e.target.tagName)) return;
       var b = UI.battle; if (!b) return;
       if (b.pendingRoll && (e.key === ' ' || e.key === 'Enter')) { e.preventDefault(); UI.rollDice(); return; }
       if (b.pendingRoll) return;
@@ -278,6 +279,8 @@
       if (b.phase === 'charge' && (e.key === 'Enter' || e.key === ' ') && b.active === UI.playerSide) UI.passCharge();
     });
     $('dice-panel').addEventListener('click', function (e) { if (e.target.tagName !== 'BUTTON') UI.rollDice(); });
+    // keep keyboard shortcuts working after a button click: buttons must not hold focus
+    ['battle-actions', 'dice-panel', 'battle-toggles', 'engagement-panel', 'army-strip', 'deploy-tray', 'battle-top'].forEach(function (id) { var e = $(id); if (e) e.addEventListener('click', function (ev) { var t = ev.target.closest && ev.target.closest('button'); if (t) setTimeout(function () { if (document.activeElement === t) t.blur(); }, 0); }); });
     $('tog-arcs').onclick = function () { r.showArcs = !r.showArcs; UI.updateToggles(); };
     $('tog-ranges').onclick = function () { r.showRanges = !r.showRanges; UI.updateToggles(); };
     $('tog-zoom').onclick = function () { r.zoom = r.zoom > 1.01 ? 1 : 1.6; r.panX = 0; r.panY = 0; };
@@ -335,8 +338,10 @@
   // Canvas click routing
   UI.canvasClick = function (p, e) {
     var b = UI.battle, r = UI.renderer; if (!b || UI.modalOpen) return;
+    e = e || {};
     if (b.pendingRoll) { UI.rollDice(); return; }
     var u = r.unitAt(b, p); if (u && b.phase === 'deploy' && u.side === UI.aiSide) u = null;
+    if (b.phase === 'combat') { if (u && UI.selectEngagement) UI.selectEngagement(u.uid); return; }
     if (b.phase === 'deploy') {
       if (u && u.side === UI.playerSide) { UI.deploySel = u.uid; UI.renderDeployTray(); return; }
       if (UI.deploySel) { var du = b.unit(UI.deploySel); var a = du.placed ? du.a : b.facingFor(UI.playerSide); if (b.placeUnit(du.uid, p.x, p.y, a)) { du._rx = du.x; du._ry = du.y; du._ra = du.a; UI.renderDeployTray(); } else UI.hint('That position is outside your deployment zone or overlaps something.'); }
@@ -388,12 +393,14 @@
   // AI pacing: one action per tick so the player can follow along
   UI.pumpAI = function () {
     var b = UI.battle; if (!b || b.phase === 'end') { if (b && b.phase === 'end') UI.onEnd(); return; }
+    if (b.phase === 'combat' || UI.combatAnimating) return;
     if (UI.aiTimer) return;
     if (b.active !== UI.aiSide || b.pendingRoll) return;
     UI.aiTimer = setTimeout(function () {
       UI.aiTimer = null;
-      if (UI.modalOpen || UI.screen !== 'battle') { setTimeout(UI.pumpAI, 300); return; }
-      if (b.pendingRoll) return;
+      if (UI.battle !== b || UI.screen !== 'battle') return;
+      if (UI.modalOpen) return; // closing a modal resumes the pump
+      if (b.phase === 'combat' || b.pendingRoll) return;
       if (b.active === UI.aiSide && b.phase !== 'end') { b.autoRoll = true; try { UI.ai.step(); } finally { b.autoRoll = false; } }
       UI.processEvents(); UI.updateHud();
       if (b.pendingRoll) return; // the player must roll before anything else happens

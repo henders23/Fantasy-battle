@@ -30,10 +30,11 @@ function expect(c, msg) { checks++; if (!c) { errors.push('CHECK FAILED: ' + msg
   // deployment with drag
   await page.click('#deploy-tray button:has-text("Auto-deploy")'); await page.waitForTimeout(100);
   var box = await page.$eval('#battle-canvas', function (c) { var r = c.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
-  var u0 = await page.evaluate(function () { var b = SOVL.UI.battle, u = b.unitsOf(0)[0], r = SOVL.UI.renderer, p = r.toScreen(u.x, u.y); return { uid: u.uid, sx: p.x, sy: p.y, x: u.x, y: u.y, a: u.a }; });
-  await page.mouse.move(box.x + u0.sx, box.y + u0.sy); await page.mouse.down(); await page.mouse.move(box.x + u0.sx + 40, box.y + u0.sy, { steps: 5 }); await page.mouse.up(); await page.waitForTimeout(100);
+  var u0 = await page.evaluate(function () { var b = SOVL.UI.battle, u = b.unitsOf(0)[0], r = SOVL.UI.renderer, p = r.toScreen(u.x, u.y); return { uid: u.uid, sx: p.x, sy: p.y, x: u.x, y: u.y, a: u.a, scale: r.scale }; });
+  // drag 1.5 inches toward the table edge (the auto-deployed line leaves room behind it)
+  await page.mouse.move(box.x + u0.sx, box.y + u0.sy); await page.mouse.down(); await page.mouse.move(box.x + u0.sx, box.y + u0.sy + 1.5 * u0.scale, { steps: 5 }); await page.mouse.up(); await page.waitForTimeout(100);
   var after = await page.evaluate(function (uid) { var u = SOVL.UI.battle.unit(uid); return { x: u.x, y: u.y, a: u.a, placed: u.placed }; }, u0.uid);
-  expect(Math.abs(after.x - u0.x) > 1, 'drag moved unit: ' + u0.x.toFixed(1) + ' -> ' + after.x.toFixed(1));
+  expect(Math.abs(after.y - u0.y) > 0.8, 'drag moved unit: ' + u0.y.toFixed(1) + ' -> ' + after.y.toFixed(1));
   await page.evaluate(function () { SOVL.UI.aiDelay = 40; });
   await page.keyboard.press('e'); await page.waitForTimeout(50);
   var rot = await page.evaluate(function (uid) { return { a: SOVL.UI.battle.unit(uid).a, hint: document.getElementById('battle-hint').textContent }; }, u0.uid);
@@ -43,7 +44,7 @@ function expect(c, msg) { checks++; if (!c) { errors.push('CHECK FAILED: ' + msg
   // play a few turns with mouse
   var t0 = Date.now(), didMove = false, didCharge = false, didShoot = false, didEnd = false, rollsSeen = 0;
   while (Date.now() - t0 < 400000) {
-    var st = await page.evaluate(function () { var UI = SOVL.UI, b = UI.battle; return { phase: b.phase, active: b.active, turn: b.turn, modal: UI.modalOpen, activeUnit: b.activeUnit, pending: !!b.pendingRoll, panelOn: document.getElementById('dice-panel').classList.contains('on') }; });
+    var st = await page.evaluate(function () { var UI = SOVL.UI, b = UI.battle; return { phase: b.phase, active: b.active, turn: b.turn, modal: UI.modalOpen, activeUnit: b.activeUnit, pending: !!b.pendingRoll, panelOn: document.getElementById('dice-panel').classList.contains('on'), animating: UI.combatAnimating }; });
     if (st.phase === 'end') break;
     if (st.pending) {
       rollsSeen++;
@@ -55,7 +56,9 @@ function expect(c, msg) { checks++; if (!c) { errors.push('CHECK FAILED: ' + msg
       continue;
     }
     if (st.modal) { var btn = await page.$('#modal-body button.primary'); if (btn) await btn.click(); await page.waitForTimeout(100); continue; }
+    if (st.phase === 'combat') { if (!st.animating) await page.click('#engagement-panel button.primary'); await page.waitForTimeout(180); continue; }
     if (st.active !== 0) { await page.waitForTimeout(150); continue; }
+    box = await page.$eval('#battle-canvas', function (c) { var r = c.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
     if (st.phase === 'charge') {
       // find a unit with valid targets; click it then the target
       var pair = await page.evaluate(function () { var UI = SOVL.UI, b = UI.battle, r = UI.renderer; var us = b.unitsOf(0); for (var i = 0; i < us.length; i++) { if (!b.canDeclareCharge(us[i])) continue; var ts = b.validChargeTargets(us[i]); if (ts.length) { var p = r.toScreen(us[i].x, us[i].y), q = r.toScreen(ts[0].unit.x, ts[0].unit.y); return { ux: p.x, uy: p.y, tx: q.x, ty: q.y, uid: us[i].uid, tid: ts[0].unit.uid }; } } return null; });
