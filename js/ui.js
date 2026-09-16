@@ -74,6 +74,8 @@
     });
     var sz = $('setup-size'); sz.innerHTML = ''; SOVL.ARMY_SIZES.forEach(function (s) { sz.appendChild(new Option(s.name + ' (' + s.pts + ' pts)', s.pts)); }); sz.value = 1000;
     var en = $('setup-enemy'); en.innerHTML = ''; en.appendChild(new Option('Random faction', 'random')); Object.keys(SOVL.FACTION_DATA).forEach(function (fid) { en.appendChild(new Option(SOVL.FACTION_DATA[fid].name, fid)); });
+    var sc = $('setup-scenario'); sc.innerHTML = ''; SOVL.SCENARIOS.forEach(function (s) { var o = new Option(s.name, s.id); o.title = s.desc; sc.appendChild(o); }); sc.value = 'pitched';
+    var df = $('setup-difficulty'); df.innerHTML = ''; SOVL.DIFFICULTIES.forEach(function (d) { df.appendChild(new Option(d.name + ' — ' + d.desc, d.id)); }); df.value = 'normal';
     function renderCommanders() {
       var box = $('setup-commanders'); box.innerHTML = '';
       var f = SOVL.FACTION_DATA[UI.setup.faction], cmds = f.sections[0].units;
@@ -102,7 +104,7 @@
         });
       } else {
         R.setSeed(null);
-        var camp = C.create({ faction: UI.setup.faction, commander: UI.setup.commander, name: $('setup-name').value.trim() || undefined });
+        var camp = C.create({ faction: UI.setup.faction, commander: UI.setup.commander, name: $('setup-name').value.trim() || undefined, difficulty: $('setup-difficulty').value });
         UI.campaign = camp; C.save(camp);
         UI.showCampaign();
         UI.modal('<h2>' + esc(SOVL.CAMPAIGN.acts[0].name) + '</h2><div class="text">' + esc(camp.commanderName) + ' rides out with a ragtag warband: ' + camp.army.entries.map(function (e) { return esc(A.entryLabel(camp.faction, e)); }).join(', ') + '.<br><br>Pick a node on the map to travel. Battles earn gold and veterancy; merchants and camps let you grow the army. Reach the end of Act III and defeat the Deathless Host.</div><div class="choices"><button class="primary" id="m-ok">Begin</button></div>');
@@ -232,7 +234,7 @@
   };
   UI.frame = function (now) {
     if (UI.screen === 'battle' && UI.battle) {
-      var st = { playerSide: UI.playerSide, selected: UI.sel || UI.inspect || UI.deploySel, hover: UI.hover, targets: UI.targets, preview: UI.preview, mode: UI.mode, spell: UI.spell, hideSide: UI.battle.phase === 'deploy' ? UI.aiSide : null };
+      var st = { playerSide: UI.playerSide, selected: UI.sel || UI.inspect || UI.deploySel, hover: UI.hover, targets: UI.targets, preview: UI.preview, mode: UI.mode, spell: UI.spell, hideSide: UI.battle.phase === 'deploy' ? UI.aiSide : null, handle: UI.handlePoint(), rotating: !!UI.rotating };
       var b = UI.battle;
       if (st.hideSide != null) { var saved = b.units; b.units = b.units.filter(function (u) { return u.side !== st.hideSide; }); try { UI.renderer.draw(b, st, now); } finally { b.units = saved; } }
       else UI.renderer.draw(b, st, now);
@@ -244,6 +246,7 @@
     cv.addEventListener('mousemove', function (e) {
       var p = r.toWorld(e.offsetX, e.offsetY), b = UI.battle; if (!b) return;
       if (UI.panning) { r.panX += e.movementX; r.panY += e.movementY; return; }
+      if (UI.rotating) { UI.rotateDrag(p); return; }
       var u = r.unitAt(b, p); if (u && b.phase === 'deploy' && u.side === UI.aiSide) u = null;
       UI.hover = u ? u.uid : null;
       var tip = $('tip');
@@ -257,14 +260,17 @@
     cv.addEventListener('mouseleave', function () { UI.hover = null; UI.preview = null; $('tip').style.display = 'none'; UI.canvasTip = false; });
     cv.addEventListener('mousedown', function (e) {
       if (e.button === 1 || e.button === 2) { UI.panning = true; e.preventDefault(); return; }
-      var b = UI.battle; if (!b || b.phase !== 'deploy') return;
-      var p = r.toWorld(e.offsetX, e.offsetY), u = r.unitAt(b, p);
+      var b = UI.battle; if (!b) return;
+      var p = r.toWorld(e.offsetX, e.offsetY), h = UI.handlePoint();
+      if (h && e.button === 0 && Math.hypot(p.x - h.x, p.y - h.y) < 0.9 + 4 / r.scale) { UI.rotating = { uid: h.uid, moved: false }; e.preventDefault(); return; }
+      if (b.phase !== 'deploy') return;
+      var u = r.unitAt(b, p);
       if (u && u.side === UI.playerSide) { UI.dragging = { u: u, dx: p.x - u.x, dy: p.y - u.y }; UI.deploySel = u.uid; UI.renderDeployTray(); }
     });
-    window.addEventListener('mouseup', function (e) { UI.panning = false; if (UI.dragging) { UI.dragging = null; UI.renderDeployTray(); } });
+    window.addEventListener('mouseup', function (e) { UI.panning = false; if (UI.dragging) { UI.dragging = null; UI.renderDeployTray(); } if (UI.rotating) UI.rotateEnd(); });
     cv.addEventListener('contextmenu', function (e) { e.preventDefault(); });
     cv.addEventListener('wheel', function (e) { e.preventDefault(); var z = r.zoom * (e.deltaY < 0 ? 1.12 : 1 / 1.12); r.zoom = G.clamp(z, 0.8, 3); }, { passive: false });
-    cv.addEventListener('click', function (e) { if (UI.dragging) return; var p = r.toWorld(e.offsetX, e.offsetY); UI.canvasClick(p, e); });
+    cv.addEventListener('click', function (e) { if (UI.dragging) return; if (UI.justRotated && performance.now() - UI.justRotated < 400) return; var p = r.toWorld(e.offsetX, e.offsetY); UI.canvasClick(p, e); });
     window.addEventListener('keydown', function (e) {
       if (UI.screen !== 'battle' || UI.modalOpen) return;
       if (/INPUT|SELECT|TEXTAREA|BUTTON/.test(e.target.tagName)) return;
@@ -274,6 +280,7 @@
       if (e.key === 'x' || e.key === 'X') { if (e.shiftKey) r.showRanges = !r.showRanges; else r.showArcs = !r.showArcs; UI.updateToggles(); }
       if (e.key === 'Escape') { UI.mode = 'move'; UI.targets = []; if (b.phase === 'charge') UI.sel = null; UI.preview = null; UI.updateHud(); }
       if (b.phase === 'deploy' && UI.deploySel) { var du = b.unit(UI.deploySel); if (du && (e.key === 'q' || e.key === 'Q')) UI.rotateDeploy(du, -1); if (du && (e.key === 'e' || e.key === 'E')) UI.rotateDeploy(du, 1); }
+      if (b.phase === 'strategic' && UI.sel && b.activeUnit === UI.sel && (e.key === 'z' || e.key === 'Z')) UI.undoMove();
       if (b.phase === 'strategic' && UI.sel && b.activeUnit === UI.sel) { if (e.key === 'q' || e.key === 'Q') { if (!b.pivot(UI.sel, -1)) UI.hint('Cannot pivot: no movement left or no room.'); UI.updateHud(); } if (e.key === 'e' || e.key === 'E') { if (!b.pivot(UI.sel, 1)) UI.hint('Cannot pivot: no movement left or no room.'); UI.updateHud(); } }
       if (b.phase === 'strategic' && b.active === UI.playerSide && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); UI.endActivation(); }
       if (b.phase === 'charge' && (e.key === 'Enter' || e.key === ' ') && b.active === UI.playerSide) UI.passCharge();
@@ -286,6 +293,66 @@
     $('tog-zoom').onclick = function () { r.zoom = r.zoom > 1.01 ? 1 : 1.6; r.panX = 0; r.panY = 0; };
   };
   UI.updateToggles = function () { $('tog-arcs').className = 'small' + (UI.renderer.showArcs ? ' primary' : ''); $('tog-ranges').className = 'small' + (UI.renderer.showRanges ? ' primary' : ''); };
+  // Rotation handle: a gold grip in front of the selected unit that can be dragged to turn it.
+  UI.handlePoint = function () {
+    var b = UI.battle; if (!b || UI.modalOpen || b.pendingRoll) return null;
+    var uid = null;
+    if (b.phase === 'deploy' && !UI.deployDone && UI.deploySel) uid = UI.deploySel;
+    else if (b.phase === 'strategic' && b.active === UI.playerSide && UI.sel && b.activeUnit === UI.sel && UI.mode === 'move') uid = UI.sel;
+    if (!uid) return null;
+    var u = b.unit(uid); if (!u || u.side !== UI.playerSide || u.fleeing) return null;
+    if (b.phase === 'deploy' && !u.placed) return null;
+    if (b.phase === 'strategic' && u.moveLeft <= 0 && u.typeInfo.pivot > 0) return null;
+    var fc = G.frontCenter(u), f = G.fwd(u.a), off = 1.4;
+    return { x: fc.x + f.x * off, y: fc.y + f.y * off, uid: uid };
+  };
+  UI.rotateDrag = function (p) {
+    var b = UI.battle, rot = UI.rotating, u = b && b.unit(rot.uid); if (!u) { UI.rotating = null; return; }
+    rot.moved = true;
+    if (b.phase === 'deploy') { var a = Math.atan2(p.y - u.y, p.x - u.x), rect = { x: u.x, y: u.y, a: a, w: u.w, d: u.d }; if (b.placementValid(u, rect, [])) { u.a = a; u._ra = a; } }
+    else if (b.phase === 'strategic' && b.activeUnit === u.uid) UI.preview = b.previewMove(u.uid, p, true);
+  };
+  UI.rotateEnd = function () {
+    var rot = UI.rotating, b = UI.battle; UI.rotating = null; if (!rot || !b) return;
+    if (rot.moved) {
+      UI.justRotated = performance.now();
+      if (b.phase === 'strategic' && b.activeUnit === rot.uid && UI.preview && UI.preview.ok) { b.applyMove(rot.uid, UI.preview); UI.processEvents(); }
+      if (b.phase === 'deploy') UI.renderDeployTray();
+      UI.updateHud();
+    }
+    UI.preview = null;
+  };
+  UI.undoMove = function () {
+    var b = UI.battle; if (!b || !UI.sel) return;
+    if (b.undoMove(UI.sel)) { UI.preview = null; UI.processEvents(); UI.updateHud(); UI.hint('Move undone.'); }
+    else UI.hint(b.canUndo(UI.sel) ? 'Cannot undo now.' : 'Nothing to undo: only moves and pivots made this activation, before shooting or casting, can be taken back.');
+  };
+  UI.faceUnit = function (uid, targetUid) {
+    var b = UI.battle, t = b.unit(targetUid); if (!t) return;
+    var pv = b.previewMove(uid, { x: t.x, y: t.y }, true);
+    if (pv.ok) { b.applyMove(uid, pv); UI.preview = null; UI.processEvents(); UI.updateHud(); if (pv.pivots && Math.abs(G.angleDiff(pv.a, Math.atan2(t.y - b.unit(uid).y, t.x - b.unit(uid).x))) > 0.05) UI.hint('Turned as far toward ' + t.name + ' as the movement allowed.'); }
+    else UI.hint(pv.reason || 'Cannot turn to face ' + t.name + '.');
+  };
+  // Charge reactions: when an enemy charge is declared against one of your units, offer the reaction up front.
+  UI.updateReactionPrompt = function () {
+    var box = $('reaction-prompt'); if (!box) return;
+    var b = UI.battle;
+    if (!b || b.phase !== 'charge' || b.active !== UI.playerSide || b.pendingRoll || UI.modalOpen) { box.hidden = true; return; }
+    var u = null, cc = null, cf = null;
+    b.unitsOf(UI.playerSide).some(function (x) { if (x.reactionSeen === b.turn || x.declaredCharge) return false; var c = b.canCounterCharge(x), f = b.canFlee(x); if (!c && !f) return false; u = x; cc = c; cf = f; return true; });
+    if (!u) { box.hidden = true; return; }
+    var charger = (cc || cf).charger;
+    box.innerHTML = '';
+    box.appendChild(el('div', 'rp-title', esc(charger.name) + ' charges ' + esc(u.name) + '!'));
+    box.appendChild(el('div', 'rp-sub', (cc ? 'Counter-charge to meet it head on: both units count as charging. ' : '') + (cf ? 'Flee to run from the charge; the unit will be fleeing and must rally later. ' : '') + 'Hold to receive the charge.'));
+    var acts = el('div', 'rp-actions');
+    if (cc) { var bc = el('button', 'primary', 'Counter-charge'); bc.onclick = function () { var r = b.declareCounterCharge(u.uid); if (!r.ok) UI.hint(r.reason); UI.sel = null; UI.targets = []; UI.afterPlayerAction(); }; acts.appendChild(bc); }
+    if (cf) { var bf = el('button', null, 'Flee'); bf.onclick = function () { var r = b.declareFlee(u.uid); if (!r.ok) UI.hint(r.reason); UI.sel = null; UI.targets = []; UI.afterPlayerAction(); }; acts.appendChild(bf); }
+    var bh = el('button', null, 'Hold'); bh.onclick = function () { u.reactionSeen = b.turn; UI.updateReactionPrompt(); }; acts.appendChild(bh);
+    var bs = el('button', 'small', 'Show'); bs.onclick = function () { UI.sel = u.uid; UI.inspect = null; UI.targets = b.canDeclareCharge(u) ? b.validChargeTargets(u).map(function (t) { return t.unit.uid; }) : []; UI.updateHud(); }; acts.appendChild(bs);
+    box.appendChild(acts); box.hidden = false;
+  };
+  UI.scenarioName = function (id) { var s = SOVL.SCENARIOS.filter(function (x) { return x.id === id; })[0]; return s ? s.name : 'Pitched Battle'; };
   UI.rotateDeploy = function (u, dir) { var b = UI.battle, a = u.a + dir * Math.PI / 4, rect = { x: u.x, y: u.y, a: a, w: u.w, d: u.d }; if (b.placementValid(u, rect, [])) u.a = a; else UI.hint('No room to rotate ' + u.name + ' here. Move it first.'); };
   UI.unitTip = function (u) {
     var b = UI.battle, s = SOVL.effStats(u, b), mv = SOVL.moveAllowance(u, b);
@@ -481,7 +548,7 @@
     UI.dice.pending = null;
     var row = { spec: spec, res: res, id: ++UI.diceRowId };
     UI.dice.rows.push(row);
-    if (UI.dice.rows.length > 12) UI.dice.rows.shift();
+    if (UI.dice.rows.length > 40) UI.dice.rows.shift();
     UI.renderDice(); UI.diceShow();
     UI.animateRow(row);
     if (spec.kind === 'discipline' && spec.n) { var u = UI.battle.unit(spec.uid); if (u) UI.renderer.addFloater(u.x, u.y - 1.5, res.ok ? (spec.why === 'rally' ? 'RALLIES' : 'HOLDS') : (spec.why === 'rally' ? 'still fleeing' : 'BREAKS'), res.ok ? '#b8f0b8' : '#ff6b6b'); }
@@ -603,10 +670,11 @@
     var b = UI.battle; if (!b) return;
     var phaseName = { deploy: 'DEPLOYMENT', charge: 'CHARGE PHASE', strategic: 'STRATEGIC PHASE', 'strategic-end': 'STRATEGIC PHASE', combat: 'COMBAT PHASE', end: 'BATTLE OVER' }[b.phase] || b.phase.toUpperCase();
     $('battle-phase').textContent = phaseName;
-    $('battle-turn').textContent = b.phase === 'deploy' ? (b.scenario === 'objectives' ? 'Scoring Objectives' : 'Pitched Battle') : 'Turn ' + b.turn + ' / ' + b.maxTurns;
+    $('battle-turn').textContent = b.phase === 'deploy' ? UI.scenarioName(b.scenario) : 'Turn ' + b.turn + ' / ' + b.maxTurns + (b.scenario !== 'pitched' ? ' · ' + UI.scenarioName(b.scenario) : '');
     var who = $('battle-who'); who.textContent = b.phase === 'deploy' || b.phase === 'end' ? '' : b.pendingRoll ? 'Roll the dice' : b.phase === 'combat' || b.phase === 'strategic-end' ? 'Resolving' : (b.active === UI.playerSide ? 'Your activation' : b.names[UI.aiSide] + ' is acting…'); who.className = 'who' + (b.active === UI.aiSide && !b.pendingRoll ? ' enemy' : '');
     $('battle-score').textContent = b.phase === 'deploy' ? '' : 'Score ' + b.scoreFor(0) + ' — ' + b.scoreFor(1) + (b.scenario === 'objectives' ? ' · objectives' : '') + (b.scoreMode === 'ratio' ? ' (share of army value)' : '');
     var info = $('battle-unitinfo'), act = $('battle-actions'); info.innerHTML = ''; act.innerHTML = '';
+    UI.updateReactionPrompt();
     var uid = UI.sel || UI.inspect || UI.deploySel, u = uid ? b.unit(uid) : null;
     if (!u) { info.appendChild(el('p', 'muted', b.phase === 'deploy' ? 'Deploy your units, then Begin Battle.' : 'Click a unit to see its profile. Your units have a blue front edge; enemies red.')); }
     else info.appendChild(UI.unitInfoPanel(u));
@@ -629,7 +697,9 @@
       if (u && u.side === UI.playerSide && b.activeUnit === u.uid) {
         if (u.fleeing) { var br = el('button', 'primary', 'Rally (Discipline test)'); br.onclick = function () { var r = b.rally(u.uid); if (!r.ok) UI.hint(r.reason); UI.afterPlayerAction(); }; act.appendChild(br); }
         else {
-          act.appendChild(el('div', 'muted', 'Movement left: <b>' + u.moveLeft.toFixed(1) + '"</b>' + (b.isEngaged(u) ? ' (engaged)' : '') + '. Click the ground to move; <kbd>Shift</kbd>-click to only pivot; <kbd>Q</kbd>/<kbd>E</kbd> pivot 45°.'));
+          act.appendChild(el('div', 'muted', 'Movement left: <b>' + u.moveLeft.toFixed(1) + '"</b>' + (b.isEngaged(u) ? ' (engaged)' : '') + '. Click the ground to move; <kbd>Shift</kbd>-click to only pivot; <kbd>Q</kbd>/<kbd>E</kbd> pivot 45°; drag the gold handle to turn; <kbd>Z</kbd> undoes.'));
+          if (b.canUndo(u.uid)) { var bu = el('button', 'small', 'Undo move (Z)'); bu.onclick = UI.undoMove; act.appendChild(bu); }
+          if (!b.isEngaged(u) && (u.moveLeft > 0 || u.typeInfo.pivot === 0)) { var near = b.enemiesOf(u.side).filter(function (t) { return !t.removed; }).map(function (t) { return { t: t, d: Math.hypot(t.x - u.x, t.y - u.y) }; }).sort(function (a, c) { return a.d - c.d; }).slice(0, 2); near.forEach(function (n) { var bfc = el('button', 'small', 'Face ' + n.t.name); bfc.setAttribute('data-tip', 'Pivot toward ' + n.t.name + ' (' + n.d.toFixed(0) + '" away) using this activation\'s movement.'); bfc.onclick = function () { UI.faceUnit(u.uid, n.t.uid); }; act.appendChild(bfc); }); }
           if (b.rangedWeaponOf(u, false) && !u.usedRanged && !u.usedAbility && !b.isEngaged(u)) { var bs = el('button', UI.mode === 'shoot' && !UI.shootCommander ? 'primary' : '', 'Shoot: ' + u.ranged); bs.onclick = function () { UI.enterTargetMode('shoot', null, false); }; act.appendChild(bs); }
           if (b.rangedWeaponOf(u, true) && !u.usedSpell && !b.isEngaged(u)) { var bcs = el('button', '', u.commander.name + ' shoots: ' + u.commander.ranged); bcs.onclick = function () { UI.enterTargetMode('shoot', null, true); }; act.appendChild(bcs); }
           if (b.canCast(u)) u.commander.spells.forEach(function (sp) { if (u.spellsCastThisTurn[sp]) return; var n = b.spellTargets(u, sp).length; var bsp = el('button', UI.mode === 'spell' && UI.spell === sp ? 'primary' : '', 'Cast ' + sp + (n ? '' : ' (no target)')); bsp.setAttribute('data-tip', esc(SOVL.SPELLS[sp].desc) + ' Casting value ' + SOVL.SPELLS[sp].cv + '.'); bsp.disabled = !n; bsp.onclick = function () { var ts = b.spellTargets(u, sp); if (ts.length === 1 && ts[0] === u) { var r = b.cast(u.uid, sp, u.uid); if (!r.ok) UI.hint(r.reason); UI.processEvents(); UI.updateHud(); if (b.phase === 'end') UI.onEnd(); } else UI.enterTargetMode('spell', sp); }; act.appendChild(bsp); });
@@ -719,6 +789,7 @@
     UI.show('campaign');
     if (camp.over) { UI.showRunOver(); return; }
     UI.renderCampaign();
+    if (camp.pendingTrait && !camp.pendingBattle) { UI.traitModal(); return; }
     if (camp.pendingBattle && camp.nodeIndex != null) {
       // a battle was started but never resolved (page reloaded mid-fight): it must be fought
       var node = C.nodeAt(camp, camp.layer, camp.nodeIndex);
@@ -766,8 +837,10 @@
       var t = e.kind === 'commander' ? e.retinue : e, def = SOVL.findUnitDef(camp.faction, t.id);
       var d = el('div', 'entry');
       var vet = t.vet ? ' <span class="accent">' + SOVL.CAMPAIGN.veteran[t.vet - 1].name + '</span>' : '';
+      if (e.kind === 'commander' && e.vet) vet += ' <span class="accent">' + esc(SOVL.CAMPAIGN.veteran[e.vet - 1].name) + ' commander</span>';
+      vet += ' <span class="muted" title="battles fought · enemy models slain">' + (t.battles || 0) + ' ⚔ · ' + ((t.kills || 0) + (e.kind === 'commander' ? (e.commanderKills || 0) : 0)) + ' ☠</span>';
       d.innerHTML = '<div class="head"><b>' + (e.kind === 'commander' ? '★ ' + esc(e.name) + ' + ' : '') + esc(def.name) + '</b>' + vet + '<span class="spacer"></span><span class="muted">' + (def.per ? t.models + '/' + def.size[1] : '1') + '</span></div>' +
-        '<div class="props">' + esc(t.weapon) + (t.ranged ? ', ' + esc(t.ranged) : '') + (t.banner ? ', ' + esc(SOVL.bannerById(t.banner).name) : '') + (e.kind === 'commander' && e.items && e.items.length ? ', ' + e.items.map(function (id) { return esc(SOVL.itemById(id).name); }).join(', ') : '') + (t.extraProps ? ', ' + t.extraProps.join(', ') : '') + '</div>';
+        '<div class="props">' + esc(t.weapon) + (t.ranged ? ', ' + esc(t.ranged) : '') + (t.banner ? ', ' + esc(SOVL.bannerById(t.banner).name) : '') + (e.kind === 'commander' && e.items && e.items.length ? ', ' + e.items.map(function (id) { return esc(SOVL.itemById(id).name); }).join(', ') : '') + (e.kind === 'commander' && e.traits && e.traits.length ? ', ' + e.traits.map(function (id) { return '<span class="accent" title="' + esc(SOVL.TRAITS[id].desc) + '">' + esc(SOVL.TRAITS[id].name) + '</span>'; }).join(', ') : '') + (t.extraProps ? ', ' + t.extraProps.join(', ') : '') + '</div>';
       if (actionFn) { var btn = actionFn(e); if (btn) d.appendChild(btn); }
       box.appendChild(d);
     });
@@ -791,35 +864,52 @@
   };
   UI.campaignBattle = function (node, kind, after) {
     var camp = UI.campaign, enemy = C.enemyArmyFor(camp, node, kind), act = SOVL.CAMPAIGN.acts[camp.act];
-    var ef = SOVL.FACTION_DATA[enemy.faction];
+    var ef = SOVL.FACTION_DATA[enemy.faction], scenario = C.scenarioFor(camp, node, kind), scen = SOVL.SCENARIOS.filter(function (s) { return s.id === scenario; })[0];
     var intro = kind === 'small' ? 'A small warband bars the way.' : kind === 'undead' ? 'The dead stir in the barrow.' : node.type === 'boss' ? (camp.act === 2 ? 'At the end of the trail waits the Deathless Host. This is the final battle.' : act.boss.name + ' holds the pass with a full army. Win, and the road to the next act is open.') : node.type === 'elite' ? 'A veteran force blocks the trail. Expect a hard fight and better plunder.' : 'An enemy army stands in your way.';
-    var body = '<h2>' + esc(node.type === 'boss' ? act.boss.name : NODE_NAME[node.type] || 'Battle') + '</h2><div class="text">' + esc(intro) + '<br><br><b>' + esc(ef.name) + '</b> — ' + enemy.entries.length + ' units, about ' + enemy.pts + ' points:<br>' + enemy.entries.map(function (e) { return esc(A.entryLabel(enemy.faction, e)); }).join('<br>') + '<br><br>Your army: ' + A.armyCost(camp.army) + ' points, ' + camp.army.entries.length + ' units.</div><div class="choices"><button class="primary" id="m-fight">To battle</button></div>';
+    var body = '<h2>' + esc(node.type === 'boss' ? act.boss.name : NODE_NAME[node.type] || 'Battle') + '</h2><div class="text">' + esc(intro) + '<br><br><b>' + esc(ef.name) + '</b> — ' + enemy.entries.length + ' units, about ' + enemy.pts + ' points:<br>' + enemy.entries.map(function (e) { return esc(A.entryLabel(enemy.faction, e)); }).join('<br>') + '<br><br>Your army: ' + A.armyCost(camp.army) + ' points, ' + camp.army.entries.length + ' units.' + (scen ? '<br><br><b>' + esc(scen.name) + '</b> — ' + esc(scen.desc) : '') + '</div><div class="choices"><button class="primary" id="m-fight">To battle</button></div>';
     UI.modalDismissable = false; UI.modal(body);
     $('m-fight').onclick = function () {
       UI.closeModal();
       camp.pendingBattle = { layer: camp.layer, idx: camp.nodeIndex, kind: kind || null }; C.save(camp);
       var terrain = A.randomTerrain({}), army = C.battleArmy(camp);
-      UI.startBattle({ armies: [army, enemy], terrain: terrain, scenario: 'pitched', names: [camp.commanderName, node.type === 'boss' ? act.boss.name : ef.name], aggression: node.type === 'boss' ? 0.7 : 0.5, campaign: true, onEnd: function (b) {
+      UI.startBattle({ armies: [army, enemy], terrain: terrain, scenario: scenario, names: [camp.commanderName, node.type === 'boss' ? act.boss.name : ef.name], aggression: node.type === 'boss' ? 0.7 : 0.5, campaign: true, onEnd: function (b) {
         var r = C.applyBattleResult(camp, b, node, enemy);
         var extra = el('div', 'text', r.lines.map(esc).join('<br>'));
         camp.pendingBattle = null; C.save(camp);
         UI.showResult(b, { extra: extra, label: r.won ? (r.draw ? 'Withdraw' : 'Continue the trail') : 'The trail ends', onDone: function () {
           UI.show('campaign');
           if (!r.won) { UI.showRunOver(); return; }
-          if (after) after();
-          if (node.type === 'boss' && !r.draw) {
-            C.advanceAct(camp); C.save(camp);
-            if (camp.victory) { UI.showRunOver(); return; }
-            UI.renderCampaign();
-            UI.simpleModal(SOVL.CAMPAIGN.acts[camp.act].name, 'The pass is won. The trail leads on into harder country. Enemies here field ' + SOVL.CAMPAIGN.acts[camp.act].pts[0] + '–' + SOVL.CAMPAIGN.acts[camp.act].pts[1] + ' point armies.');
-          } else UI.renderCampaign();
+          var cont = function () {
+            if (after) after();
+            if (node.type === 'boss' && !r.draw) {
+              C.advanceAct(camp); C.save(camp);
+              if (camp.victory) { UI.showRunOver(); return; }
+              UI.renderCampaign();
+              UI.simpleModal(SOVL.CAMPAIGN.acts[camp.act].name, 'The pass is won. The trail leads on into harder country. Enemies here field ' + SOVL.CAMPAIGN.acts[camp.act].pts[0] + '–' + SOVL.CAMPAIGN.acts[camp.act].pts[1] + ' point armies.');
+            } else UI.renderCampaign();
+          };
+          if (camp.pendingTrait) UI.traitModal(cont); else cont();
         } });
       } });
     };
   };
+  UI.traitModal = function (onDone) {
+    var camp = UI.campaign, choices = C.traitChoices(camp), cmd = camp.army.entries[0], box = el('div');
+    if (!choices.length) { camp.pendingTrait = false; C.save(camp); if (onDone) onDone(); return; }
+    box.appendChild(el('h2', null, 'A commander\'s trait'));
+    box.appendChild(el('div', 'text', esc(cmd.name) + ' has grown in stature. Choose one trait to learn; it lasts for the rest of the run.'));
+    var ch = el('div', 'choices'); ch.style.flexDirection = 'column'; ch.style.alignItems = 'stretch';
+    choices.forEach(function (id) { var t = SOVL.TRAITS[id]; var btn = el('button', 'primary', '<b>' + esc(t.name) + '</b><br><span style="font-weight:normal;opacity:.85">' + esc(t.desc) + '</span>'); btn.style.textAlign = 'left'; btn.onclick = function () { C.learnTrait(camp, id); C.save(camp); UI.closeModal(); UI.renderCampaign(); if (onDone) onDone(); }; ch.appendChild(btn); });
+    box.appendChild(ch); UI.modalDismissable = false; UI.modal(box);
+  };
   UI.showRunOver = function () {
-    var camp = UI.campaign, won = camp.victory;
-    var body = '<h2>' + (won ? 'The Trail\'s End' : 'The Trail Ends Here') + '</h2><div class="result-big">' + (won ? 'VICTORY' : 'RUN OVER') + '</div><div class="text">' + (won ? esc(camp.commanderName) + ' has broken the Deathless Host and walked the whole Trail of Death.' : esc(camp.commanderName) + '\'s campaign is over.') + '<br><br>Battles fought: ' + camp.battles + ' · Won: ' + camp.wins + ' · Enemy models slain: ' + camp.kills + ' · Acts completed: ' + (won ? 3 : camp.act) + '</div><div class="choices"><button class="primary" id="m-menu">Back to menu</button></div>';
+    var camp = UI.campaign, won = camp.victory, diff = C.difficulty(camp), TYPE = { battle: 'Battle', elite: 'Elite battle', boss: 'Boss', event: 'Event' };
+    var hist = (camp.history || []).map(function (h) { var f = SOVL.FACTION_DATA[h.enemy]; return '<tr><td>Act ' + (h.act + 1) + '</td><td>' + esc(TYPE[h.type] || h.type) + '</td><td>' + esc(f ? f.name : h.enemy) + ' <span class="muted">' + h.pts + ' pts</span></td><td class="' + (h.won ? (h.draw ? '' : 'accent') : 'danger') + '">' + (h.won ? (h.draw ? 'Draw' : 'Victory') : 'Defeat') + (h.fatal ? ' — commander slain' : '') + ' <span class="muted">turn ' + h.turn + '</span></td></tr>'; }).join('');
+    var army = camp.army.entries.map(function (e) { var t = e.kind === 'commander' ? e.retinue : e, def = SOVL.findUnitDef(camp.faction, t.id); return '<tr><td>' + (e.kind === 'commander' ? '★ ' + esc(e.name) + ' + ' : '') + esc(def.name) + '</td><td>' + (t.vet ? esc(SOVL.CAMPAIGN.veteran[t.vet - 1].name) : '—') + '</td><td>' + (t.battles || 0) + '</td><td>' + ((t.kills || 0) + (e.kind === 'commander' ? (e.commanderKills || 0) : 0)) + '</td></tr>'; }).join('');
+    var body = '<h2>' + (won ? 'The Trail\'s End' : 'The Trail Ends Here') + '</h2><div class="result-big">' + (won ? 'VICTORY' : 'RUN OVER') + '</div><div class="text">' + (won ? esc(camp.commanderName) + ' has broken the Deathless Host and walked the whole Trail of Death.' : esc(camp.commanderName) + '\'s campaign is over.') + '<br><br>Battles fought: ' + camp.battles + ' · Won: ' + camp.wins + ' · Enemy models slain: ' + camp.kills + ' · Acts completed: ' + (won ? 3 : camp.act) + ' · Difficulty: ' + esc(diff.name) + '</div>' +
+      (hist ? '<h3>Battle honours</h3><table class="result-table"><tr><th>Act</th><th>Fight</th><th>Enemy</th><th>Outcome</th></tr>' + hist + '</table>' : '') +
+      '<h3>The army</h3><table class="result-table"><tr><th>Unit</th><th>Rank</th><th>Battles</th><th>Slain</th></tr>' + army + '</table>' +
+      '<div class="choices"><button class="primary" id="m-menu">Back to menu</button></div>';
     UI.modalDismissable = false; UI.modal(body);
     $('m-menu').onclick = function () { UI.closeModal(); C.clear(); UI.campaign = null; UI.show('menu'); };
   };
@@ -843,7 +933,8 @@
             if (itemAfter) { var it = R.pick(SOVL.MAGIC_ITEMS.filter(function (i) { return i.kind === itemAfter; })); var err = C.buy(camp, { kind: 'item', item: it, price: 0 }); more.push(err ? 'The relic is useless to you.' : 'You claim ' + it.name + '.'); }
             if (more.length) { camp.log.push(more.join(' ')); C.save(camp); UI.simpleModal('Aftermath', more.map(esc).join('<br>')); }
           });
-        } else if (lines.length) UI.simpleModal(ev.title, lines.map(esc).join('<br>'));
+        } else if (lines.length) UI.simpleModal(ev.title, lines.map(esc).join('<br>'), function () { if (camp.pendingTrait) UI.traitModal(); });
+        else if (camp.pendingTrait) UI.traitModal();
       };
       ch.appendChild(btn);
     });
@@ -872,6 +963,17 @@
         b.onclick = function () { var err = C.reinforce(camp, e); C.save(camp); UI.renderCampaign(); render(err); };
         return b;
       }));
+      var offers = C.equipmentOffers(camp);
+      if (offers.length) {
+        box.appendChild(el('h3', null, 'Re-arm'));
+        box.appendChild(el('p', 'muted', 'Swap a unit\'s weapons or add an upgrade from its source list.'));
+        offers.forEach(function (o) {
+          var d = el('div', 'shop-item'); d.innerHTML = '<div class="desc"><b>' + esc(o.unitName) + '</b> <span class="muted">' + (o.what === 'weapon' ? 'switch to ' : 'add ') + '</span>' + propSpan(o.name) + '</div>';
+          var btn = el('button', 'small primary', o.price + ' g'); btn.disabled = camp.gold < o.price;
+          btn.onclick = function () { var err = C.buy(camp, o); if (!err) camp.log.push(o.unitName + (o.what === 'weapon' ? ' re-armed with ' : ' takes ') + o.name + ' for ' + o.price + ' gold.'); C.save(camp); UI.renderCampaign(); render(err); };
+          d.appendChild(btn); box.appendChild(d);
+        });
+      }
       var leave = el('button', 'primary', 'Leave'); leave.style.marginTop = '10px'; leave.onclick = function () { UI.closeModal(); C.save(camp); UI.renderCampaign(); };
       box.appendChild(leave);
       UI.modalDismissable = false; UI.modal(box);
@@ -897,8 +999,8 @@
       '<h3>Turn structure</h3><p>Each turn has three phases. Players alternate activations in the first two.</p><ul><li><b>Charge Phase</b> — declare charges one at a time. A charge needs the target within the charger\'s move distance and inside its 45° front arc, with line of sight. Units already charged can <b>counter-charge</b> a frontal charger, or <b>flee</b> if fast enough.</li><li><b>Strategic Phase</b> — activate one unit at a time: advance and pivot (each 45° pivot costs movement: 1 for infantry, 2 for cavalry), use one ranged attack or ability, and the commander may cast one spell. Fleeing units may only try to rally.</li><li><b>Combat Phase</b> — every engagement is fought simultaneously: models in the front rank attack (second rank adds one supporting attack each; spears add a third rank when not charging). Compare Skill to hit (3+ if higher, else 4+), then the defender saves against Power versus Defense. Wounds plus flank (+1) and rear (+1) bonuses give the combat score; the loser tests Discipline on 2d6 minus the difference, adding +1 per rank of 3+ models.</li></ul>',
       '<h3>Ranged attacks</h3><p>One die per model, 4+ to hit modified by Skill (±1 per point from 3), −1 at long range (over half range) and −1 against targets in cover. Losing a quarter of a unit to shooting forces a Discipline test.</p>',
       '<h3>Terrain</h3><p>Forests and swamps are difficult terrain (−2 movement to enter or start in). Cliffs, ruins and lakes are impassable. Forests, cliffs and ruins block line of sight.</p>',
-      '<h3>Controls</h3><table><tr><td>Click a unit</td><td>select / activate (Strategic Phase)</td></tr><tr><td>Click ground</td><td>pivot toward the point and advance</td></tr><tr><td><kbd>Shift</kbd> + click</td><td>pivot only</td></tr><tr><td><kbd>Q</kbd> / <kbd>E</kbd></td><td>pivot 45° left / right</td></tr><tr><td><kbd>Enter</kbd></td><td>end activation / pass</td></tr><tr><td><kbd>X</kbd> / <kbd>Shift</kbd>+<kbd>X</kbd></td><td>show charge arcs / weapon ranges</td></tr><tr><td>Mouse wheel, right-drag</td><td>zoom and pan</td></tr><tr><td><kbd>Esc</kbd></td><td>cancel targeting</td></tr></table>',
-      '<h3>Trail of Death</h3><p>A roguelite campaign in three acts. Choose a path through battles (⚔), elite battles (☠), events (?), merchants (⚖), camps (⛺) and treasure (✪), then defeat each act\'s boss (♛). Victories earn gold and veterancy; half of a unit\'s losses return after a won battle. A lost battle, or a dead commander, ends the run.</p>',
+      '<h3>Controls</h3><table><tr><td>Click a unit</td><td>select / activate (Strategic Phase)</td></tr><tr><td>Click ground</td><td>pivot toward the point and advance</td></tr><tr><td><kbd>Shift</kbd> + click</td><td>pivot only</td></tr><tr><td><kbd>Q</kbd> / <kbd>E</kbd></td><td>pivot 45° left / right</td></tr><tr><td>Drag the gold handle</td><td>turn the selected unit freely (deployment and movement)</td></tr><tr><td><kbd>Z</kbd></td><td>undo the moves and pivots of the current activation</td></tr><tr><td><kbd>Enter</kbd></td><td>end activation / pass</td></tr><tr><td><kbd>X</kbd> / <kbd>Shift</kbd>+<kbd>X</kbd></td><td>show charge arcs / weapon ranges</td></tr><tr><td>Mouse wheel, right-drag</td><td>zoom and pan</td></tr><tr><td><kbd>Esc</kbd></td><td>cancel targeting</td></tr></table>',
+      '<h3>Trail of Death</h3><p>A roguelite campaign in three acts. Choose a path through battles (⚔), elite battles (☠), events (?), merchants (⚖), camps (⛺) and treasure (✪), then defeat each act\'s boss (♛). Victories earn gold and veterancy; half of a unit\'s losses return after a won battle. A lost battle, or a dead commander, ends the run.</p><p>Battles are fought as Pitched Battles, Meeting Engagements (deep zones only 12" apart) or Scoring Objectives. Three difficulties scale the enemy armies and your starting purse. Your commander learns a trait at each veterancy rank, merchants can re-arm units, and every unit keeps a tally of battles fought and models slain.</p>',
       '<h3>Factions</h3><ul>' + Object.keys(SOVL.FACTION_DATA).map(function (f) { return '<li><b>' + esc(SOVL.FACTION_DATA[f].name) + '</b> — ' + esc(SOVL.FACTION_INFO[f].tagline) + '</li>'; }).join('') + '</ul>',
       '<h3>Dice</h3><p>Nothing is rolled for you. When an attack, save, casting roll, break test or flight move comes up, the dice appear in the panel at the bottom of the battlefield: click them (or press <kbd>Space</kbd>) to roll. Attack dice that meet the target count as hits; the defender then rolls a save for each hit. After every engagement the combat score is shown, and the losing units roll their break tests. Use Auto-resolve if you want the rest of a phase rolled for you.</p>',
       '<p class="muted">Core rules follow the public SOVL rules document by Dalen Studios. Spells, magic items and the campaign structure are this game\'s own design, matching the names used in the source lists.</p>'

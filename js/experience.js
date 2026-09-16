@@ -93,14 +93,29 @@
         audioContext.resume().catch(function () {});
       var t = audioContext.currentTime,
         impact = kind === "combat" || kind === "destroy",
-        dur = impact ? 0.36 : kind === "shoot" ? 0.15 : 0.1;
+        dur = impact ? 0.36 : kind === "shoot" ? 0.15 : kind === "horn" ? 0.7 : kind === "dice" ? 0.2 : 0.1;
+      if (kind === "dice") { diceRattle(t); return; }
       var gain = audioContext.createGain();
       gain.gain.setValueAtTime(0.0001, t);
       gain.gain.exponentialRampToValueAtTime(impact ? 0.12 : 0.05, t + 0.005);
       gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
       gain.connect(audioContext.destination);
       var osc = audioContext.createOscillator();
-      osc.type = "triangle";
+      osc.type = kind === "horn" ? "sawtooth" : "triangle";
+      if (kind === "horn") {
+        gain.gain.cancelScheduledValues(t);
+        gain.gain.setValueAtTime(0.0001, t);
+        gain.gain.exponentialRampToValueAtTime(0.07, t + 0.12);
+        gain.gain.setValueAtTime(0.07, t + 0.45);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        osc.frequency.setValueAtTime(156, t);
+        osc.frequency.linearRampToValueAtTime(208, t + 0.16);
+        osc.frequency.setValueAtTime(208, t + 0.4);
+        osc.frequency.linearRampToValueAtTime(196, t + dur);
+        var lp = audioContext.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 900;
+        osc.connect(lp); lp.connect(gain); osc.start(t); osc.stop(t + dur);
+        return;
+      }
       osc.frequency.setValueAtTime(
         impact ? 125 : kind === "phase" ? 220 : 175,
         t,
@@ -133,6 +148,24 @@
       /* Audio availability never blocks an order. */
     }
   };
+  // Three quick clicks of noise: dice shaken and thrown.
+  function diceRattle(t) {
+    if (!noise) {
+      noise = audioContext.createBuffer(1, Math.floor(audioContext.sampleRate * 0.4), audioContext.sampleRate);
+      var d = noise.getChannelData(0);
+      for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    for (var k = 0; k < 3; k++) {
+      var at = t + k * 0.055 + Math.random() * 0.01, g = audioContext.createGain();
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.exponentialRampToValueAtTime(k === 2 ? 0.09 : 0.05, at + 0.004);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + (k === 2 ? 0.09 : 0.04));
+      var src = audioContext.createBufferSource(), f = audioContext.createBiquadFilter();
+      src.buffer = noise; f.type = "bandpass"; f.frequency.value = 2600 + k * 500; f.Q.value = 1.2;
+      src.connect(f); f.connect(g); g.connect(audioContext.destination);
+      src.start(at); src.stop(at + 0.1);
+    }
+  }
   UI.showSettings = function () {
     var box = elem("div");
     box.appendChild(elem("h2", null, "Battle settings"));
@@ -219,12 +252,17 @@
       [
         "03",
         "Move and shoot",
-        "Select a ready regiment. Point at the ground to preview its route and movement cost, then click to move. Use Shoot or a spell, and end the activation. Your opponent acts next.",
+        "Select a ready regiment. Point at the ground to preview its route and movement cost, then click to move. Drag the gold handle in front of the regiment to turn it, press Z to take a move back, then Shoot or cast, and end the activation. Your opponent acts next.",
       ],
       [
         "04",
         "Fight on the field",
         "Click an engagement and choose Fight this engagement. Roll the attack dice, then the armour saves, then any break tests yourself: click the dice or press Space. Select the next fight when the outcome is shown.",
+      ],
+      [
+        "05",
+        "Answer a charge",
+        "When the enemy declares a charge against you, a prompt appears over the field: counter-charge to meet it head on, flee if the regiment is fast enough, or hold and receive it.",
       ],
     ].forEach(function (s) {
       box.appendChild(
@@ -681,7 +719,7 @@
     var cv = $("battle-canvas");
     cv.addEventListener("mousemove", function (e) {
       var b = UI.battle;
-      if (!b || UI.modalOpen) return;
+      if (!b || UI.modalOpen || UI.rotating) return;
       if (
         UI.orderPivot &&
         b.phase === "strategic" &&
@@ -813,8 +851,9 @@
       if (ev.type === "destroy") UI.sound("destroy");
       if (ev.type === "engagementResolved" && b.phase === "combat")
         UI.finishEngagement(ev.report);
-      if (ev.type === "roll") UI.sound(ev.spec && ev.spec.kind === "hits" ? "shoot" : "select");
-      if (ev.type === "charge") UI.sound("combat");
+      if (ev.type === "roll") UI.sound("dice");
+      if (ev.type === "charge") UI.sound("horn");
+      if (ev.type === "declare" && b.unit(ev.from) && b.unit(ev.from).side !== UI.playerSide) UI.sound("horn");
       if (ev.type === "phase") {
         var key = ev.turn + ":" + ev.phase;
         if (UI.lastPhaseKey !== key) {

@@ -177,3 +177,11 @@ kbd { background: #2a2e25; border: 1px solid #555; border-radius: 3px; padding: 
 .die.p1 { box-shadow: 0 0 0 1px #b04a4a; }
 .die.rolling { animation: dice-shake 0.12s infinite; background: #f4f1e8; color: #444; }
 @keyframes dice-shake { 0% { transform: rotate(-8deg) translateY(-1px); } 50% { transform: rotate(8deg) translateY(1px); } 100% { transform: rotate(-4deg); } }
+
+/* charge reaction prompt */
+#reaction-prompt { position: absolute; left: 14px; top: 14px; z-index: 21; background: rgba(12,14,11,0.96); border: 1px solid #b8901c; border-radius: 6px; padding: 8px 10px; width: 250px; box-shadow: 0 10px 30px rgba(0,0,0,0.6); font-size: 12px; }
+#reaction-prompt[hidden] { display: none; }
+#reaction-prompt .rp-title { font-family: var(--head); color: var(--accent); font-size: 13px; margin-bottom: 4px; }
+#reaction-prompt .rp-sub { color: var(--muted); font-size: 11px; margin-bottom: 8px; line-height: 1.4; }
+#reaction-prompt .rp-actions { display: flex; flex-direction: column; gap: 5px; }
+#reaction-prompt button { text-align: left; }

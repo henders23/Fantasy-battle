@@ -18,9 +18,11 @@
     var f = SOVL.FACTION_DATA[fid], bl = f.sections.filter(function (s) { return s.name === 'Battle Line'; })[0];
     var picks = R.shuffle(bl.units.slice()).slice(0, 2);
     picks.forEach(function (d, i) { var e = A.defaultEntry(fid, d.id, d.size[0]); e.ref = 'u' + (i + 2); army.entries.push(e); });
+    var diff = SOVL.DIFFICULTIES.filter(function (d) { return d.id === opts.difficulty; })[0] || SOVL.DIFFICULTIES[1];
     var camp = {
-      version: 1, faction: fid, commanderName: name, army: army, gold: SOVL.CAMPAIGN.startGold, act: 0, layer: 0, nodeIndex: null,
-      map: C.generateMap(), battles: 0, wins: 0, kills: 0, refCounter: 10, log: [], reputation: 0, items: [], over: false, victory: false, seed: Math.floor(R.rng() * 1e9)
+      version: 2, faction: fid, commanderName: name, army: army, gold: diff.gold, difficulty: diff.id, act: 0, layer: 0, nodeIndex: null,
+      map: C.generateMap(), battles: 0, wins: 0, kills: 0, refCounter: 10, log: [], reputation: 0, items: [], over: false, victory: false, seed: Math.floor(R.rng() * 1e9),
+      history: [], pendingTrait: false
     };
     camp.log.push('The trail begins. ' + name + ' leads a ragtag warband of ' + army.entries.length + ' units.');
     return camp;
@@ -76,18 +78,25 @@
     var actDef = SOVL.CAMPAIGN.acts[camp.act], t = camp.layer / Math.max(1, actDef.layers - 1);
     var pts = Math.round(actDef.pts[0] + (actDef.pts[1] - actDef.pts[0]) * t);
     // scale a little with the player's own strength so the run stays fair
-    var own = A.armyCost(camp.army);
-    pts = Math.round(pts * 0.7 + Math.min(own * 0.8, pts * 1.5) * 0.3);
+    var own = A.armyCost(camp.army), diff = C.difficulty(camp);
+    pts = Math.round((pts * 0.7 + Math.min(own * 0.8, pts * 1.5) * 0.3) * diff.pts);
     var type = kind || node.type, fids = Object.keys(SOVL.FACTION_DATA), fid;
     if (type === 'small') { pts = Math.round(pts * 0.6); }
     if (type === 'undead') { fid = 'dead_nations'; pts = Math.round(pts * 0.9); }
     if (type === 'elite') pts = Math.round(pts * actDef.elitePts);
-    if (type === 'boss') { pts = Math.round(Math.min(actDef.boss.pts, Math.max(actDef.boss.pts * 0.6, own * 1.25))); fid = camp.act === 2 ? 'dead_nations' : null; }
-    else pts = Math.min(pts, Math.round(own * 1.4 + 50)); // never wildly larger than the player's own army
+    if (type === 'boss') { pts = Math.round(Math.min(actDef.boss.pts, Math.max(actDef.boss.pts * 0.6, own * 1.25)) * diff.pts); fid = camp.act === 2 ? 'dead_nations' : null; }
+    else pts = Math.min(pts, Math.round((own * 1.4 + 50) * diff.pts)); // never wildly larger than the player's own army
     if (!fid) { var others = fids.filter(function (f) { return f !== camp.faction; }); fid = R.rng() < 0.85 ? R.pick(others) : camp.faction; }
     var army = A.randomArmy({ faction: fid, pts: Math.max(150, pts), boss: type === 'boss', name: type === 'boss' ? actDef.boss.name : undefined });
     army.pts = pts; army.kind = type;
     return army;
+  };
+  C.difficulty = function (camp) { return SOVL.DIFFICULTIES.filter(function (d) { return d.id === camp.difficulty; })[0] || SOVL.DIFFICULTIES[1]; };
+  // Scenario for a campaign battle: mostly pitched, sometimes a meeting engagement or objectives.
+  C.scenarioFor = function (camp, node, kind) {
+    if (kind || (node && node.type === 'boss')) return 'pitched';
+    var r = R.rng();
+    return r < 0.55 ? 'pitched' : r < 0.8 ? 'meeting' : 'objectives';
   };
   C.goldReward = function (camp, enemyArmy, node) {
     var base = Math.round(enemyArmy.pts * 0.22);
@@ -107,6 +116,7 @@
     var lines = [];
     if ((!won && !draw) || !cmdAlive) {
       camp.over = true;
+      camp.history.push({ act: camp.act, type: node ? node.type : 'battle', enemy: enemyArmy.faction, pts: enemyArmy.pts, won: false, draw: false, turn: battle.result.turn, why: battle.result.why, fatal: true });
       lines.push(cmdAlive ? 'The battle is lost. The trail ends here.' : camp.commanderName + ' has fallen. The trail ends here.');
       camp.log = camp.log.concat(lines);
       return { won: false, lines: lines };
@@ -121,7 +131,8 @@
       var survivors = Math.max(0, u.models) + back;
       if (u.removed && u.removedHow !== 'fled') { survivors = e.kind === 'commander' ? Math.max(0, back) : 0; }
       if (u.removed && u.removedHow === 'fled') survivors = Math.max(survivors, Math.floor(u.maxModels / 2));
-      camp.kills += 0;
+      t.kills = (t.kills || 0) + (u.kills || 0);
+      if (u.commander && e.kind === 'commander') e.commanderKills = (e.commanderKills || 0) + (u.commanderKills || 0);
       if (def.per) {
         if (survivors < Math.max(1, Math.floor(def.size[0] / 2)) && e.kind !== 'commander') { lines.push(def.name + ' has been wiped out.'); return; }
         t.models = Math.max(e.kind === 'commander' ? 1 : 1, Math.min(def.size[1], survivors));
@@ -131,13 +142,15 @@
       t.battles = (t.battles || 0) + 1;
       var vt = SOVL.CAMPAIGN.veteran, newVet = 0; for (var i = 0; i < vt.length; i++) if (t.battles >= vt[i].at) newVet = i + 1;
       if (newVet > (t.vet || 0)) { t.vet = newVet; lines.push(def.name + ' is now ' + vt[newVet - 1].name + '!'); }
-      if (e.kind === 'commander') { e.battles = (e.battles || 0) + 1; var cv = 0; for (var j = 0; j < vt.length; j++) if (e.battles >= vt[j].at) cv = j + 1; if (cv > (e.vet || 0)) { e.vet = cv; lines.push(e.name + ' is now ' + vt[cv - 1].name + '!'); } }
+      if (e.kind === 'commander') { e.battles = (e.battles || 0) + 1; var cv = 0; for (var j = 0; j < vt.length; j++) if (e.battles >= vt[j].at) cv = j + 1; if (cv > (e.vet || 0)) { e.vet = cv; camp.pendingTrait = true; lines.push(e.name + ' is now ' + vt[cv - 1].name + ' and may learn a trait!'); } }
       newEntries.push(e);
     });
     camp.army.entries = newEntries;
     var gold = won ? C.goldReward(camp, enemyArmy, node) : 0;
     if (gold) { camp.gold += gold; lines.push('Plunder: +' + gold + ' gold.'); }
     battle.dead.filter(function (u) { return u.side === 1; }).forEach(function (u) { camp.kills += u.killed; });
+    battle.units.filter(function (u) { return u.side === 1; }).forEach(function (u) { camp.kills += u.killed; });
+    camp.history.push({ act: camp.act, type: node ? node.type : 'battle', enemy: enemyArmy.faction, pts: enemyArmy.pts, won: won, draw: draw, turn: battle.result.turn, why: battle.result.why });
     if (!won && node && node.type === 'boss') { camp.over = true; lines.push('A stalemate is not enough against ' + (SOVL.CAMPAIGN.acts[camp.act].boss.name) + '. The trail ends here.'); camp.log = camp.log.concat(lines); return { won: false, lines: lines }; }
     camp.log = camp.log.concat(lines);
     return { won: true, draw: draw, lines: lines, gold: gold };
@@ -156,6 +169,21 @@
     if (camp.act >= camp.map.acts.length) { camp.victory = true; camp.over = true; }
   };
 
+  // ---- Commander traits ----
+  C.traitChoices = function (camp) {
+    var cmd = camp.army.entries[0], cdef = SOVL.findUnitDef(camp.faction, cmd.id), owned = cmd.traits || [];
+    var pool = Object.keys(SOVL.TRAITS).filter(function (id) { var t = SOVL.TRAITS[id]; return owned.indexOf(id) < 0 && (!t.caster || cdef.caster); });
+    return R.shuffle(pool).slice(0, 3);
+  };
+  C.learnTrait = function (camp, id) {
+    if (!SOVL.TRAITS[id]) return 'Unknown trait.';
+    var cmd = camp.army.entries[0]; cmd.traits = cmd.traits || [];
+    if (cmd.traits.indexOf(id) >= 0) return 'Already known.';
+    cmd.traits.push(id); camp.pendingTrait = false;
+    camp.log.push(cmd.name + ' learns ' + SOVL.TRAITS[id].name + '.');
+    return null;
+  };
+
   // ---- Merchant ----
   C.merchantStock = function (camp) {
     var f = SOVL.FACTION_DATA[camp.faction], stock = [], sections = f.sections.filter(function (s) { return s.name !== 'Commanders' && s.name !== 'Mounts'; });
@@ -167,6 +195,21 @@
     R.shuffle(SOVL.MAGIC_ITEMS.slice()).slice(0, 2).forEach(function (it) { stock.push({ kind: 'item', item: it, price: it.cost * 2 + 20 }); });
     R.shuffle(SOVL.BANNERS.slice()).slice(0, 2).forEach(function (bn) { stock.push({ kind: 'banner', banner: bn, price: bn.cost * 2 + 10 }); });
     return stock;
+  };
+  // Equipment a unit could be re-armed with: alternative weapon sets and optional upgrades from its source entry.
+  C.equipmentOffers = function (camp) {
+    var offers = [];
+    camp.army.entries.forEach(function (e) {
+      var t = e.kind === 'commander' ? e.retinue : e, def = SOVL.findUnitDef(camp.faction, t.id), models = def.per ? t.models : 1;
+      def.weapons.forEach(function (w) { if (w.name !== t.weapon) offers.push({ kind: 'equip', ref: t.ref, entry: e, unitName: def.name, name: w.name, what: 'weapon', price: Math.round((8 + w.cost * models) * 1.5) }); });
+      (def.upgrades || []).forEach(function (up) { if ((t.upgrades || []).indexOf(up.name) < 0) offers.push({ kind: 'equip', ref: t.ref, entry: e, unitName: def.name, name: up.name, what: 'upgrade', price: Math.round((10 + up.cost * (def.per && (SOVL.WEAPONS[up.name] || SOVL.RANGED[up.name]) ? models : 1)) * 1.5) }); });
+      if (e.kind === 'commander') {
+        var cdef = SOVL.findUnitDef(camp.faction, e.id);
+        cdef.weapons.forEach(function (w) { if (w.name !== e.weapon) offers.push({ kind: 'equip', ref: e.ref, entry: e, commander: true, unitName: e.name, name: w.name, what: 'weapon', price: Math.round((10 + w.cost) * 1.5) }); });
+        (cdef.upgrades || []).forEach(function (up) { if ((e.upgrades || []).indexOf(up.name) < 0) offers.push({ kind: 'equip', ref: e.ref, entry: e, commander: true, unitName: e.name, name: up.name, what: 'upgrade', price: Math.round((10 + up.cost) * 1.5) }); });
+      }
+    });
+    return offers;
   };
   C.reinforceCost = function (camp, entry) {
     var t = entry.kind === 'commander' ? entry.retinue : entry, def = SOVL.findUnitDef(camp.faction, t.id);
@@ -189,6 +232,10 @@
       var same = cmd.items.map(SOVL.itemById).filter(function (i) { return i && i.kind === offer.item.kind; });
       if (same.length) cmd.items = cmd.items.filter(function (id) { return SOVL.itemById(id).kind !== offer.item.kind; });
       cmd.items.push(offer.item.id);
+    } else if (offer.kind === 'equip') {
+      var target = offer.commander ? offer.entry : (offer.entry.kind === 'commander' ? offer.entry.retinue : offer.entry);
+      if (offer.what === 'weapon') target.weapon = offer.name;
+      else { target.upgrades = target.upgrades || []; if (target.upgrades.indexOf(offer.name) < 0) target.upgrades.push(offer.name); }
     } else if (offer.kind === 'banner') {
       var target = null;
       camp.army.entries.forEach(function (en) { var t = en.kind === 'commander' ? en.retinue : en, def = SOVL.findUnitDef(camp.faction, t.id); if (!target && def.banner && def.banner >= offer.banner.cost && !t.banner) target = t; });
@@ -214,8 +261,9 @@
   };
   // ---- Events ----
   C.randomEvent = function (camp) {
-    var pool = SOVL.CAMPAIGN.events.filter(function (e) { return (camp.seenEvents || []).indexOf(e.id) < 0; });
-    if (!pool.length) pool = SOVL.CAMPAIGN.events;
+    var eligible = SOVL.CAMPAIGN.events.filter(function (e) { return (!e.faction || e.faction === camp.faction) && (e.minAct == null || camp.act >= e.minAct); });
+    var pool = eligible.filter(function (e) { return (camp.seenEvents || []).indexOf(e.id) < 0; });
+    if (!pool.length) pool = eligible;
     var ev = R.pick(pool); camp.seenEvents = (camp.seenEvents || []).concat([ev.id]);
     return ev;
   };
@@ -232,7 +280,10 @@
     if (effect.commanderWounds) { camp.army.entries[0].extraWounds = (camp.army.entries[0].extraWounds || 0) + effect.commanderWounds; lines.push('Your commander feels blessed: +' + effect.commanderWounds + ' Wound.'); }
     if (effect.loseModelsPct) { camp.army.entries.forEach(function (e) { var t = e.kind === 'commander' ? e.retinue : e, def = SOVL.findUnitDef(camp.faction, t.id); if (def.per) t.models = Math.max(1, t.models - Math.ceil(t.models * effect.loseModelsPct)); }); lines.push('Every unit loses some of its number.'); }
     if (effect.grantProp) { var cands = camp.army.entries.filter(function (e) { var t = e.kind === 'commander' ? e.retinue : e, def = SOVL.findUnitDef(camp.faction, t.id); return def.props.indexOf(effect.grantProp) < 0 && (t.extraProps || []).indexOf(effect.grantProp) < 0 && def.type.indexOf('Infantry') === 0; }); if (cands.length) { var pick = R.pick(cands), tt = pick.kind === 'commander' ? pick.retinue : pick; tt.extraProps = (tt.extraProps || []).concat([effect.grantProp]); lines.push(SOVL.findUnitDef(camp.faction, tt.id).name + ' now has ' + effect.grantProp + '.'); } else lines.push('No unit could use the armour.'); }
-    if (effect.randomItem) { var it = R.pick(SOVL.MAGIC_ITEMS); C.buy(camp, { kind: 'item', item: it, price: 0 }); lines.push('Your commander receives ' + it.name + '.'); }
+    if (effect.randomItem) { var it = R.pick(SOVL.MAGIC_ITEMS.filter(function (i) { return i.kind === 'item'; })); var err0 = C.buy(camp, { kind: 'item', item: it, price: 0 }); lines.push(err0 ? 'The item is useless to your commander.' : 'Your commander receives ' + it.name + '.'); }
+    if (effect.randomWeapon) { var wp = R.pick(SOVL.MAGIC_ITEMS.filter(function (i) { return i.kind === 'weapon'; })); var err1 = C.buy(camp, { kind: 'item', item: wp, price: 0 }); lines.push(err1 ? 'Your commander cannot wield it; it is sold for 60 gold.' : 'Your commander takes up ' + wp.name + '.'); if (err1) camp.gold += 60; }
+    if (effect.recruitMachine) { var f2 = SOVL.FACTION_DATA[camp.faction], machines = []; f2.sections.forEach(function (s) { s.units.forEach(function (u) { if (u.type === 'War Machine') machines.push(u); }); }); if (machines.length) { var md = R.pick(machines), me = A.defaultEntry(camp.faction, md.id, 1); me.ref = C.nextRef(camp); camp.army.entries.push(me); lines.push('A ' + md.name + ' joins the column.'); } else lines.push('Your people have no use for such a machine.'); }
+    if (effect.traitOffer) { camp.pendingTrait = true; lines.push('Your commander may learn a new trait.'); }
     if (effect.trainOne) { var best = camp.army.entries[0]; C.camp(camp, 'train', best); lines.push(SOVL.findUnitDef(camp.faction, best.retinue.id).name + ' gains a veterancy rank.'); }
     if (effect.healAll) { camp.army.entries.forEach(function (e) { var t = e.kind === 'commander' ? e.retinue : e, def = SOVL.findUnitDef(camp.faction, t.id); if (def.per) t.models = Math.min(def.size[1], Math.max(t.models, t.maxSeen || def.size[0])); }); lines.push('All units are back to strength.'); }
     if (effect.reputation) camp.reputation += effect.reputation;

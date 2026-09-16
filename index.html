@@ -41,13 +41,13 @@
     <div id="setup-skirmish-opts" class="row" style="gap:18px">
       <label>Army size <select id="setup-size"></select></label>
       <label>Opponent <select id="setup-enemy"></select></label>
-      <label>Scenario <select id="setup-scenario"><option value="pitched">Pitched Battle</option><option value="objectives">Scoring Objectives</option></select></label>
+      <label>Scenario <select id="setup-scenario"></select></label>
       <label>AI aggression <select id="setup-aggr"><option value="0.35">Cautious</option><option value="0.5" selected>Balanced</option><option value="0.8">Reckless</option></select></label>
     </div>
     <div id="setup-campaign-opts" class="col" style="display:none">
       <h3>Choose your commander</h3>
       <div id="setup-commanders" class="row" style="align-items:stretch"></div>
-      <div class="row"><label>Commander's name <input type="text" id="setup-name" maxlength="18"></label></div>
+      <div class="row" style="gap:18px"><label>Commander's name <input type="text" id="setup-name" maxlength="18"></label><label>Difficulty <select id="setup-difficulty"></select></label></div>
       <p class="muted" style="max-width:720px;line-height:1.6">You begin with your commander, a small retinue and two supporting units, and a purse of gold. Fight along the trail, recruit and upgrade, survive three acts and defeat the Deathless Host. Losing a battle, or your commander, ends the run.</p>
     </div>
     <div class="row"><button class="primary" id="setup-next">Continue →</button></div>
@@ -87,6 +87,7 @@
       <div id="engagement-panel" hidden></div>
       <div id="battle-hint"></div>
       <div id="dice-panel"></div>
+      <div id="reaction-prompt" hidden></div>
     </div>
     <div id="battle-right">
       <div class="dock-head"><span id="dock-title">Deploy your army</span><button id="close-log" class="small" aria-label="Close chronicle">×</button></div>

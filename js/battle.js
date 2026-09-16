@@ -74,7 +74,7 @@
         weapon: c.weapon || cdef.weapons[0].name,
         ranged: c.ranged || (cdef.ranged.length ? cdef.ranged[0].name : null),
         props: cdef.props.slice(), upgrades: (c.upgrades || []).slice(),
-        items: (c.items || []).map(itemById).filter(Boolean),
+        items: (c.items || []).map(itemById).filter(Boolean).concat((c.traits || []).map(function (id) { var t = SOVL.TRAITS && SOVL.TRAITS[id]; return t ? { id: id, name: t.name, kind: 'trait', cost: 0, effect: t.effect, desc: t.desc } : null; }).filter(Boolean)),
         spells: (c.spells || []).slice(), caster: cdef.caster || 0,
         wounds: 0, alive: true, vet: c.vet || 0, extraWounds: c.extraWounds || 0, costPts: c.cost || 0, ref: c.ref || null
       };
@@ -146,7 +146,7 @@
     }
     if (u.banner) { var be = u.banner.effect; s.df += be.defense || 0; s.pw += be.power || 0; s.ds += be.discipline || 0; }
     s.ds += vetBonus(u.vet, 'discipline'); s.sk += vetBonus(u.vet, 'skill'); s.pw += vetBonus(u.vet, 'power');
-    s.ds += itemBonus(u, 'retinueDiscipline') + (u.discMod || 0);
+    s.ds += itemBonus(u, 'retinueDiscipline') + (u.discMod || 0); s.df += itemBonus(u, 'retinueDefense');
     s.sk += effectSum(u, 'skill'); s.pw += effectSum(u, 'power'); s.df += effectSum(u, 'defense'); s.at += effectSum(u, 'attacks');
     if (battle) { var ae = battle.armyEffects[u.side]; s.df += ae.defense || 0; s.pw += ae.power || 0; }
     if (commanderOnly(u)) { var c = effCmdStats(u, battle); return c; }
@@ -204,6 +204,7 @@
     this.charges = []; this.contacts = []; this.log = []; this.events = [];
     this.armyEffects = [{}, {}]; this.armies = opts.armies; this.maxTurns = opts.maxTurns || SOVL.MAX_TURNS;
     this.scenario = opts.scenario || 'pitched'; this.objectives = []; this.objectiveScore = [0, 0];
+    this.deployDepth = this.scenario === 'meeting' ? 14 : TABLE.deployDepth;
     this.activeUnit = null; this.winner = null; this.result = null; this.deployed = [false, false];
     this.names = opts.names || ['Player', 'Enemy']; this.sides = opts.sides || ['bottom', 'top'];
     this.scoreMode = opts.scoreMode || 'points'; // 'points' or 'ratio' (share of enemy army value destroyed)
@@ -245,8 +246,8 @@
 
   // ---------- Deployment ----------
   BP.deployZone = function (side) {
-    var top = this.sides[side] === 'top';
-    return top ? { x: 0, y: 0, w: TABLE.w, h: TABLE.deployDepth } : { x: 0, y: TABLE.h - TABLE.deployDepth, w: TABLE.w, h: TABLE.deployDepth };
+    var top = this.sides[side] === 'top', dd = this.deployDepth || TABLE.deployDepth;
+    return top ? { x: 0, y: 0, w: TABLE.w, h: dd } : { x: 0, y: TABLE.h - dd, w: TABLE.w, h: dd };
   };
   BP.halfZone = function (side) {
     var top = this.sides[side] === 'top';
@@ -711,6 +712,7 @@
       // caught: move to the target's position and destroy it
       var pos = { x: u.x, y: u.y };
       this.addLog(ch.name + ' runs down the fleeing ' + u.name + '!', 'kill');
+      ch.kills = (ch.kills || 0) + u.models + (u.commander && u.commander.alive ? 1 : 0);
       this.destroyUnit(u, 'run down');
       this.moveToward(ch, pos, range, 0);
       this.emit({ type: 'rundown', uid: ch.uid, target: u.uid });
@@ -749,6 +751,7 @@
     if (u.moveStarted) return { ok: true };
     u.moveStarted = true;
     u.inDifficultAtStart = !isFlying(u) && !hasProp(u, 'Scout') && this.inDifficult(u);
+    u.undoStack = [];
     u.moveLeft = this.isEngaged(u) || u.fleeing ? 0 : Math.max(0, moveAllowance(u, this) - (u.inDifficultAtStart ? 2 : 0));
     if (hasEffect(u, 'rooted')) u.moveLeft = 0;
     this.emit({ type: 'activate', uid: u.uid });
@@ -817,6 +820,7 @@
     var u = this.unit(uid);
     if (!mv.ok || this.activeUnit !== uid) return false;
     var from = { x: u.x, y: u.y, a: u.a };
+    (u.undoStack = u.undoStack || []).push({ x: u.x, y: u.y, a: u.a, moveLeft: u.moveLeft, inDifficultAtStart: u.inDifficultAtStart });
     u.x = mv.x; u.y = mv.y; u.a = mv.a; u.moveLeft = Math.max(0, u.moveLeft - mv.cost);
     if (mv.enteredDifficult) u.inDifficultAtStart = true;
     this.emit({ type: 'move', uid: u.uid, from: from, to: { x: u.x, y: u.y, a: u.a } });
@@ -830,8 +834,22 @@
     var a = u.a + dir * Math.PI / 4, r = { x: u.x, y: u.y, a: a, w: u.w, d: u.d };
     if (!G.rectInsideTable(r, TABLE.w, TABLE.h, 0) || this.collides(u, r, [], false)) return false;
     var from = { x: u.x, y: u.y, a: u.a };
+    (u.undoStack = u.undoStack || []).push({ x: u.x, y: u.y, a: u.a, moveLeft: u.moveLeft, inDifficultAtStart: u.inDifficultAtStart });
     u.a = a; u.moveLeft -= pc;
     this.emit({ type: 'move', uid: u.uid, from: from, to: { x: u.x, y: u.y, a: u.a } });
+    return true;
+  };
+
+  // Undo the last move or pivot of the current activation, as long as nothing has been rolled since.
+  BP.canUndo = function (uid) {
+    var u = this.unit(uid);
+    return !!(u && this.activeUnit === uid && !this.pendingRoll && u.undoStack && u.undoStack.length && !u.usedRanged && !u.usedSpell && !u.usedAbility);
+  };
+  BP.undoMove = function (uid) {
+    if (!this.canUndo(uid)) return false;
+    var u = this.unit(uid), s = u.undoStack.pop(), from = { x: u.x, y: u.y, a: u.a };
+    u.x = s.x; u.y = s.y; u.a = s.a; u.moveLeft = s.moveLeft; u.inDifficultAtStart = s.inDifficultAtStart;
+    this.emit({ type: 'move', uid: u.uid, from: from, to: { x: u.x, y: u.y, a: u.a }, undo: true });
     return true;
   };
 
@@ -924,6 +942,7 @@
   BP.applyWounds = function (t, wounds, opts) {
     opts = opts || {};
     var res = { wounds: 0, killed: 0, commanderKilled: false, commanderWounds: 0 };
+    var startModels = t.models;
     var W = t.base.wd;
     while (wounds > 0 && t.models > 0) {
       var dealt = (opts.lethal && W > 1) ? Math.min(2, W - t.woundsOnCurrent) : 1;
@@ -938,6 +957,7 @@
         if (c.wounds >= c.maxWounds) { c.alive = false; res.commanderKilled = true; this.addLog(c.name + ' has been slain!', 'kill'); this.emit({ type: 'commanderDeath', uid: t.uid }); }
       }
     }
+    if (opts.source && !opts.source.removed) { opts.source.kills = (opts.source.kills || 0) + (startModels - t.models) + (res.commanderKilled ? 1 : 0); if (res.commanderKilled) opts.source.commanderKills = (opts.source.commanderKills || 0) + 1; }
     if (t.models <= 0 && t.commander && t.commander.alive && !t.wasRetinueLost) {
       t.wasRetinueLost = true; t.files = 1; refreshFootprint(t, true);
       this.addLog(t.commander.name + ' fights on alone.', 'info');
@@ -975,7 +995,7 @@
   BP.disciplineTest = function (u, penalty, why, cb) {
     var self = this, s = effStats(u, this), rb = commanderOnly(u) ? 0 : R.rankBonus(u.models, u.files), fearless = isFearless(u, this);
     var value = s.ds + rb - (fearless ? 0 : penalty);
-    var reroll = (hasProp(u, 'Bodyguard') && u.commander && u.commander.alive) || (u.banner && u.banner.effect.rerollBreak && why === 'break test');
+    var reroll = (hasProp(u, 'Bodyguard') && u.commander && u.commander.alive) || ((u.banner && u.banner.effect.rerollBreak || cmdHasItemFlag(u, 'rerollBreak')) && why === 'break test');
     var breakdown = 'Disc ' + s.ds + (rb ? ' + ' + rb + ' ranks' : '') + (penalty && !fearless ? ' − ' + penalty : '') + (fearless && penalty ? ' (Fearless)' : '');
     if (isReanimated(u)) {
       var test0 = { dice: [], total: 0, ok: true, reanimated: true, value: value, rankBonus: rb, fearless: fearless };
@@ -1267,6 +1287,7 @@
       pow += w.chargePow || 0;
       for (var i = 0; i < u.props.length; i++) { var p = SOVL.PROPS[u.props[i]]; if (p && p.chargePow) pow += p.chargePow; if (p && p.chargeAtt) att += p.chargeAtt; }
       if (u.banner && u.banner.effect.chargePow) pow += u.banner.effect.chargePow;
+      pow += itemBonus(u, 'retinueChargePow');
     }
     var rerollMiss = hasProp(u, 'Elven Mastery') || hasEffect(u, 'rerollMiss') || (hasProp(u, 'Frenzy') && u.combatRounds === 0);
     var single = commanderOnly(u) || isSingle(u.type);

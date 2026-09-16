@@ -14,6 +14,54 @@
     if (u.ranged) v *= 1.2; if (u.type === 'War Machine') v *= 1.3;
     return v;
   };
+  // Battlefield roles drive movement. Cached per unit per battle.
+  P.roleOf = function (u) {
+    if (u.role) return u.role;
+    var r;
+    if (u.type === 'War Machine') r = 'artillery';
+    else if (SOVL.isSingle(u.type) && !u.commander) r = 'monster';
+    else if (u.ranged && !/Pistol/.test(u.ranged) && (u.type === 'Cavalry' || u.type === 'Hounds')) r = 'skirmisher';
+    else if (u.ranged && !/Pistol/.test(u.ranged) && !SOVL.isSingle(u.type)) r = 'shooter';
+    else if (u.type === 'Cavalry' || u.type === 'Chariot' || u.type === 'Hounds' || SOVL.hasProp(u, 'Flying')) r = 'flanker';
+    else r = 'line';
+    u.role = r; return r;
+  };
+  // Direction of advance for this side (toward the enemy's deployment edge)
+  P.advanceDir = function () { return this.b.sides[this.side] === 'bottom' ? -1 : 1; };
+  // Enemy main body: model-weighted centroid of the enemy's blocks
+  P.enemyMainBody = function () {
+    var en = this.b.enemiesOf(this.side).filter(function (u) { return !u.fleeing; }), x = 0, y = 0, w = 0;
+    en.forEach(function (u) { var k = Math.max(1, u.models * u.base.wd); x += u.x * k; y += u.y * k; w += k; });
+    if (!w) return null;
+    return { x: x / w, y: y / w };
+  };
+  // How far forward (toward the enemy) our line units' fronts are, on average
+  P.lineFront = function (exclude) {
+    var self = this, dir = this.advanceDir(), ys = [];
+    this.b.unitsOf(this.side).forEach(function (u) { if (u === exclude || u.fleeing || self.b.isEngaged(u)) return; if (self.roleOf(u) !== 'line') return; ys.push(G.frontCenter(u).y * dir); });
+    if (!ys.length) return null;
+    ys.sort(function (a, b) { return b - a; });
+    var top = ys.slice(0, Math.max(1, Math.ceil(ys.length / 2)));
+    return top.reduce(function (a, b) { return a + b; }, 0) / top.length;
+  };
+  // Enemy units that could charge unit u next turn
+  P.threatsTo = function (u) {
+    var b = this.b, self = this;
+    return b.enemiesOf(this.side).filter(function (e) {
+      if (e.fleeing || b.isEngaged(e) || SOVL.hasProp(e, 'Crewed Weapon')) return false;
+      var d = G.dist(G.frontCenter(e), u) - Math.max(u.w, u.d) / 2;
+      return d <= b.chargeRange(e) + 1 && self.expectedMelee(e, u, true, 'front') > 0.5;
+    });
+  };
+  // Is there a friendly line unit between u and enemy e?
+  P.screened = function (u, e) {
+    var self = this;
+    return this.b.unitsOf(this.side).some(function (f) {
+      if (f === u || f.fleeing || self.roleOf(f) !== 'line') return false;
+      var l = G.toLocal({ x: u.x, y: u.y, a: Math.atan2(e.y - u.y, e.x - u.x) }, f);
+      return l.y > 0 && l.y < G.dist(u, e) && Math.abs(l.x) < f.w / 2 + 1.5;
+    });
+  };
   // Expected wounds dealt by attacker to defender in one melee round (approx).
   P.expectedMelee = function (att, def, charging, side) {
     var b = this.b, as = SOVL.effStats(att, b), ds = SOVL.effStats(def, b);
@@ -58,6 +106,16 @@
     // time pressure: an army that never engages cannot win on points
     if (this.b.turn >= 5) score += 1.0;
     if (this.b.armyStrength(u.side) >= this.b.armyStrength(t.side) * 1.2) score += 0.8;
+    if (this.opts.classicCharge) return score;
+    // mass on one target: a second charge onto a unit we already charge (ideally into its flank)
+    var ours = this.b.chargeAgainst(t).filter(function (c) { var cu = this.b.unit(c.charger); return cu && cu.side === u.side; }, this);
+    if (ours.length) score += 1.5 + (info.side !== 'front' ? 1.0 : 0);
+    // frontal charges into deep blocks lose the rank fight; shooters and skirmishers should not charge at all
+    var role = this.roleOf(u), theirRb = SOVL.isSingle(t.type) ? 0 : R.rankBonus(t.models, t.files);
+    if (info.side === 'front' && !SOVL.isSingle(t.type)) score -= Math.max(0, theirRb - rb) * 0.6;
+    if (role === 'shooter' || role === 'skirmisher') score -= (t.type === 'War Machine' || t.fleeing || (t.models <= 5 && !SOVL.isSingle(t.type))) ? 0 : 2.5;
+    if (role === 'flanker') score += info.side !== 'front' ? 1.0 : (theirRb >= 3 ? -1.2 : 0);
+    if (role === 'monster' && (t.ranged || t.type === 'War Machine')) score += 0.8;
     return score;
   };
 
@@ -75,8 +133,9 @@
       var charger = b.unit(inc[0].charger);
       var cc = b.canCounterCharge(u), cf = b.canFlee(u);
       var dealt = this.expectedMelee(u, charger, true, 'front'), taken = this.expectedRetaliation(u, charger, 'front');
-      if (cc && dealt >= taken * 0.9) { return b.declareCounterCharge(u.uid); }
       var dealtStanding = this.expectedMelee(u, charger, false, 'front');
+      // counter-charge when our own charge bonus outweighs what we lose (spears prefer to hold), or the enemy is a lance-armed flanker we want to meet head on
+      if (cc && (this.opts.classicCounter ? dealt >= taken * 0.9 : (dealt > dealtStanding + 0.3 || (dealt >= taken * 0.9 && this.roleOf(u) !== 'shooter')))) { return b.declareCounterCharge(u.uid); }
       var incoming = this.expectedMelee(charger, u, true, inc[0].side);
       if (cf && (u.ranged || u.type === 'War Machine' || incoming > dealtStanding * 2 + 2) && incoming > u.models * 0.25) {
         // fleeing is only worth it with room to run and a real chance to outpace the pursuit
@@ -122,13 +181,15 @@
     return cands[0];
   };
   P.activationPriority = function (u) {
-    var b = this.b, p = 0;
+    var b = this.b, p = 0, role = this.roleOf(u);
     if (u.fleeing) return 10;
     if (b.isEngaged(u)) return 9; // just spells
-    if (u.type === 'War Machine' && this.bestShot(u)) return 8;
-    if (u.ranged && this.bestShot(u)) return 7;
+    if (role === 'artillery' && this.bestShot(u)) return 8;
+    if ((role === 'shooter' || role === 'skirmisher') && this.bestShot(u)) return 7;
     if (b.canCast(u)) p += 2;
-    return p + (SOVL.hasProp(u, 'Flying') ? 1 : 0);
+    if (role === 'line') p += 1; // the line moves first so shooters and flankers can react to it
+    if (role === 'flanker') p -= 1;
+    return p;
   };
   P.bestShot = function (u, commander) {
     var b = this.b, best = null, bs = 0, en = b.enemiesOf(this.side);
@@ -156,13 +217,14 @@
     var shot = null;
     if (u.ranged) {
       shot = this.bestShot(u);
-      // shooters: shoot first if a target exists, otherwise reposition
-      if (shot) b.shoot(u.uid, shot.t.uid);
+      // shooters: shoot first if a target exists and nothing threatens them; otherwise move first
+      if (shot && (this.roleOf(u) !== 'skirmisher' || !this.threatsTo(u).length)) b.shoot(u.uid, shot.t.uid);
+      else shot = null;
     }
     if (u.commander && u.commander.alive && u.commander.ranged && !u.usedSpell) { var cs = this.bestShot(u, true); if (cs) b.shoot(u.uid, cs.t.uid, true); }
     if (b.activeUnit !== u.uid || u.removed) return; // destroyed or something odd
     this.moveUnit(u, !!shot);
-    if (u.ranged && !shot && !u.usedRanged && b.activeUnit === u.uid) { var s2 = this.bestShot(u); if (s2) b.shoot(u.uid, s2.t.uid); }
+    if (u.ranged && !u.usedRanged && !u.usedAbility && b.activeUnit === u.uid) { var s2 = this.bestShot(u); if (s2) b.shoot(u.uid, s2.t.uid); }
     if (b.activeUnit === u.uid) b.endActivation();
   };
   P.castSpells = function (u) {
@@ -173,9 +235,10 @@
       var targets = b.spellTargets(u, name);
       for (var j = 0; j < targets.length; j++) {
         var t = targets[j], v = 0;
-        if (sp.kind === 'bolt') v = avgExpr(sp.hits) * pFailSave(R.saveTarget(sp.pow, SOVL.effStats(t, b).df)) * (sp.lethal && t.base.wd > 1 ? 2 : 1) + (t.commander ? 0.5 : 0);
-        else if (sp.kind === 'hex') v = (b.isEngaged(t) || G.dist(u, t) < 14 ? 1.5 : 0.6) + (sp.effect.hits ? avgExpr(sp.effect.hits) * pFailSave(R.saveTarget(sp.effect.pow, SOVL.effStats(t, b).df)) : 0);
-        else if (sp.kind === 'buff') v = b.isEngaged(t) ? 2.0 : (this.threatAt(t, t) > 0 ? 1.2 : (sp.effect.shrouded ? 0.3 : 0.4));
+        var tv = this.unitValue(t) / Math.max(1, t.models * t.base.wd);
+        if (sp.kind === 'bolt') v = avgExpr(sp.hits) * pFailSave(R.saveTarget(sp.pow, SOVL.effStats(t, b).df)) * (sp.lethal && t.base.wd > 1 ? 2 : 1) * (0.7 + tv * 0.3) + (t.commander && t.commander.alive ? 0.6 : 0) + (b.isEngaged(t) ? 0.4 : 0) + (t.type === 'War Machine' || t.ranged ? 0.4 : 0);
+        else if (sp.kind === 'hex') v = (b.isEngaged(t) ? 2.0 : this.threatsTo(t).length ? 0.9 : G.dist(u, t) < 14 ? 1.2 : 0.5) * (0.7 + tv * 0.3) + (sp.effect.hits ? avgExpr(sp.effect.hits) * pFailSave(R.saveTarget(sp.effect.pow, SOVL.effStats(t, b).df)) : 0) + (sp.effect.rooted && !b.isEngaged(t) && (t.type === 'Cavalry' || SOVL.hasProp(t, 'Flying')) ? 1.0 : 0);
+        else if (sp.kind === 'buff') v = (b.isEngaged(t) ? 2.2 : (this.threatsTo(t).length ? 1.4 : (sp.effect.shrouded ? (t.ranged ? 0.2 : 0.6) : 0.35))) * (0.6 + tv * 0.4) + (t.commander && t.commander.alive ? 0.3 : 0);
         else if (sp.kind === 'heal') v = (t.maxModels - t.models) * 0.6;
         else if (sp.kind === 'summon') v = 2.2;
         v *= pTwoD6AtLeast(sp.cv - u.commander.caster);
@@ -204,6 +267,74 @@
     });
   };
   P.moveUnit = function (u, hasShot) {
+    var b = this.b, self = this;
+    if (this.opts.classicMove) return this.moveUnitClassic(u, hasShot);
+    var enemy = this.nearestEnemy(u); if (!enemy) return;
+    var role = this.roleOf(u), threats = this.threatsTo(u), strength = b.armyStrength(this.side), theirs = b.armyStrength(1 - this.side);
+    if (this.opts.classicShooters && (role === 'shooter' || role === 'skirmisher' || role === 'artillery')) return this.moveUnitClassic(u, hasShot);
+    if (this.opts.classicFlankers && (role === 'flanker' || role === 'monster')) return this.moveUnitClassic(u, hasShot);
+    if (this.opts.classicLine && role === 'line') return this.moveUnitClassic(u, hasShot);
+    var pressing = strength >= theirs * 0.9 || b.turn >= 3 || this.aggression > 0.7, late = b.turn >= 5;
+    if (role === 'artillery') {
+      if (!hasShot) this.faceToward(u, enemy);
+      return;
+    }
+    if (role === 'shooter' || role === 'skirmisher') {
+      var w = SOVL.RANGED[u.ranged], d = G.dist(u, enemy), exposed = threats.filter(function (e) { return !self.screened(u, e); });
+      if (exposed.length && u.moveLeft > 2 && (role === 'skirmisher' || !hasShot || exposed.length > 1)) { this.retreatFrom(u, exposed[0]); if (!hasShot) this.tryShot(u); return; }
+      if (hasShot) { if (role === 'skirmisher' && threats.length && u.moveLeft > 2) this.retreatFrom(u, threats[0]); return; }
+      // no shot yet: creep forward to get one, but never inside an unscreened enemy's charge reach
+      var reach = b.chargeRange(enemy) + 2, front = this.lineFront(u), dir = this.advanceDir();
+      var maxAdvance = Math.max(0, d - Math.max(w.range * 0.7, this.screened(u, enemy) ? 0 : reach));
+      if (front != null && role === 'shooter') { var myFront = G.frontCenter(u).y * dir; maxAdvance = Math.min(maxAdvance, Math.max(0, front - 3 - myFront)); }
+      if (maxAdvance > 0.5) this.advanceToward(u, enemy, maxAdvance); else this.faceToward(u, enemy);
+      this.tryShot(u);
+      return;
+    }
+    var dist = G.dist(G.frontCenter(u), enemy), ourRange = b.chargeRange(u), theirRange = b.chargeRange(enemy);
+    if (role === 'flanker') {
+      // work round the enemy's exposed flank; charges come next turn from the AI's charge phase
+      var obj = this.flankObjective(u);
+      if (obj) {
+        var dObj = G.dist(u, obj.point);
+        if (dObj > 1.5) { this.advanceToward(u, obj.point, u.moveLeft); if (u.moveLeft > u.typeInfo.pivot) this.faceToward(u, obj.target); return; }
+        this.faceToward(u, obj.target); return;
+      }
+    }
+    if (role === 'monster') {
+      var soft = this.softTarget(u) || enemy;
+      this.advanceToward(u, soft, u.moveLeft); return;
+    }
+    // line units: screen threatened shooters, then advance together
+    var shooterInDanger = null;
+    b.unitsOf(this.side).forEach(function (f) {
+      if (shooterInDanger || f === u || f.fleeing) return;
+      if (self.roleOf(f) !== 'shooter' && self.roleOf(f) !== 'artillery') return;
+      var th = self.threatsTo(f).filter(function (e) { return !self.screened(f, e); })[0];
+      if (th && G.dist(u, f) < 12) shooterInDanger = { f: f, e: th };
+    });
+    if (shooterInDanger && !late) {
+      var f0 = shooterInDanger.f, e0 = shooterInDanger.e, mid = { x: (f0.x + e0.x) / 2 + (e0.x - f0.x) * 0.15, y: (f0.y + e0.y) / 2 + (e0.y - f0.y) * 0.15 };
+      this.advanceToward(u, mid, u.moveLeft); this.faceToward(u, e0); return;
+    }
+    var stopAt = null;
+    if (!pressing && theirRange >= ourRange && dist - u.moveLeft < theirRange + 1 && dist > theirRange + 1) stopAt = theirRange + 1.5;
+    // cohesion: do not run more than a few inches ahead of the rest of the line unless the enemy is already close
+    var toMove = stopAt != null ? Math.max(0, dist - stopAt) : u.moveLeft;
+    var lf = this.lineFront(u);
+    if (lf != null && dist > ourRange + 2 && !late) {
+      var ahead = G.frontCenter(u).y * this.advanceDir() - lf;
+      if (ahead > 3) toMove = Math.min(toMove, Math.max(0, 1 - ahead + 3));
+    }
+    var target = { x: enemy.x, y: enemy.y };
+    if (b.isEngaged(enemy)) {
+      var sides = ['left', 'right', 'rear'].filter(function (s2) { return !b.sideEngaged(enemy, s2); });
+      if (sides.length) { var sd = G.side(enemy, sides[0]); target = { x: sd.c.x + sd.n.x * (u.d / 2 + ourRange * 0.5), y: sd.c.y + sd.n.y * (u.d / 2 + ourRange * 0.5) }; }
+    }
+    if (toMove <= 0.3) { this.faceToward(u, enemy); return; }
+    this.advanceToward(u, target, toMove);
+  };
+  P.moveUnitClassic = function (u, hasShot) {
     var b = this.b; if (u.moveLeft <= 0 && b.moveAllowanceZero) return;
     var enemy = this.nearestEnemy(u); if (!enemy) return;
     var isShooter = !!u.ranged && !/Pistol/.test(u.ranged), isMachine = u.type === 'War Machine';
@@ -234,6 +365,36 @@
     var toMove = stopAt != null ? Math.max(0, dist - stopAt) : moveMax;
     if (toMove <= 0.3) { this.faceToward(u, enemy); return; }
     this.advanceToward(u, target, toMove);
+  };
+  P.tryShot = function (u) {
+    var b = this.b; if (!u.ranged || u.usedRanged || u.usedAbility) return;
+    var shot = this.bestShot(u); if (shot) b.shoot(u.uid, shot.t.uid);
+  };
+  // The most valuable enemy block with an open flank, and a staging point outside its front arc.
+  P.flankObjective = function (u) {
+    var b = this.b, self = this, best = null, bs = -Infinity;
+    b.enemiesOf(this.side).forEach(function (t) {
+      if (t.fleeing || SOVL.isSingle(t.type)) return;
+      var v = self.unitValue(t);
+      ['left', 'right', 'rear'].forEach(function (side) {
+        if (b.sideEngaged(t, side)) return;
+        var sd = G.side(t, side), stage = { x: sd.c.x + sd.n.x * (u.d / 2 + 5), y: sd.c.y + sd.n.y * (u.d / 2 + 5) };
+        if (stage.x < 1 || stage.y < 1 || stage.x > SOVL.TABLE.w - 1 || stage.y > SOVL.TABLE.h - 1) return;
+        var d = G.dist(u, stage), danger = self.threatAt({ x: stage.x, y: stage.y, w: u.w, d: u.d }, u);
+        var score = v * 0.05 - d * 0.35 - danger * 0.8 + (side === 'rear' ? 1 : 0) + (b.isEngaged(t) ? 2 : 0);
+        if (score > bs) { bs = score; best = { target: t, side: side, point: stage }; }
+      });
+    });
+    return best;
+  };
+  P.softTarget = function (u) {
+    var self = this, best = null, bs = -Infinity;
+    this.b.enemiesOf(this.side).forEach(function (t) {
+      if (t.fleeing) return;
+      var soft = (t.type === 'War Machine' ? 3 : t.ranged ? 2 : 0) + (SOVL.isSingle(t.type) ? 0 : Math.max(0, 3 - R.rankBonus(t.models, t.files))) - G.dist(u, t) * 0.12;
+      if (soft > bs) { bs = soft; best = t; }
+    });
+    return best;
   };
   P.faceToward = function (u, p) {
     var b = this.b, mv = b.previewMove(u.uid, p, true);

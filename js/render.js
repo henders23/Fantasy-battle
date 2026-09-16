@@ -100,6 +100,7 @@
     order.forEach(function (u) { self.drawUnit(u, battle, st, now); });
     // move preview ghost
     if (st.preview && sel) this.drawGhost(sel, st.preview);
+    if (st.handle && sel && sel.uid === st.handle.uid) this.drawHandle(sel, st.handle, st.rotating);
     // projectiles and floaters
     this.projectiles = this.projectiles.filter(function (p) { return now - p.t0 < p.dur; });
     this.projectiles.forEach(function (p) {
@@ -125,6 +126,16 @@
     ctx.beginPath(); ctx.moveTo(fc.x, fc.y); ctx.arc(fc.x, fc.y, range, u.a - Math.PI / 4, u.a + Math.PI / 4); ctx.closePath();
     ctx.fillStyle = fill; ctx.fill(); ctx.strokeStyle = stroke; ctx.lineWidth = 0.1; ctx.setLineDash([0.4, 0.3]); ctx.stroke(); ctx.setLineDash([]);
     if (full) { ctx.beginPath(); ctx.moveTo(fc.x, fc.y); ctx.arc(fc.x, fc.y, range / 2, u.a - Math.PI / 4, u.a + Math.PI / 4); ctx.closePath(); ctx.strokeStyle = stroke; ctx.setLineDash([0.2, 0.3]); ctx.stroke(); ctx.setLineDash([]); }
+  };
+  RP.drawHandle = function (u, h, active) {
+    var ctx = this.ctx, fc = G.frontCenter(u), r = active ? 0.55 : 0.45;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,210,74,0.8)'; ctx.lineWidth = 0.1; ctx.setLineDash([0.25, 0.2]); ctx.beginPath(); ctx.moveTo(fc.x, fc.y); ctx.lineTo(h.x, h.y); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(h.x, h.y, r, 0, Math.PI * 2); ctx.fillStyle = active ? '#ffe28a' : 'rgba(255,210,74,0.9)'; ctx.fill(); ctx.strokeStyle = '#3a2a00'; ctx.lineWidth = 0.08; ctx.stroke();
+    ctx.strokeStyle = '#3a2a00'; ctx.lineWidth = 0.09; ctx.beginPath(); ctx.arc(h.x, h.y, r * 0.55, u.a + Math.PI * 0.25, u.a + Math.PI * 1.75); ctx.stroke();
+    var tip = { x: h.x + Math.cos(u.a + Math.PI * 1.75) * r * 0.55, y: h.y + Math.sin(u.a + Math.PI * 1.75) * r * 0.55 };
+    ctx.beginPath(); ctx.moveTo(tip.x, tip.y); ctx.lineTo(tip.x + Math.cos(u.a + Math.PI * 1.75 + 2.4) * 0.18, tip.y + Math.sin(u.a + Math.PI * 1.75 + 2.4) * 0.18); ctx.moveTo(tip.x, tip.y); ctx.lineTo(tip.x + Math.cos(u.a + Math.PI * 1.75 + 0.9) * 0.18, tip.y + Math.sin(u.a + Math.PI * 1.75 + 0.9) * 0.18); ctx.stroke();
+    ctx.restore();
   };
   RP.drawGhost = function (u, pv) {
     var ctx = this.ctx, r = { x: pv.x, y: pv.y, a: pv.a, w: u.w, d: u.d }, c = G.corners(r);

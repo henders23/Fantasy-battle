@@ -144,6 +144,31 @@ SOVL.BANNERS = [
   { id: 'banner_of_wrath', name: 'Banner of Wrath', cost: 100, effect: { power: 1 }, desc: '+1 Power.' }
 ];
 
+// Commander traits, earned with veterancy in the campaign. Effects use the magic-item effect keys.
+SOVL.TRAITS = {
+  iron_will:   { name: 'Iron Will',       effect: { retinueDiscipline: 1 }, desc: 'The retinue has +1 Discipline.' },
+  butcher:     { name: 'Butcher',         effect: { attacks: 1, power: 1 }, desc: 'The commander has +1 Attack and +1 Power.' },
+  warden:      { name: 'Warden',          effect: { defense: 1, regen: true }, desc: 'The commander has +1 Defense and recovers all wounds at the end of each turn.' },
+  pathfinder:  { name: 'Pathfinder',      effect: { retinueMove: 2 }, desc: 'The commander\'s unit has +2 Movement.' },
+  standard:    { name: 'Rallying Standard', effect: { rerollBreak: true }, desc: 'The commander\'s unit re-rolls failed Break Tests.' },
+  fury:        { name: 'Fury',            effect: { retinueChargePow: 1 }, desc: 'The commander\'s unit has +1 Power when it charges.' },
+  arcanist:    { name: 'Arcanist',        effect: { casting: 1 }, desc: '+1 to casting rolls.', caster: true },
+  duelist:     { name: 'Duelist',         effect: { skill: 1 }, desc: 'The commander has +1 Skill.' },
+  bulwark:     { name: 'Bulwark',         effect: { retinueDefense: 1 }, desc: 'The retinue has +1 Defense.' }
+};
+
+SOVL.SCENARIOS = [
+  { id: 'pitched', name: 'Pitched Battle', desc: 'Both armies line up 24" apart and fight for eight turns.' },
+  { id: 'meeting', name: 'Meeting Engagement', desc: 'Deep deployment zones only 12" apart. First blood on turn one.' },
+  { id: 'objectives', name: 'Scoring Objectives', desc: 'Two markers to hold; the side holding more scores 50 points a turn.' }
+];
+
+SOVL.DIFFICULTIES = [
+  { id: 'easy', name: 'Recruit', pts: 0.8, gold: 220, desc: 'Smaller enemy armies, more gold.' },
+  { id: 'normal', name: 'Veteran', pts: 1.0, gold: 150, desc: 'The intended challenge.' },
+  { id: 'hard', name: 'Legend', pts: 1.2, gold: 110, desc: 'Larger enemy armies, less gold.' }
+];
+
 SOVL.ARMY_SIZES = [
   { id: 'warband', name: 'Warband', pts: 500 },
   { id: 'battalion', name: 'Battalion', pts: 1000 },
@@ -251,6 +276,72 @@ SOVL.CAMPAIGN = {
     { id: 'feast', title: 'A Grateful Village', text: 'The villagers you have kept safe hold a feast in your honour. Morale soars.',
       choices: [
         { text: 'Enjoy the feast: all units recover losses', effect: { healAll: true } }
+      ] },
+    { id: 'bridge_storm', title: 'The Storm-Wrecked Bridge', text: 'Last night\'s storm took the bridge. The ford downstream costs a day; the mountain track costs boots and tempers.',
+      choices: [
+        { text: 'Take the mountain track (one unit gains a veterancy rank, lose 25 gold on lost gear)', effect: { gold: -25, trainOne: true } },
+        { text: 'Wait for the water to fall (+30 gold from a passing merchant)', effect: { gold: 30 } }
+      ] },
+    { id: 'relic_seller', title: 'The Relic Seller', text: 'A hooded pedlar unwraps a blade that hums when your commander touches it. The price is steep.',
+      choices: [
+        { text: 'Buy it (-110 gold): a random magic weapon', effect: { gold: -110, randomWeapon: true } },
+        { text: 'Haggle: buy a random item instead (-60 gold)', effect: { gold: -60, randomItem: true } },
+        { text: 'Keep your purse shut', effect: {} }
+      ] },
+    { id: 'lost_patrol', title: 'The Lost Patrol', text: 'A patrol of your own kind, cut off from a defeated army, falls in beside the road and asks for a place in the line.',
+      choices: [
+        { text: 'Welcome them (recruit a unit)', effect: { recruitRandom: true, big: true } },
+        { text: 'Take their supplies and send them home (+55 gold)', effect: { gold: 55 } }
+      ] },
+    { id: 'omen', title: 'A Red Sky', text: 'The sun rises the colour of blood. The camp priests argue over what it means.',
+      choices: [
+        { text: 'A good omen: march with confidence (+1 Discipline to all units)', effect: { disciplineAll: 1 } },
+        { text: 'A warning: double the sentries (nothing happens)', effect: {} }
+      ], minAct: 1 },
+    { id: 'siege_train', title: 'The Abandoned Siege Train', text: 'A war machine lies broken in a ditch, its crew long gone. Your engineers think it can be made to work.',
+      choices: [
+        { text: 'Repair it (-70 gold): recruit a war machine', effect: { gold: -70, recruitMachine: true } },
+        { text: 'Strip it for iron (+40 gold)', effect: { gold: 40 } }
+      ], minAct: 1 },
+    { id: 'gravefield', title: 'The Old Battlefield', text: 'Bones and rusted mail crunch underfoot. Something in the mist watches your column pass.',
+      choices: [
+        { text: 'March on quietly', effect: {} },
+        { text: 'Loot the dead (+80 gold, fight an undead warband)', effect: { battle: 'undead', goldAfter: 80 } }
+      ], minAct: 1 },
+    { id: 'necro_pact', title: 'The Whispering Barrow', text: 'The voices of the dead offer their service to one who commands the dead already.', faction: 'dead_nations',
+      choices: [
+        { text: 'Accept: a unit of the dead rises to join you', effect: { recruitRandom: true } },
+        { text: 'Refuse: the dead go quiet (+1 Discipline to all units)', effect: { disciplineAll: 1 } }
+      ] },
+    { id: 'dwarf_hold', title: 'The Sealed Hold', text: 'A dwarf hold\'s gate stands shut against the world. Your name is known within.', faction: 'dwarf_holds',
+      choices: [
+        { text: 'Trade for hold-forged armour (arm a unit with Heavy Armor)', effect: { grantProp: 'Heavy Armor' } },
+        { text: 'Recruit from the hold\'s reserves (-60 gold)', effect: { gold: -60, recruitRandom: true, big: true } }
+      ] },
+    { id: 'elf_grove', title: 'The Singing Grove', text: 'Ancient trees remember your people. The grove offers a gift to those who leave it untouched.', faction: 'elven_conclaves',
+      choices: [
+        { text: 'Accept the grove\'s blessing (commander +1 Wound)', effect: { commanderWounds: 1 } },
+        { text: 'Cut timber for the march (+50 gold)', effect: { gold: 50 } }
+      ] },
+    { id: 'orc_challenge', title: 'A Challenge!', text: 'A rival boss steps out of the scrub and roars a challenge. The lads are watching.', faction: 'greenskin_tribes',
+      choices: [
+        { text: 'Fight the rival warband', effect: { battle: 'small', goldAfter: 70, trainOne: true } },
+        { text: 'Laugh at him and march on (-1 Discipline to all units)', effect: { disciplineAll: -1 } }
+      ] },
+    { id: 'imperial_levy', title: 'The Baron\'s Levy', text: 'A local baron owes the crown a levy. He would rather owe it to you.', faction: 'empires_of_men',
+      choices: [
+        { text: 'Accept the levy (recruit a unit)', effect: { recruitRandom: true } },
+        { text: 'Take his gold instead (+65 gold)', effect: { gold: 65 } }
+      ] },
+    { id: 'deserters_night', title: 'Desertion', text: 'In the night, part of the camp slipped away with its pay. The sergeants blame each other.',
+      choices: [
+        { text: 'Let them go (lose 10% of models)', effect: { loseModelsPct: 0.1 } },
+        { text: 'Send riders after them (-40 gold, keep the men)', effect: { gold: -40 } }
+      ], minAct: 1 },
+    { id: 'wandering_wizard', title: 'The Wandering Wizard', text: 'A threadbare wizard offers to tutor your commander in the arts, for a modest fee and a hot meal.',
+      choices: [
+        { text: 'Pay for lessons (-45 gold): commander gains a trait', effect: { gold: -45, traitOffer: true } },
+        { text: 'Send him on his way', effect: {} }
       ] }
   ]
 };

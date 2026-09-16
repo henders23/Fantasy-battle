@@ -9,12 +9,15 @@ click to roll them.
 Two modes:
 
 - **Skirmish** — build a 500 / 1000 / 1500 point army from one of five factions in the
-  army builder, then fight the AI in a Pitched Battle or the Scoring Objectives scenario.
-- **Trail of Death** — a three-act roguelite campaign. Start with a commander, a small
-  retinue and two supporting units, pick a path across a branching map of battles, elite
-  battles, events, merchants, camps and treasure, recruit and reinforce, earn veterancy,
-  and defeat each act's boss. A lost battle or a dead commander ends the run. Progress is
-  saved in the browser.
+  army builder, then fight the AI in a Pitched Battle, a Meeting Engagement (deep
+  deployment zones only 12" apart) or the Scoring Objectives scenario.
+- **Trail of Death** — a three-act roguelite campaign at one of three difficulties. Start
+  with a commander, a small retinue and two supporting units, pick a path across a
+  branching map of battles, elite battles, events, merchants, camps and treasure, recruit,
+  reinforce and re-arm, earn veterancy, learn commander traits, and defeat each act's
+  boss. Battles along the trail use all three scenarios. A lost battle or a dead commander
+  ends the run, and the run-over screen lists every battle fought and each unit's honours
+  (battles fought and enemy models slain). Progress is saved in the browser.
 
 ## Illustrated tactical edition
 
@@ -40,6 +43,14 @@ end until all engagements are complete. Shooting, spells and rallies in the stra
 phase are rolled the same way; the enemy's own rolls are shown as they happen. Engine
 consumers can omit `interactive` and `interactiveCombat` to keep the original automatic
 simulation behaviour.
+
+During movement a gold handle sits in front of the selected regiment: drag it to turn the
+regiment freely (in deployment and in the Strategic Phase, where pivots still cost
+movement). **Z** or the Undo button takes back the moves and pivots of the current
+activation, as long as the unit has not yet shot, cast or used an ability, and **Face**
+buttons pivot toward the nearest enemies. When the enemy declares a charge against one of
+your regiments a prompt appears over the field offering the counter-charge, flee or hold
+reactions.
 
 The **Guide** explains each phase. **Settings** controls optional synthesized sound,
 enemy action speed, motion and persistent unit labels. Sound is off initially and starts
@@ -74,7 +85,7 @@ the source lists. All artwork is original.
 ```
 index.html        the game shell
 css/sovl.css      styling
-js/data.js        rules tables: unit types, weapons, properties, spells, items, campaign data
+js/data.js        rules tables: unit types, weapons, properties, spells, items, traits, scenarios, campaign data
 js/data_units.js  the five faction source lists (generated from the rules repo)
 js/geom.js        oriented-rectangle geometry
 js/rules.js       dice and the hit / save / discipline tables
@@ -92,6 +103,9 @@ test/sim.js       headless rules tests and AI-vs-AI simulations (node test/sim.j
 test/tactical.js  seeded automatic/manual combat equivalence and phase guards
 test/interface.js DOM integration and native Canvas checks (optional test dependencies)
 test/browser.js   Playwright smoke test through both modes (node test/browser.js [url])
+test/interact.js  Playwright interaction test of orders, dice and engagements
+test/features.js  Playwright test of scenarios, the rotation handle, undo, charge reactions,
+                  difficulty, traits, honours and re-arming
 ```
 
 ## Controls
@@ -102,6 +116,8 @@ test/browser.js   Playwright smoke test through both modes (node test/browser.js
 | Click the ground | pivot toward the point and advance |
 | Shift + click | pivot only |
 | Q / E | pivot 45° left / right |
+| Drag the gold handle | turn the selected unit freely |
+| Z | undo the moves and pivots of the current activation |
 | Space / Enter | roll the dice when a roll is waiting; otherwise end activation / pass |
 | X, Shift + X | show charge arcs / weapon ranges |
 | Mouse wheel, right-drag | zoom and pan |
@@ -111,6 +127,17 @@ test/browser.js   Playwright smoke test through both modes (node test/browser.js
 | Enter during Combat | resolve / acknowledge the selected engagement |
 | Move / Pivot buttons | choose a ground-click order without a keyboard modifier |
 
+## AI
+
+The AI assigns each unit a role (line, flanker, shooter, skirmisher, artillery, monster)
+and moves by role: the line advances together and screens threatened shooters, flankers
+work round exposed flanks, shooters keep their distance and creep forward for a shot.
+Charge scoring rewards gang-ups on units already engaged and penalises charges that would
+lose to the enemy's rank bonus, counter-charges are only declared when they improve on
+standing, and spells are weighted by the target's value and situation. Against the
+previous opponent it wins about 55% of seeded head-to-head games
+(150 games, mixed factions and sizes).
+
 ## Tests
 
 ```
@@ -118,6 +145,8 @@ node test/sim.js 80          # rules unit tests + 80 simulated battles + campaig
 node test/tactical.js        # 20 automatic/manual battles with matching seeded outcomes
 python3 -m http.server 8123  # then, in another shell:
 node test/browser.js http://127.0.0.1:8123/index.html
+node test/interact.js
+node test/features.js
 ```
 
 `test/interface.js` uses `linkedom` and `@napi-rs/canvas` as optional test-only
