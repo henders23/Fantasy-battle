@@ -145,3 +145,35 @@ a { color: var(--accent2); }
 .rules td, .rules th { border: 1px solid var(--line); padding: 4px 8px; }
 kbd { background: #2a2e25; border: 1px solid #555; border-radius: 3px; padding: 0 5px; font-size: 11px; }
 @media (max-width: 1100px) { #battle-left { width: 240px; } #battle-right { width: 260px; } }
+
+/* dice panel */
+#dice-panel { position: absolute; left: 50%; bottom: 44px; transform: translateX(-50%); width: min(780px, 94%); background: rgba(12,14,11,0.95); border: 1px solid #4a5040; border-radius: 6px; box-shadow: 0 12px 40px rgba(0,0,0,0.65); display: none; z-index: 20; font-size: 12px; }
+#dice-panel.on { display: block; }
+#dice-panel.passive { pointer-events: none; opacity: 0.88; }
+.dp-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 8px 12px; border-bottom: 1px solid #2c3026; }
+.dp-title { font-family: var(--head); color: var(--accent); font-size: 14px; letter-spacing: 0.04em; }
+.dp-rows { padding: 2px 12px; max-height: 230px; overflow: auto; }
+.dp-row { display: grid; grid-template-columns: 78px 40px 1fr 120px; gap: 8px; align-items: center; padding: 5px 0 6px; border-bottom: 1px solid #23271f; }
+.dp-row .dp-label { grid-column: 1 / -1; font-size: 11px; color: #cfcbbf; padding-bottom: 2px; }
+.dp-badge { font-size: 9px; letter-spacing: 0.12em; padding: 3px 0; text-align: center; border: 1px solid var(--line); border-radius: 3px; color: var(--muted); }
+.dp-badge.k-hits { border-color: #7a6a2a; color: #ffd24a; }
+.dp-badge.k-saves { border-color: #3a7a3a; color: #8be08b; }
+.dp-badge.k-discipline, .dp-badge.k-crumble { border-color: #7a3a3a; color: #ff9c9c; }
+.dp-badge.k-flight { border-color: #7a7a3a; color: #f7f7a0; }
+.dp-badge.k-casting, .dp-badge.k-expr { border-color: #6a4a8a; color: #d8b0ff; }
+.dp-target { font-weight: bold; color: #fff; font-size: 13px; }
+.dp-dice { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
+.dp-plus { color: #ddd; margin-left: 6px; }
+.dp-odds { margin-left: 8px; font-size: 10px; letter-spacing: 0.05em; }
+.dp-count { text-align: right; font-weight: bold; color: #fff; }
+.dp-banner { text-align: center; font-family: var(--head); font-size: 22px; color: var(--accent); padding: 8px 6px 4px; letter-spacing: 0.08em; }
+.dp-banner.theirs { color: #ff9c9c; }
+.dp-banner.mine { color: #9fd0ff; }
+.dp-pending { padding: 8px 12px 10px; background: rgba(232,193,90,0.07); border-top: 1px solid #3a3f33; cursor: pointer; }
+.dp-pending .dp-label { font-size: 12px; margin-bottom: 6px; }
+.dp-actions { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+.die.blank { background: #2a2d26; border-color: #555; color: transparent; box-shadow: inset 0 0 0 2px #1b1e18; }
+.die.p0 { box-shadow: 0 0 0 1px #4a7ab0; }
+.die.p1 { box-shadow: 0 0 0 1px #b04a4a; }
+.die.rolling { animation: dice-shake 0.12s infinite; background: #f4f1e8; color: #444; }
+@keyframes dice-shake { 0% { transform: rotate(-8deg) translateY(-1px); } 50% { transform: rotate(8deg) translateY(1px); } 100% { transform: rotate(-4deg); } }

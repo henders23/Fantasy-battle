@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SOVL — Fantasy Warfare (browser replica)</title>
+<title>Fantasy Battle</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%231b1e18%27/%3E%3Cpath d=%27M16 4l3 8 8 1-6 5 2 8-7-4-7 4 2-8-6-5 8-1z%27 fill=%27%23e8c15a%27/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,15 +13,15 @@
 <body>
 
 <div id="screen-menu" class="screen active">
-  <h1>SOVL</h1>
-  <div class="sub">FANTASY WARFARE — BROWSER REPLICA</div>
+  <h1>FANTASY BATTLE</h1>
+  <div class="sub">A TURN-BASED FANTASY WARGAME</div>
   <div class="menu">
     <button class="primary" id="btn-campaign">New Campaign — Trail of Death</button>
     <button id="btn-continue" style="display:none">Continue Campaign</button>
     <button id="btn-skirmish">Skirmish Battle</button>
     <button id="btn-rules">How to Play</button>
   </div>
-  <div class="credit">An unofficial fan re-implementation of the open SOVL tabletop ruleset (SOVL: Fantasy Warfare by Dalen Studios). All art here is original; rules text follows the public rules document. Everything runs locally in your browser.</div>
+  <div class="credit">Built on the open SOVL tabletop ruleset by Dalen Studios. All art here is original. Everything runs locally in your browser.</div>
 </div>
 
 <div id="screen-setup" class="screen"><div class="page">
@@ -71,6 +71,7 @@
       <canvas id="battle-canvas"></canvas>
       <div id="battle-toggles"><button class="small" id="tog-arcs" title="Show charge arcs (X)">Arcs</button><button class="small" id="tog-ranges" title="Show weapon ranges (Shift+X)">Ranges</button><button class="small" id="tog-zoom">Zoom</button></div>
       <div id="battle-hint"></div>
+      <div id="dice-panel"></div>
     </div>
     <div id="battle-right">
       <div id="deploy-tray" style="display:none"></div>

@@ -1,9 +1,10 @@
-# SOVL — Fantasy Warfare (browser replica)
+# Fantasy Battle
 
-An unofficial, fan-made browser re-implementation of **SOVL: Fantasy Warfare**, the
-turn-based rank-and-flank fantasy wargame by Dalen Studios. It runs entirely in the
-browser with no build step and no server: open `index.html` (or serve the folder
-statically) and play.
+A turn-based rank-and-flank fantasy wargame for the browser, built on the open SOVL
+ruleset by Dalen Studios. It runs entirely in the browser with no build step and no
+server: open `index.html` (or serve the folder statically) and play. Every attack, save,
+break test and flight move is rolled by hand: the dice appear on the battlefield and you
+click to roll them.
 
 Two modes:
 
@@ -35,7 +36,7 @@ The battle rules follow the public SOVL rules document
   spell lists and section limits.
 
 Spells, magic items, magic banners, the heavy-casualty test and the campaign structure are
-not defined in the public rules text; this replica designs them to match the names used in
+not defined in the public rules text; this game designs them to match the names used in
 the source lists. All artwork is original.
 
 ## Layout
@@ -65,7 +66,7 @@ test/browser.js   Playwright smoke test through both modes (node test/browser.js
 | Click the ground | pivot toward the point and advance |
 | Shift + click | pivot only |
 | Q / E | pivot 45° left / right |
-| Enter | end activation / pass |
+| Space / Enter | roll the dice when a roll is waiting; otherwise end activation / pass |
 | X, Shift + X | show charge arcs / weapon ranges |
 | Mouse wheel, right-drag | zoom and pan |
 | Esc | cancel targeting |

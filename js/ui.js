@@ -215,7 +215,8 @@
   UI.startBattle = function (opts) {
     if (UI.aiTimer) { clearTimeout(UI.aiTimer); UI.aiTimer = null; }
     R.setSeed(null);
-    var b = new SOVL.Battle({ armies: opts.armies, terrain: opts.terrain, scenario: opts.scenario, names: opts.names, sides: ['bottom', 'top'], scoreMode: opts.campaign ? 'ratio' : 'points' });
+    var b = new SOVL.Battle({ armies: opts.armies, terrain: opts.terrain, scenario: opts.scenario, names: opts.names, sides: ['bottom', 'top'], scoreMode: opts.campaign ? 'ratio' : 'points', interactive: true });
+    UI.dice = { title: '', sub: '', rows: [], pending: null, banner: null }; UI.diceSeqId = 0; UI.deployDone = false; UI.renderDice(); $('dice-panel').classList.remove('on');
     UI.battle = b; UI.battleOpts = opts; UI.ai = new SOVL.AI(b, UI.aiSide, { aggression: opts.aggression || 0.5 });
     UI.sel = null; UI.inspect = null; UI.hover = null; UI.mode = 'move'; UI.targets = []; UI.preview = null; UI.busy = false; UI.deploySel = null;
     UI.ai.deploy(); // simultaneous deployment: hidden until the player is done
@@ -267,6 +268,8 @@
     window.addEventListener('keydown', function (e) {
       if (UI.screen !== 'battle' || UI.modalOpen) return;
       var b = UI.battle; if (!b) return;
+      if (b.pendingRoll && (e.key === ' ' || e.key === 'Enter')) { e.preventDefault(); UI.rollDice(); return; }
+      if (b.pendingRoll) return;
       if (e.key === 'x' || e.key === 'X') { if (e.shiftKey) r.showRanges = !r.showRanges; else r.showArcs = !r.showArcs; UI.updateToggles(); }
       if (e.key === 'Escape') { UI.mode = 'move'; UI.targets = []; if (b.phase === 'charge') UI.sel = null; UI.preview = null; UI.updateHud(); }
       if (b.phase === 'deploy' && UI.deploySel) { var du = b.unit(UI.deploySel); if (du && (e.key === 'q' || e.key === 'Q')) UI.rotateDeploy(du, -1); if (du && (e.key === 'e' || e.key === 'E')) UI.rotateDeploy(du, 1); }
@@ -274,6 +277,7 @@
       if (b.phase === 'strategic' && b.active === UI.playerSide && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); UI.endActivation(); }
       if (b.phase === 'charge' && (e.key === 'Enter' || e.key === ' ') && b.active === UI.playerSide) UI.passCharge();
     });
+    $('dice-panel').addEventListener('click', function (e) { if (e.target.tagName !== 'BUTTON') UI.rollDice(); });
     $('tog-arcs').onclick = function () { r.showArcs = !r.showArcs; UI.updateToggles(); };
     $('tog-ranges').onclick = function () { r.showRanges = !r.showRanges; UI.updateToggles(); };
     $('tog-zoom').onclick = function () { r.zoom = r.zoom > 1.01 ? 1 : 1.6; r.panX = 0; r.panY = 0; };
@@ -296,7 +300,7 @@
   // Deployment tray
   UI.renderDeployTray = function () {
     var b = UI.battle, tray = $('deploy-tray');
-    if (b.phase !== 'deploy') { tray.style.display = 'none'; $('battle-log').style.display = ''; return; }
+    if (b.phase !== 'deploy' || UI.deployDone) { tray.style.display = 'none'; $('battle-log').style.display = ''; return; }
     tray.style.display = ''; $('battle-log').style.display = 'none'; tray.innerHTML = '';
     tray.appendChild(el('h3', null, 'Deploy your army'));
     tray.appendChild(el('p', 'muted', 'Click a unit, then click inside your deployment zone (the blue band). Drag to reposition, <kbd>Q</kbd>/<kbd>E</kbd> to rotate. Ambushers may deploy anywhere on your half.'));
@@ -322,15 +326,16 @@
   };
   UI.beginBattle = function () {
     var b = UI.battle; b.deployed[UI.playerSide] = true;
-    UI.deploySel = null;
-    b.start();
+    UI.deploySel = null; UI.deployDone = true;
     UI.renderDeployTray();
+    b.start();
     UI.processEvents(); UI.updateHud(); UI.pumpAI();
   };
 
   // Canvas click routing
   UI.canvasClick = function (p, e) {
     var b = UI.battle, r = UI.renderer; if (!b || UI.modalOpen) return;
+    if (b.pendingRoll) { UI.rollDice(); return; }
     var u = r.unitAt(b, p); if (u && b.phase === 'deploy' && u.side === UI.aiSide) u = null;
     if (b.phase === 'deploy') {
       if (u && u.side === UI.playerSide) { UI.deploySel = u.uid; UI.renderDeployTray(); return; }
@@ -355,7 +360,7 @@
         if (b.activeUnit && b.activeUnit !== u.uid) { UI.inspect = u.uid; UI.hint('Finish the current activation first (End Activation).'); UI.updateHud(); return; }
         if (!b.canActivate(u)) { UI.inspect = u.uid; UI.hint(u.name + ' has already been activated this turn.'); UI.updateHud(); return; }
         var ra = b.beginActivation(u.uid); if (!ra.ok) { UI.hint(ra.reason); return; }
-        UI.sel = u.uid; UI.inspect = null; UI.mode = 'move'; UI.targets = []; UI.processEvents(); UI.updateHud(); return;
+        UI.sel = u.uid; UI.inspect = null; UI.mode = 'move'; UI.targets = []; UI.diceHide(); UI.processEvents(); UI.updateHud(); return;
       }
       if (u) { UI.inspect = u.uid; UI.updateHud(); return; }
       // ground click: move
@@ -372,25 +377,26 @@
     else if (UI.mode === 'spell') res = b.cast(UI.sel, UI.spell, t.uid);
     else if (UI.mode === 'ability') res = b.useAbility(UI.sel, UI.ability, t.uid);
     if (res && !res.ok) UI.hint(res.reason);
-    UI.mode = 'move'; UI.targets = []; UI.processEvents(); UI.updateHud();
+    UI.mode = 'move'; if (!b.pendingRoll) UI.targets = []; UI.processEvents(); UI.updateHud();
     if (b.phase === 'end') UI.onEnd();
   };
   UI.hint = function (txt) { $('battle-hint').textContent = txt; };
-  UI.afterPlayerAction = function () { UI.processEvents(); UI.updateHud(); if (UI.battle.phase === 'end') { UI.onEnd(); return; } UI.pumpAI(); };
-  UI.passCharge = function () { var b = UI.battle; if (b.phase !== 'charge' || b.active !== UI.playerSide) return; UI.sel = null; UI.targets = []; b.passCharge(); UI.afterPlayerAction(); };
-  UI.endActivation = function () { var b = UI.battle; if (b.phase !== 'strategic' || b.active !== UI.playerSide) return; if (b.activeUnit) b.endActivation(); else b.passStrategic(); UI.sel = null; UI.mode = 'move'; UI.targets = []; UI.preview = null; UI.afterPlayerAction(); };
+  UI.afterPlayerAction = function () { UI.processEvents(); UI.updateHud(); if (UI.battle.phase === 'end') { UI.onEnd(); return; } if (UI.battle.pendingRoll) return; UI.pumpAI(); };
+  UI.passCharge = function () { var b = UI.battle; if (b.phase !== 'charge' || b.active !== UI.playerSide || b.pendingRoll) return; UI.sel = null; UI.targets = []; b.passCharge(); UI.afterPlayerAction(); };
+  UI.endActivation = function () { var b = UI.battle; if (b.phase !== 'strategic' || b.active !== UI.playerSide || b.pendingRoll) return; if (b.activeUnit) b.endActivation(); else b.passStrategic(); UI.sel = null; UI.mode = 'move'; UI.targets = []; UI.preview = null; UI.afterPlayerAction(); };
 
   // AI pacing: one action per tick so the player can follow along
   UI.pumpAI = function () {
     var b = UI.battle; if (!b || b.phase === 'end') { if (b && b.phase === 'end') UI.onEnd(); return; }
     if (UI.aiTimer) return;
-    if (b.active !== UI.aiSide) return;
+    if (b.active !== UI.aiSide || b.pendingRoll) return;
     UI.aiTimer = setTimeout(function () {
       UI.aiTimer = null;
       if (UI.modalOpen || UI.screen !== 'battle') { setTimeout(UI.pumpAI, 300); return; }
-      var phaseBefore = b.phase, logBefore = b.log.length;
-      if (b.active === UI.aiSide && b.phase !== 'end') UI.ai.step();
+      if (b.pendingRoll) return;
+      if (b.active === UI.aiSide && b.phase !== 'end') { b.autoRoll = true; try { UI.ai.step(); } finally { b.autoRoll = false; } }
       UI.processEvents(); UI.updateHud();
+      if (b.pendingRoll) return; // the player must roll before anything else happens
       if (b.phase === 'end') { UI.onEnd(); return; }
       if (b.active === UI.aiSide) UI.pumpAI();
     }, UI.aiDelay);
@@ -399,11 +405,16 @@
   // Animation and log events from the engine
   UI.processEvents = function () {
     var b = UI.battle, r = UI.renderer, evs = b.events; b.events = [];
-    var showCombat = false;
     evs.forEach(function (ev) {
       var u = b.unit(ev.uid || ev.from) || findDead(ev.uid || ev.from);
       switch (ev.type) {
-        case 'shoot': { var f = b.unit(ev.from), t = b.unit(ev.to) || findDead(ev.to); if (f && t) { for (var i = 0; i < Math.min(6, Math.max(1, ev.hits)); i++) r.addProjectile({ x: f.x + (Math.random() - 0.5) * f.w, y: f.y + (Math.random() - 0.5) * f.d }, { x: t.x + (Math.random() - 0.5) * t.w, y: t.y + (Math.random() - 0.5) * t.d }, f.side === UI.playerSide ? '#cfe6ff' : '#ffd0d0', 380 + i * 60); r.addFloater(t.x, t.y - 1, ev.wounds ? '-' + ev.wounds : 'miss', ev.wounds ? '#ff8080' : '#ccc'); } break; }
+        case 'shoot': { var f = b.unit(ev.from), t = b.unit(ev.to) || findDead(ev.to); if (f && t) { for (var i = 0; i < Math.min(6, Math.max(1, ev.hits)); i++) r.addProjectile({ x: f.x + (Math.random() - 0.5) * f.w, y: f.y + (Math.random() - 0.5) * f.d }, { x: t.x + (Math.random() - 0.5) * t.w, y: t.y + (Math.random() - 0.5) * t.d }, f.side === UI.playerSide ? '#cfe6ff' : '#ffd0d0', 380 + i * 60); if (!ev.hits) r.addFloater(t.x, t.y - 1, 'miss', '#ccc'); } break; }
+        case 'wounds': { var wu = b.unit(ev.uid) || findDead(ev.uid); if (wu) r.addFloater(wu.x, wu.y - 1, ev.wounds ? '-' + ev.wounds + (ev.killed ? ' (' + ev.killed + ' slain)' : '') : 'no wounds', ev.wounds ? '#ff8080' : '#ccc'); break; }
+        case 'seq': UI.diceSeq(ev); break;
+        case 'seqEnd': UI.diceIdle(); break;
+        case 'rollRequest': UI.dicePending(ev.spec); break;
+        case 'roll': UI.diceRolled(ev.spec, ev.res); break;
+        case 'score': { UI.diceBanner(ev); r.addFloater(ev.x, ev.y - 2, ev.winner == null ? 'Drawn combat' : (ev.winner === UI.playerSide ? 'You win by ' : b.names[ev.winner] + ' wins by ') + ev.diff, ev.winner == null ? '#ddd' : ev.winner === UI.playerSide ? '#9fd0ff' : '#ff9c9c'); break; }
         case 'spell': { var c = b.unit(ev.from), tt = b.unit(ev.to) || findDead(ev.to); if (tt) { r.addFlash(tt.x, tt.y, 2, ev.ok ? '#c090ff' : '#666'); r.addFloater(tt.x, tt.y - 1, ev.ok ? ev.spell : 'fizzle', ev.ok ? '#d8b0ff' : '#999'); } break; }
         case 'charge': { var cu = b.unit(ev.uid); if (cu) r.addFloater(cu.x, cu.y - 1, 'CHARGE!', '#ffd24a'); break; }
         case 'flee': { var fu = b.unit(ev.uid) || findDead(ev.uid); if (fu) r.addFloater(ev.from.x, ev.from.y - 1, 'flees ' + (ev.dice ? ev.dice.reduce(function (s, d) { return s + d; }, 0) + '"' : ''), '#f7f7a0'); break; }
@@ -411,12 +422,11 @@
         case 'commanderDeath': { var cd = b.unit(ev.uid) || findDead(ev.uid); if (cd) r.addFloater(cd.x, cd.y - 2, 'COMMANDER SLAIN', '#ff6b6b'); break; }
         case 'rundown': break;
         case 'summon': { var su = b.unit(ev.uid); if (su) { su._rx = su.x; su._ry = su.y; su._ra = su.a; r.addFlash(su.x, su.y, 3, '#9060ff'); } break; }
-        case 'endTurn': if (b.combatReports && b.combatReports.length) showCombat = true; break;
-        case 'phase': if (ev.phase === 'charge') UI.hint('Turn ' + ev.turn + ' — Charge Phase. Select a unit and click an enemy within its arc to declare a charge, or Pass.'); if (ev.phase === 'strategic') UI.hint('Strategic Phase. Click one of your units to activate it, click the ground to move, or use the action buttons.'); break;
+        case 'endTurn': break;
+        case 'phase': if (ev.phase === 'charge' || ev.phase === 'strategic') UI.diceHide(); if (ev.phase === 'charge') UI.hint('Turn ' + ev.turn + ' — Charge Phase. Select a unit and click an enemy within its arc to declare a charge, or Pass.'); if (ev.phase === 'strategic') UI.hint('Strategic Phase. Click one of your units to activate it, click the ground to move, or use the action buttons.'); break;
       }
     });
     UI.renderLog();
-    if (showCombat) UI.showCombatReports(b.combatReports);
     function findDead(uid) { for (var i = 0; i < b.dead.length; i++) if (b.dead[i].uid === uid) return b.dead[i]; return null; }
   };
   function diceHtml(dice, target, kind) {
@@ -443,43 +453,163 @@
     while (box.children.length > 600) box.removeChild(box.firstChild);
     if (atBottom) box.scrollTop = box.scrollHeight;
   };
-  UI.showCombatReports = function (reports) {
-    var b = UI.battle, box = el('div');
-    box.appendChild(el('h2', null, 'Combat Phase — Turn ' + (reports[0] && reports[0].turn != null ? reports[0].turn : b.turn - (b.phase === 'charge' ? 1 : 0))));
-    reports.forEach(function (rep) {
-      var d = el('div', 'combat-report');
-      d.appendChild(el('div', 'vs', esc(rep.names.join('  vs  '))));
-      rep.rounds.forEach(function (rd) {
-        var a = el('div', 'atk');
-        a.innerHTML = '<span class="who"><b>' + esc(rd.who) + '</b> → ' + esc(rd.targetName) + '</span><span>' + rd.dice + ' dice, ' + rd.hits + ' hits (' + rd.hitTarget + '+)</span><span class="' + (rd.wounds ? 'danger' : 'muted') + '">' + rd.wounds + ' wounds' + (rd.killed ? ', ' + rd.killed + ' slain' : '') + (rd.commanderKilled ? ' — COMMANDER SLAIN' : '') + '</span>';
-        a.innerHTML += '<div style="flex-basis:100%">' + diceHtml(rd.hitDice, rd.hitTarget, 'hit') + (rd.saveDice.length ? '<span class="muted" style="font-size:10px"> saves ' + rd.saveTarget + '+ </span>' + diceHtml(rd.saveDice, rd.saveTarget, 'save') : '') + '</div>';
-        d.appendChild(a);
-      });
-      d.appendChild(el('div', 'score', 'Combat score: <span class="accent">' + esc(b.names[0]) + ' ' + rep.score[0] + '</span> — <span class="danger">' + esc(b.names[1]) + ' ' + rep.score[1] + '</span>' + (rep.score[0] === rep.score[1] ? ' · draw' : '')));
-      rep.breakTests.forEach(function (bt) {
-        d.appendChild(el('div', null, esc(bt.name) + ': break test needs ' + bt.value + ', rolled ' + bt.dice.join('+') + ' — ' + (bt.reanimated ? 'Reanimated, crumbles ' + (bt.crumble || 0) : bt.ok ? '<span class="ok">holds</span>' : '<span class="danger">BREAKS' + (bt.escaped ? ' and flees the field' : '') + '</span>')));
-      });
-      box.appendChild(d);
+  // ---------- Dice panel ----------
+  var BADGE = { hits: 'ATTACK', saves: 'SAVE', discipline: 'TEST', flight: 'FLEE', casting: 'CAST', expr: 'HITS', initiative: 'INITIATIVE', crumble: 'CRUMBLE' };
+  function holdWord(pct) { return pct >= 0.8 ? 'Confident' : pct >= 0.55 ? 'Steady' : pct >= 0.3 ? 'Shaky' : pct > 0 ? 'Desperate' : 'Doomed'; }
+  UI.diceSeq = function (ev) {
+    UI.dice = { title: ev.title, sub: ev.sub || '', rows: [], pending: null, banner: null, uids: ev.uids || [] };
+    UI.diceSeqId++;
+    if (ev.uids) UI.targets = ev.uids.slice();
+    UI.renderDice(); UI.diceShow();
+  };
+  UI.dicePending = function (spec) {
+    if (!UI.dice) UI.dice = { title: '', sub: '', rows: [], pending: null, banner: null };
+    UI.dice.pending = spec;
+    if (spec.uid != null) { UI.targets = [spec.uid]; if (spec.targetUid != null) UI.targets.push(spec.targetUid); }
+    UI.hint(spec.label + ' — ' + spec.sub + '. Click the dice (or press Space) to roll.');
+    UI.renderDice(); UI.diceShow();
+  };
+  UI.diceRolled = function (spec, res) {
+    if (!UI.dice) UI.dice = { title: '', sub: '', rows: [], pending: null, banner: null };
+    UI.dice.pending = null;
+    var row = { spec: spec, res: res, id: ++UI.diceRowId };
+    UI.dice.rows.push(row);
+    if (UI.dice.rows.length > 12) UI.dice.rows.shift();
+    UI.renderDice(); UI.diceShow();
+    UI.animateRow(row);
+    if (spec.kind === 'discipline' && spec.n) { var u = UI.battle.unit(spec.uid); if (u) UI.renderer.addFloater(u.x, u.y - 1.5, res.ok ? (spec.why === 'rally' ? 'RALLIES' : 'HOLDS') : (spec.why === 'rally' ? 'still fleeing' : 'BREAKS'), res.ok ? '#b8f0b8' : '#ff6b6b'); }
+  };
+  UI.diceBanner = function (ev) {
+    if (!UI.dice) return;
+    UI.dice.banner = ev.winner == null ? 'Drawn combat' : (ev.winner === UI.playerSide ? 'You win by ' : UI.battle.names[ev.winner] + ' wins by ') + ev.diff;
+    UI.dice.bannerSide = ev.winner;
+    UI.renderDice(); UI.diceShow();
+  };
+  UI.diceIdle = function () { if (UI.diceHideTimer) clearTimeout(UI.diceHideTimer); $('dice-panel').classList.add('passive'); UI.diceHideTimer = setTimeout(function () { UI.diceHideTimer = null; if (UI.battle && !UI.battle.pendingRoll) $('dice-panel').classList.remove('on'); }, 4000); };
+  UI.diceShow = function () { var p = $('dice-panel'); p.classList.add('on'); if (UI.diceHideTimer) { clearTimeout(UI.diceHideTimer); UI.diceHideTimer = null; } if (UI.battle.pendingRoll) p.classList.remove('passive'); else UI.diceIdle(); };
+  UI.diceHide = function () { if (UI.battle && UI.battle.pendingRoll) return; $('dice-panel').classList.remove('on'); if (UI.diceHideTimer) { clearTimeout(UI.diceHideTimer); UI.diceHideTimer = null; } };
+  UI.diceRowId = 0;
+  function dieEl(v, cls) { var d = el('span', 'die' + (cls ? ' ' + cls : ''), v == null ? '' : String(v)); return d; }
+  function diceClassFor(spec, v, i, res) {
+    if (spec.kind === 'hits') return v >= spec.target ? 'hit' : 'miss';
+    if (spec.kind === 'saves') return v >= spec.target ? 'save' : 'fail';
+    if (spec.kind === 'discipline') return res.ok ? 'save big' : 'fail big';
+    if (spec.kind === 'casting') return res.miscast ? 'fail big' : res.ok ? 'hit big' : 'miss big';
+    if (spec.kind === 'initiative') return 'big';
+    return '';
+  }
+  function rowSummary(spec, res) {
+    var b = UI.battle;
+    switch (spec.kind) {
+      case 'hits': return res.hits + '/' + spec.n + ' hit';
+      case 'saves': return res.saved + '/' + spec.n + ' saved';
+      case 'discipline': if (!spec.n) return 'never fails'; return res.total + ' — ' + (res.ok ? (spec.why === 'rally' ? 'RALLIES' : 'HOLDS') : (spec.why === 'rally' ? 'FAILS' : 'BREAKS'));
+      case 'flight': return res.dice.reduce(function (a, c) { return a + c; }, 0) + '"';
+      case 'casting': return res.total + (res.miscast ? ' MISCAST' : res.ok ? ' cast' : ' fizzles');
+      case 'expr': return res.total + ' hits';
+      case 'initiative': return b.names[res.dice[0] > res.dice[1] ? 0 : res.dice[0] < res.dice[1] ? 1 : 0] + (res.dice[0] === res.dice[1] ? ' tie' : ' first');
+      case 'crumble': return Math.ceil(res.dice[0] / 2) + ' wounds';
+    }
+    return '';
+  }
+  function rowTargetText(spec) {
+    if (spec.kind === 'hits' || spec.kind === 'saves') return spec.target + '+';
+    if (spec.kind === 'discipline') return spec.n ? '≤ ' + spec.target : '—';
+    if (spec.kind === 'casting') return '≥ ' + spec.target;
+    return '';
+  }
+  UI.renderDice = function () {
+    var panel = $('dice-panel'), d = UI.dice, b = UI.battle; if (!panel) return;
+    panel.innerHTML = '';
+    if (!d) return;
+    var head = el('div', 'dp-head', '<span class="dp-title">' + esc(d.title || '') + '</span><span class="dp-sub muted">' + esc(d.sub || '') + '</span>');
+    panel.appendChild(head);
+    var rows = el('div', 'dp-rows');
+    d.rows.forEach(function (row) {
+      var spec = row.spec, res = row.res, mine = spec.side === UI.playerSide;
+      var r = el('div', 'dp-row' + (mine ? ' mine' : ' theirs')); r.id = 'dp-row-' + row.id;
+      r.appendChild(el('div', 'dp-label', esc(spec.label) + (spec.sub ? ' <span class="muted">· ' + esc(spec.sub) + '</span>' : '')));
+      r.appendChild(el('span', 'dp-badge k-' + spec.kind, BADGE[spec.kind] || spec.kind));
+      r.appendChild(el('span', 'dp-target', rowTargetText(spec)));
+      var dd = el('span', 'dp-dice');
+      var dice = res.dice || [];
+      dice.slice(0, 48).forEach(function (v, i) { dd.appendChild(dieEl(v, diceClassFor(spec, v, i, res) + (mine ? ' p0' : ' p1'))); });
+      if (dice.length > 48) dd.appendChild(el('span', 'muted', '+' + (dice.length - 48)));
+      if (spec.kind === 'casting') dd.appendChild(el('span', 'dp-plus', '+ ' + spec.bonus + ' = ' + res.total));
+      if (spec.kind === 'discipline' && spec.n) { dd.appendChild(el('span', 'dp-plus', '= ' + res.total + ' · ' + spec.target + ' or lower to ' + (spec.why === 'rally' ? 'rally' : 'hold'))); var pct = R.p2d6AtMost(spec.target); dd.appendChild(el('span', 'dp-odds ' + (pct >= 0.55 ? 'ok' : 'danger'), holdWord(pct) + ' ' + Math.round(pct * 100) + '%')); }
+      if (res.rerolled && res.rerolled.length) dd.appendChild(el('span', 'muted', spec.kind === 'discipline' ? '(first roll ' + res.rerolled.join('+') + ', re-rolled)' : '(' + res.rerolled.length + ' re-rolled)'));
+      r.appendChild(dd);
+      r.appendChild(el('span', 'dp-count ' + ((spec.kind === 'discipline' || spec.kind === 'casting') ? (res.ok ? 'ok' : 'danger') : ''), rowSummary(spec, res)));
+      rows.appendChild(r);
     });
-    var ok = el('button', 'primary', 'Continue'); ok.onclick = function () { UI.closeModal(); if (b.phase === 'end' || UI.pendingEnd) UI.onEnd(); else UI.pumpAI(); };
-    box.appendChild(ok);
-    UI.modalDismissable = false; UI.modal(box);
+    panel.appendChild(rows);
+    if (d.banner) panel.appendChild(el('div', 'dp-banner' + (d.bannerSide == null ? '' : d.bannerSide === UI.playerSide ? ' mine' : ' theirs'), esc(d.banner)));
+    if (d.pending) {
+      var spec = d.pending, pend = el('div', 'dp-pending');
+      pend.appendChild(el('div', 'dp-label', '<b>' + esc(spec.label) + '</b> <span class="muted">· ' + esc(spec.sub) + '</span>'));
+      var blank = el('span', 'dp-dice');
+      for (var i = 0; i < Math.min(48, spec.n || 1); i++) blank.appendChild(dieEl(null, 'blank'));
+      if (spec.n > 48) blank.appendChild(el('span', 'muted', '+' + (spec.n - 48)));
+      pend.appendChild(blank);
+      var acts = el('div', 'dp-actions');
+      var rollB = el('button', 'primary', 'Roll ' + (spec.n === 1 ? 'the die' : 'the dice') + ' (Space)'); rollB.onclick = function (e) { e.stopPropagation(); UI.rollDice(); };
+      var auto = el('button', 'small', 'Auto-resolve'); auto.title = 'Roll everything left in this phase automatically'; auto.onclick = function (e) { e.stopPropagation(); UI.autoResolve(); };
+      acts.appendChild(rollB); acts.appendChild(auto); pend.appendChild(acts);
+      panel.appendChild(pend);
+    }
+    rows.scrollTop = rows.scrollHeight;
+  };
+  UI.animateRow = function (row) {
+    var r = document.getElementById('dp-row-' + row.id); if (!r) return;
+    var dies = r.querySelectorAll('.die'), finals = [];
+    dies.forEach(function (d) { finals.push({ text: d.textContent, cls: d.className }); d.className = 'die rolling'; d.textContent = String(1 + Math.floor(Math.random() * 6)); });
+    var t0 = performance.now();
+    var tick = setInterval(function () {
+      var done = performance.now() - t0 > 380;
+      dies.forEach(function (d, i) { if (done) { d.className = finals[i].cls; d.textContent = finals[i].text; } else d.textContent = String(1 + Math.floor(Math.random() * 6)); });
+      if (done) clearInterval(tick);
+    }, 60);
+  };
+  UI.rollDice = function () {
+    var b = UI.battle; if (!b || !b.pendingRoll || UI.rollLock) return false;
+    UI.rollLock = true; setTimeout(function () { UI.rollLock = false; }, 250);
+    b.roll();
+    UI.afterRoll();
+    return true;
+  };
+  UI.autoResolve = function () {
+    var b = UI.battle; if (!b || !b.pendingRoll) return;
+    b.rollAll();
+    UI.afterRoll();
+  };
+  UI.afterRoll = function () {
+    var b = UI.battle;
+    UI.processEvents(); UI.updateHud();
+    if (b.phase === 'end') { UI.onEnd(); return; }
+    if (b.pendingRoll) return;
+    if (b.phase === 'strategic' && b.active === UI.playerSide && b.activeUnit) { UI.sel = b.activeUnit; UI.targets = []; UI.updateHud(); }
+    if (b.active === UI.aiSide) UI.pumpAI();
   };
 
   // HUD: phase bar, unit info and actions
   UI.updateHud = function () {
     var b = UI.battle; if (!b) return;
-    var phaseName = { deploy: 'DEPLOYMENT', charge: 'CHARGE PHASE', strategic: 'STRATEGIC PHASE', combat: 'COMBAT PHASE', end: 'BATTLE OVER' }[b.phase];
+    var phaseName = { deploy: 'DEPLOYMENT', charge: 'CHARGE PHASE', strategic: 'STRATEGIC PHASE', 'strategic-end': 'STRATEGIC PHASE', combat: 'COMBAT PHASE', end: 'BATTLE OVER' }[b.phase] || b.phase.toUpperCase();
     $('battle-phase').textContent = phaseName;
     $('battle-turn').textContent = b.phase === 'deploy' ? (b.scenario === 'objectives' ? 'Scoring Objectives' : 'Pitched Battle') : 'Turn ' + b.turn + ' / ' + b.maxTurns;
-    var who = $('battle-who'); who.textContent = b.phase === 'deploy' || b.phase === 'end' ? '' : (b.active === UI.playerSide ? 'Your activation' : b.names[UI.aiSide] + ' is acting…'); who.className = 'who' + (b.active === UI.aiSide ? ' enemy' : '');
+    var who = $('battle-who'); who.textContent = b.phase === 'deploy' || b.phase === 'end' ? '' : b.pendingRoll ? 'Roll the dice' : b.phase === 'combat' || b.phase === 'strategic-end' ? 'Resolving' : (b.active === UI.playerSide ? 'Your activation' : b.names[UI.aiSide] + ' is acting…'); who.className = 'who' + (b.active === UI.aiSide && !b.pendingRoll ? ' enemy' : '');
     $('battle-score').textContent = b.phase === 'deploy' ? '' : 'Score ' + b.scoreFor(0) + ' — ' + b.scoreFor(1) + (b.scenario === 'objectives' ? ' · objectives' : '') + (b.scoreMode === 'ratio' ? ' (share of army value)' : '');
     var info = $('battle-unitinfo'), act = $('battle-actions'); info.innerHTML = ''; act.innerHTML = '';
     var uid = UI.sel || UI.inspect || UI.deploySel, u = uid ? b.unit(uid) : null;
     if (!u) { info.appendChild(el('p', 'muted', b.phase === 'deploy' ? 'Deploy your units, then Begin Battle.' : 'Click a unit to see its profile. Your units have a blue front edge; enemies red.')); }
     else info.appendChild(UI.unitInfoPanel(u));
     // actions
-    if (b.phase === 'charge' && b.active === UI.playerSide) {
+    if (b.pendingRoll) {
+      var sp = b.pendingRoll.spec;
+      act.appendChild(el('div', 'muted', '<b>' + esc(sp.label) + '</b><br>' + esc(sp.sub)));
+      var rb = el('button', 'primary', 'Roll (Space)'); rb.onclick = UI.rollDice; act.appendChild(rb);
+      var ab = el('button', null, 'Auto-resolve the rest'); ab.onclick = UI.autoResolve; act.appendChild(ab);
+    } else if (b.phase === 'charge' && b.active === UI.playerSide) {
       if (u && u.side === UI.playerSide) {
         var cc = b.canCounterCharge(u), cf = b.canFlee(u);
         if (b.canDeclareCharge(u)) act.appendChild(el('div', 'muted', UI.targets.length ? 'Click a highlighted enemy to charge it.' : 'No valid charge targets for this unit.'));
@@ -490,7 +620,7 @@
       var pass = el('button', null, 'Pass (no more charges)'); pass.onclick = UI.passCharge; act.appendChild(pass);
     } else if (b.phase === 'strategic' && b.active === UI.playerSide) {
       if (u && u.side === UI.playerSide && b.activeUnit === u.uid) {
-        if (u.fleeing) { var br = el('button', 'primary', 'Rally (Discipline test)'); br.onclick = function () { var r = b.rally(u.uid); UI.sel = null; UI.afterPlayerAction(); }; act.appendChild(br); }
+        if (u.fleeing) { var br = el('button', 'primary', 'Rally (Discipline test)'); br.onclick = function () { var r = b.rally(u.uid); if (!r.ok) UI.hint(r.reason); UI.afterPlayerAction(); }; act.appendChild(br); }
         else {
           act.appendChild(el('div', 'muted', 'Movement left: <b>' + u.moveLeft.toFixed(1) + '"</b>' + (b.isEngaged(u) ? ' (engaged)' : '') + '. Click the ground to move; <kbd>Shift</kbd>-click to only pivot; <kbd>Q</kbd>/<kbd>E</kbd> pivot 45°.'));
           if (b.rangedWeaponOf(u, false) && !u.usedRanged && !u.usedAbility && !b.isEngaged(u)) { var bs = el('button', UI.mode === 'shoot' && !UI.shootCommander ? 'primary' : '', 'Shoot: ' + u.ranged); bs.onclick = function () { UI.enterTargetMode('shoot', null, false); }; act.appendChild(bs); }
@@ -548,9 +678,8 @@
     var b = UI.battle; if (!b || UI.endShown === b) return;
     if (UI.aiTimer) { clearTimeout(UI.aiTimer); UI.aiTimer = null; }
     UI.processEvents(); UI.updateHud();
-    if (UI.modalOpen) { UI.pendingEnd = true; return; } // let the player read the final combat report first
-    UI.endShown = b; UI.pendingEnd = false;
-    setTimeout(function () { if (UI.battleOpts.onEnd) UI.battleOpts.onEnd(b); }, 600);
+    UI.endShown = b;
+    setTimeout(function () { if (UI.battleOpts.onEnd) UI.battleOpts.onEnd(b); }, 1200);
   };
   UI.confirmLeaveBattle = function () {
     UI.modalDismissable = true;
@@ -757,14 +886,15 @@
   // ---------- rules ----------
   UI.showRules = function () {
     $('rules-body').innerHTML = [
-      '<h3>The game</h3><p>SOVL is a rank-and-flank fantasy wargame. Each unit is a block of models with a front, two flanks and a rear. Battles last ' + SOVL.MAX_TURNS + ' turns, or end when one army is destroyed or fleeing; otherwise the winner is decided on points (full cost for destroyed or routed units, half for units below half strength, plus slain commanders).</p>',
+      '<h3>The game</h3><p>Fantasy Battle is a rank-and-flank fantasy wargame. Each unit is a block of models with a front, two flanks and a rear. Battles last ' + SOVL.MAX_TURNS + ' turns, or end when one army is destroyed or fleeing; otherwise the winner is decided on points (full cost for destroyed or routed units, half for units below half strength, plus slain commanders).</p>',
       '<h3>Turn structure</h3><p>Each turn has three phases. Players alternate activations in the first two.</p><ul><li><b>Charge Phase</b> — declare charges one at a time. A charge needs the target within the charger\'s move distance and inside its 45° front arc, with line of sight. Units already charged can <b>counter-charge</b> a frontal charger, or <b>flee</b> if fast enough.</li><li><b>Strategic Phase</b> — activate one unit at a time: advance and pivot (each 45° pivot costs movement: 1 for infantry, 2 for cavalry), use one ranged attack or ability, and the commander may cast one spell. Fleeing units may only try to rally.</li><li><b>Combat Phase</b> — every engagement is fought simultaneously: models in the front rank attack (second rank adds one supporting attack each; spears add a third rank when not charging). Compare Skill to hit (3+ if higher, else 4+), then the defender saves against Power versus Defense. Wounds plus flank (+1) and rear (+1) bonuses give the combat score; the loser tests Discipline on 2d6 minus the difference, adding +1 per rank of 3+ models.</li></ul>',
       '<h3>Ranged attacks</h3><p>One die per model, 4+ to hit modified by Skill (±1 per point from 3), −1 at long range (over half range) and −1 against targets in cover. Losing a quarter of a unit to shooting forces a Discipline test.</p>',
       '<h3>Terrain</h3><p>Forests and swamps are difficult terrain (−2 movement to enter or start in). Cliffs, ruins and lakes are impassable. Forests, cliffs and ruins block line of sight.</p>',
       '<h3>Controls</h3><table><tr><td>Click a unit</td><td>select / activate (Strategic Phase)</td></tr><tr><td>Click ground</td><td>pivot toward the point and advance</td></tr><tr><td><kbd>Shift</kbd> + click</td><td>pivot only</td></tr><tr><td><kbd>Q</kbd> / <kbd>E</kbd></td><td>pivot 45° left / right</td></tr><tr><td><kbd>Enter</kbd></td><td>end activation / pass</td></tr><tr><td><kbd>X</kbd> / <kbd>Shift</kbd>+<kbd>X</kbd></td><td>show charge arcs / weapon ranges</td></tr><tr><td>Mouse wheel, right-drag</td><td>zoom and pan</td></tr><tr><td><kbd>Esc</kbd></td><td>cancel targeting</td></tr></table>',
       '<h3>Trail of Death</h3><p>A roguelite campaign in three acts. Choose a path through battles (⚔), elite battles (☠), events (?), merchants (⚖), camps (⛺) and treasure (✪), then defeat each act\'s boss (♛). Victories earn gold and veterancy; half of a unit\'s losses return after a won battle. A lost battle, or a dead commander, ends the run.</p>',
       '<h3>Factions</h3><ul>' + Object.keys(SOVL.FACTION_DATA).map(function (f) { return '<li><b>' + esc(SOVL.FACTION_DATA[f].name) + '</b> — ' + esc(SOVL.FACTION_INFO[f].tagline) + '</li>'; }).join('') + '</ul>',
-      '<p class="muted">Core rules follow the public SOVL rules document. Spells, magic items and the campaign structure are this replica\'s own design, matching the names used in the source lists.</p>'
+      '<h3>Dice</h3><p>Nothing is rolled for you. When an attack, save, casting roll, break test or flight move comes up, the dice appear in the panel at the bottom of the battlefield: click them (or press <kbd>Space</kbd>) to roll. Attack dice that meet the target count as hits; the defender then rolls a save for each hit. After every engagement the combat score is shown, and the losing units roll their break tests. Use Auto-resolve if you want the rest of a phase rolled for you.</p>',
+      '<p class="muted">Core rules follow the public SOVL rules document by Dalen Studios. Spells, magic items and the campaign structure are this game\'s own design, matching the names used in the source lists.</p>'
     ].join('');
     UI.show('rules');
   };

@@ -253,8 +253,8 @@
     camp.army.entries.forEach(function (e) { var t = e.kind === 'commander' ? e.retinue : e; t.maxSeen = Math.max(t.maxSeen || 0, t.models); });
     return army;
   };
-  C.save = function (camp) { try { localStorage.setItem('sovl_campaign', JSON.stringify(camp)); } catch (e) {} };
-  C.load = function () { try { var s = localStorage.getItem('sovl_campaign'); return s ? JSON.parse(s) : null; } catch (e) { return null; } };
-  C.clear = function () { try { localStorage.removeItem('sovl_campaign'); } catch (e) {} };
+  C.save = function (camp) { try { localStorage.setItem('fantasy_battle_campaign', JSON.stringify(camp)); } catch (e) {} };
+  C.load = function () { try { var s = localStorage.getItem('fantasy_battle_campaign'); return s ? JSON.parse(s) : null; } catch (e) { return null; } };
+  C.clear = function () { try { localStorage.removeItem('fantasy_battle_campaign'); } catch (e) {} };
   SOVL.Campaign = C;
 })();

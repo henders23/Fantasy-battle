@@ -207,6 +207,7 @@
     this.activeUnit = null; this.winner = null; this.result = null; this.deployed = [false, false];
     this.names = opts.names || ['Player', 'Enemy']; this.sides = opts.sides || ['bottom', 'top'];
     this.scoreMode = opts.scoreMode || 'points'; // 'points' or 'ratio' (share of enemy army value destroyed)
+    this.interactive = !!opts.interactive; this.autoRoll = false; this.pendingRoll = null; this.lastRoll = null;
     if (opts.seed != null) R.setSeed(opts.seed);
     for (var s = 0; s < 2; s++) this.buildArmy(s, opts.armies[s]);
     // disambiguate duplicate unit names within a side
@@ -363,15 +364,39 @@
   };
 
   // ---------- Start / turn structure ----------
+  // ---------- Dice roll requests ----------
+  // In interactive mode a roll pauses the engine until roll() is called; headless play rolls at once.
+  BP.requestRoll = function (spec, rollFn, cb) {
+    var self = this;
+    var exec = function () {
+      var res = rollFn();
+      self.lastRoll = { spec: spec, res: res };
+      self.emit({ type: 'roll', spec: spec, res: res });
+      cb(res);
+    };
+    if (!this.interactive || this.autoRoll) { exec(); return; }
+    this.pendingRoll = { spec: spec, exec: exec };
+    this.emit({ type: 'rollRequest', spec: spec });
+  };
+  BP.roll = function () { var p = this.pendingRoll; if (!p) return false; this.pendingRoll = null; p.exec(); return true; };
+  BP.rollAll = function () { var g = 0, saved = this.autoRoll; this.autoRoll = true; while (this.pendingRoll && g++ < 10000) this.roll(); this.autoRoll = saved; };
+  BP.seq = function (title, sub, extra) { var ev = Object.assign({ type: 'seq', title: title, sub: sub || '' }, extra || {}); this.emit(ev); };
+
   BP.start = function (firstSide) {
-    // Initiative roll-off if not given
-    if (firstSide == null) {
-      var a, b; do { a = R.d6(); b = R.d6(); } while (a === b);
-      firstSide = a > b ? 0 : 1;
-      this.addLog(this.names[0] + ' rolls ' + a + ', ' + this.names[1] + ' rolls ' + b + '. ' + this.names[firstSide] + ' has the initiative.', 'dice', { dice: [a, b] });
-    }
-    this.startSide = firstSide; this.turn = 1;
-    this.beginChargePhase();
+    var self = this;
+    if (firstSide != null) { this.startSide = firstSide; this.turn = 1; this.beginChargePhase(); return; }
+    this.seq('Roll for initiative', this.names[0] + ' vs ' + this.names[1]);
+    var rollOff = function () {
+      self.requestRoll({ kind: 'initiative', n: 2, label: 'Initiative', sub: self.names[0] + ' vs ' + self.names[1], names: self.names.slice() }, function () { return { dice: R.dice(2) }; }, function (res) {
+        var a = res.dice[0], b = res.dice[1];
+        if (a === b) { self.addLog('Tied roll (' + a + ' each): roll again.', 'dice', { dice: res.dice }); rollOff(); return; }
+        var fs = a > b ? 0 : 1;
+        self.addLog(self.names[0] + ' rolls ' + a + ', ' + self.names[1] + ' rolls ' + b + '. ' + self.names[fs] + ' has the initiative.', 'dice', { dice: [a, b] });
+        self.startSide = fs; self.turn = 1;
+        self.beginChargePhase();
+      });
+    };
+    rollOff();
   };
   BP.beginTurn = function () {
     this.turn++;
@@ -575,20 +600,29 @@
   };
   BP.resolveCharges = function () {
     var self = this;
+    this.autoRoll = false;
     this.addLog('Resolving charges.', 'phase');
-    // 1. flee reactions
-    this.charges.filter(function (c) { return c.flee; }).forEach(function (c) {
-      var u = self.unit(c.charger), ch = self.unit(c.target); if (!u || !ch) return;
+    // 1. flee reactions, one at a time (each needs a flight roll)
+    var flees = this.charges.filter(function (c) { return c.flee; }), i = 0;
+    var nextFlee = function () {
+      if (i >= flees.length) { self.resolveNormalCharges(); return; }
+      var c = flees[i++], u = self.unit(c.charger), ch = self.unit(c.target);
+      if (!u || !ch) { nextFlee(); return; }
       var away = Math.atan2(u.y - ch.y, u.x - ch.x);
       u.fleeing = true;
-      var fm = self.flightMove(u, away, 'flees from the charge');
-      // the charger's own charge is spent either way
-      self.charges = self.charges.filter(function (x) { return !(x.charger === ch.uid && x.target === u.uid); });
-      ch.activated = true;
-      if (!unitAlive(u) || u.removed) return;
-      // charger pursues its full move (once)
-      self.pursue(ch, u);
-    });
+      self.seq(u.name + ' flees from ' + ch.name, 'Flight move', { uids: [u.uid, ch.uid] });
+      self.flightMove(u, away, 'flees from the charge', function () {
+        // the charger's own charge is spent either way
+        self.charges = self.charges.filter(function (x) { return !(x.charger === ch.uid && x.target === u.uid); });
+        ch.activated = true;
+        if (unitAlive(u) && !u.removed) self.pursue(ch, u);
+        nextFlee();
+      });
+    };
+    nextFlee();
+  };
+  BP.resolveNormalCharges = function () {
+    var self = this;
     // 2. counter charges, 3. others by priority
     var normal = this.charges.filter(function (c) { return !c.flee; });
     normal.sort(function (a, b) { return (b.counter ? 1 : 0) - (a.counter ? 1 : 0) || (b.priority - a.priority); });
@@ -835,45 +869,55 @@
     return res;
   };
   BP.shoot = function (uid, targetUid, commander) {
-    var u = this.unit(uid), t = this.unit(targetUid);
+    var u = this.unit(uid), t = this.unit(targetUid), self = this;
     if (!u || !t || this.activeUnit !== uid) return { ok: false, reason: 'Not active' };
+    if (this.pendingRoll) return { ok: false, reason: 'Roll the dice first' };
     var info = this.rangedInfo(u, t, commander); if (!info.ok) return info;
-    var w = info.weapon, hits = 0, roll, hitDice = [];
+    var w = info.weapon, shooterName = u.name + (commander ? ' (' + u.commander.name + ')' : '');
     if (w.once) u.usedOnce[w.name] = true;
-    if (w.perModel || commander) {
-      var n = info.shooters * (w.shots || 1);
-      roll = R.rollAgainst(n, info.target, { rerollMiss: false });
-      // Mechanical Expertise: re-roll 1s
-      if (hasEffect(u, 'reroll1s')) { for (var i = 0; i < roll.dice.length; i++) if (roll.dice[i] === 1) { var v = R.d6(); roll.dice[i] = v; if (v >= info.target) roll.hits++; } }
-      hits = roll.hits; hitDice = roll.dice;
-    } else {
-      var shots = w.shots || 1;
-      roll = R.rollAgainst(shots, info.target, {});
-      if (hasEffect(u, 'reroll1s')) { for (var k = 0; k < roll.dice.length; k++) if (roll.dice[k] === 1) { var v2 = R.d6(); roll.dice[k] = v2; if (v2 >= info.target) roll.hits++; } }
-      hitDice = roll.dice;
-      for (var j = 0; j < roll.hits; j++) hits += R.rollExpr(w.hits || '1').total;
-    }
     if (commander) u.usedSpell = true; else u.usedRanged = true;
     var lethal = hasProp(u, 'Lethal Shots') || (commander && cmdHasProp(u, 'Lethal Shots'));
-    var dmg = this.applyHits(t, hits, w.pow, { lethal: lethal, source: u, ranged: true });
-    var txt = u.name + (commander ? ' (' + u.commander.name + ')' : '') + ' fires ' + w.name + ' at ' + t.name + ': ' + hits + ' hit' + (hits === 1 ? '' : 's') + ' (' + info.target + '+' + (info.notes.length ? ', ' + info.notes.join(', ') : '') + '), ' + dmg.wounds + ' wound' + (dmg.wounds === 1 ? '' : 's') + (dmg.killed ? ', ' + dmg.killed + ' slain' : '') + '.';
-    var entry = this.addLog(txt, 'shoot', { hitDice: hitDice, hitTarget: info.target, saveDice: dmg.saveDice, saveTarget: dmg.saveTarget });
-    this.emit({ type: 'shoot', from: u.uid, to: t.uid, hits: hits, wounds: dmg.wounds, killed: dmg.killed, log: entry });
-    this.afterCasualties(t, dmg, u);
-    return { ok: true, hits: hits, wounds: dmg.wounds, killed: dmg.killed, dmg: dmg };
+    var result = { ok: true, pending: true };
+    this.seq(shooterName + ' fires ' + w.name + ' at ' + t.name, info.target + '+ to hit' + (info.notes.length ? ' (' + info.notes.join(', ') + ')' : ''), { uids: [u.uid, t.uid], kind: 'shoot' });
+    var afterHits = function (hits, hitDice) {
+      self.applyHits(t, hits, w.pow, { lethal: lethal, source: u, ranged: true }, function (dmg) {
+        var txt = shooterName + ' fires ' + w.name + ' at ' + t.name + ': ' + hits + ' hit' + (hits === 1 ? '' : 's') + ' (' + info.target + '+' + (info.notes.length ? ', ' + info.notes.join(', ') : '') + '), ' + dmg.wounds + ' wound' + (dmg.wounds === 1 ? '' : 's') + (dmg.killed ? ', ' + dmg.killed + ' slain' : '') + '.';
+        var entry = self.addLog(txt, 'shoot', { hitDice: hitDice, hitTarget: info.target, saveDice: dmg.saveDice, saveTarget: dmg.saveTarget });
+        self.emit({ type: 'shoot', from: u.uid, to: t.uid, hits: hits, wounds: dmg.wounds, killed: dmg.killed, log: entry });
+        result.hits = hits; result.wounds = dmg.wounds; result.killed = dmg.killed; result.dmg = dmg;
+        self.afterCasualties(t, dmg, u, function () { result.pending = false; self.emit({ type: 'seqEnd' }); });
+      });
+    };
+    var rerollOnes = hasEffect(u, 'reroll1s');
+    function fixOnes(roll, target) { if (!rerollOnes) return roll; for (var i = 0; i < roll.dice.length; i++) if (roll.dice[i] === 1) { var v = R.d6(); roll.dice[i] = v; if (v >= target) roll.hits++; } return roll; }
+    if (w.perModel || commander) {
+      var n = info.shooters * (w.shots || 1);
+      this.requestRoll({ kind: 'hits', ranged: true, n: n, target: info.target, label: shooterName + ' shoots', sub: n + ' dice, ' + info.target + '+ to hit', uid: u.uid, targetUid: t.uid, side: u.side }, function () { return fixOnes(R.rollAgainst(n, info.target, {}), info.target); }, function (roll) { afterHits(roll.hits, roll.dice); });
+    } else {
+      var shots = w.shots || 1;
+      this.requestRoll({ kind: 'hits', ranged: true, n: shots, target: info.target, label: shooterName + ' fires', sub: shots + ' shot' + (shots === 1 ? '' : 's') + ', ' + info.target + '+ to hit', uid: u.uid, targetUid: t.uid, side: u.side }, function () { return fixOnes(R.rollAgainst(shots, info.target, {}), info.target); }, function (roll) {
+        if (roll.hits === 0 || !w.hits || String(w.hits) === '1') { afterHits(roll.hits, roll.dice); return; }
+        self.requestRoll({ kind: 'expr', n: roll.hits, expr: w.hits, label: 'Hits inflicted', sub: w.hits.toUpperCase() + ' per hit × ' + roll.hits, uid: u.uid, targetUid: t.uid, side: u.side }, function () { var tot = 0, dice = []; for (var j = 0; j < roll.hits; j++) { var e = R.rollExpr(w.hits); tot += e.total; dice = dice.concat(e.dice); } return { dice: dice, total: tot }; }, function (ex) { afterHits(ex.total, roll.dice); });
+      });
+    }
+    return result;
   };
-  // Apply N hits at power P to unit t; returns wounds/killed info.
-  BP.applyHits = function (t, hits, pow, opts) {
+  // Apply N hits at power P to unit t (rolls Damage Saves); cb(res) with wounds/killed info.
+  BP.applyHits = function (t, hits, pow, opts, cb) {
     opts = opts || {};
-    var res = { hits: hits, wounds: 0, killed: 0, commanderKilled: false, saveDice: [], saveTarget: null };
-    if (hits <= 0 || !unitAlive(t)) return res;
-    var ds = effStats(t, this), target = R.saveTarget(pow, ds.df - ((opts.melee && hasProp(t, 'Crewed Weapon')) ? 2 : 0));
-    var sv = R.rollSaves(hits, target, { halberd: opts.halberd, poison: opts.poison, rerollFail: hasEffect(t, 'rerollSaves'), saveBonus: ds.saveBonus });
-    res.saveDice = sv.dice; res.saveTarget = sv.target;
-    var wounds = sv.failed;
-    var dmg = this.applyWounds(t, wounds, opts);
-    res.wounds = dmg.wounds; res.killed = dmg.killed; res.commanderKilled = dmg.commanderKilled; res.commanderWounds = dmg.commanderWounds;
-    return res;
+    var self = this, res = { hits: hits, wounds: 0, killed: 0, commanderKilled: false, saveDice: [], saveTarget: null };
+    if (hits <= 0 || !unitAlive(t)) { cb(res); return; }
+    var ds = effStats(t, this), raw = R.saveTarget(pow, ds.df - ((opts.melee && hasProp(t, 'Crewed Weapon')) ? 2 : 0));
+    var sopts = { halberd: opts.halberd, poison: opts.poison, rerollFail: hasEffect(t, 'rerollSaves'), saveBonus: ds.saveBonus };
+    var target = R.adjustSaveTarget(raw, sopts);
+    var notes = []; if (opts.halberd && raw < 4) notes.push('halberd'); if (opts.poison) notes.push('poisoned'); if (sopts.rerollFail) notes.push('re-roll fails');
+    this.requestRoll({ kind: 'saves', n: hits, target: target, label: t.name + ' saves', sub: hits + ' hit' + (hits === 1 ? '' : 's') + ', ' + target + '+ to save' + (notes.length ? ' (' + notes.join(', ') + ')' : ''), uid: t.uid, side: t.side, pow: pow, def: ds.df }, function () { return R.rollSaves(hits, raw, sopts); }, function (sv) {
+      res.saveDice = sv.dice; res.saveTarget = sv.target;
+      var dmg = self.applyWounds(t, sv.failed, opts);
+      res.wounds = dmg.wounds; res.killed = dmg.killed; res.commanderKilled = dmg.commanderKilled; res.commanderWounds = dmg.commanderWounds;
+      self.emit({ type: 'wounds', uid: t.uid, wounds: res.wounds, killed: res.killed });
+      cb(res);
+    });
   };
   BP.applyWounds = function (t, wounds, opts) {
     opts = opts || {};
@@ -912,63 +956,72 @@
     if (this.activeUnit === u.uid) this.activeUnit = null;
   };
   // Heavy casualties: 25%+ of current models lost to shooting/magic -> Discipline test or flee
-  BP.afterCasualties = function (t, dmg, source) {
-    if (!unitAlive(t) || t.removed || t.fleeing || dmg.killed <= 0) return;
+  // Heavy casualties: 25%+ of current models lost to shooting/magic -> Discipline test or flee
+  BP.afterCasualties = function (t, dmg, source, cb) {
+    var self = this; cb = cb || function () {};
+    if (!unitAlive(t) || t.removed || t.fleeing || dmg.killed <= 0) { cb(); return; }
     var before = t.models + dmg.killed;
-    if (dmg.killed < Math.ceil(before * 0.25) || isReanimated(t)) return;
-    if (this.isEngaged(t)) return;
-    var test = this.disciplineTest(t, 0, 'heavy casualties');
-    if (!test.ok) {
+    if (dmg.killed < Math.ceil(before * 0.25) || isReanimated(t) || this.isEngaged(t)) { cb(); return; }
+    this.disciplineTest(t, 0, 'heavy casualties', function (test) {
+      if (test.ok) { cb(); return; }
       var away = Math.atan2(t.y - source.y, t.x - source.x);
-      t.fleeing = true; this.contacts = this.contacts.filter(function (c) { return c.a !== t.uid && c.b !== t.uid; });
-      this.flightMove(t, away, 'panics and flees');
-    }
+      t.fleeing = true; self.contacts = self.contacts.filter(function (c) { return c.a !== t.uid && c.b !== t.uid; });
+      self.flightMove(t, away, 'panics and flees', function () { cb(); });
+    });
   };
-  BP.disciplineTest = function (u, penalty, why) {
-    var s = effStats(u, this), rb = commanderOnly(u) ? 0 : R.rankBonus(u.models, u.files), fearless = isFearless(u, this);
+  // Discipline test (2d6 <= Discipline + rank bonus - penalty); cb(test).
+  BP.disciplineTest = function (u, penalty, why, cb) {
+    var self = this, s = effStats(u, this), rb = commanderOnly(u) ? 0 : R.rankBonus(u.models, u.files), fearless = isFearless(u, this);
     var value = s.ds + rb - (fearless ? 0 : penalty);
     var reroll = (hasProp(u, 'Bodyguard') && u.commander && u.commander.alive) || (u.banner && u.banner.effect.rerollBreak && why === 'break test');
-    var test = R.disciplineTest(value, { reroll: reroll });
-    test.value = value; test.rankBonus = rb; test.fearless = fearless;
-    if (isReanimated(u)) { test.ok = true; test.reanimated = true; }
-    var txt = u.name + ' tests Discipline (' + why + '): needs ' + value + ' (Disc ' + s.ds + (rb ? ' + ' + rb + ' ranks' : '') + (penalty && !fearless ? ' − ' + penalty : '') + '), rolls ' + test.total + (test.rerolled ? ' after re-roll' : '') + ' — ' + (test.reanimated ? 'Reanimated never fail' : test.ok ? 'holds' : 'FAILS') + '.';
-    var e = this.addLog(txt, test.ok ? 'test' : 'fail', { discDice: test.dice, target: value });
-    test.log = e;
-    return test;
-  };
-  // Flight move: d6 per 4" of base movement, in direction `ang`.
-  BP.flightMove = function (u, ang, why) {
-    var base = isFlying(u) ? 20 : (commanderOnly(u) ? 8 : u.typeInfo.move), n = Math.max(1, Math.floor(base / 4));
-    var dice = R.dice(n), dist = R.sum(dice), from = { x: u.x, y: u.y, a: u.a };
-    var tried = [0, 0.35, -0.35, 0.7, -0.7, 1.05, -1.05], placed = false, self = this, final = null;
-    for (var i = 0; i < tried.length && !placed; i++) {
-      var a = ang + tried[i], f = G.fwd(a), last = null, escaped = false;
-      for (var s = 0.5; s <= dist + 1e-9; s += 0.5) {
-        var r = { x: from.x + f.x * s, y: from.y + f.y * s, a: a, w: u.w, d: u.d };
-        if (G.rectTouchesEdge(r, TABLE.w, TABLE.h)) { escaped = true; last = r; break; }
-        var hit = null;
-        if (!isFlying(u)) for (var j = 0; j < this.terrain.length; j++) { var t = this.terrain[j]; if (SOVL.TERRAIN_TYPES[t.kind].impassable && G.rectOverlapsAabb(r, t, -0.05)) { hit = t; break; } }
-        if (hit) break;
-        last = r;
-      }
-      if (last && (escaped || !this.collides(u, last, [], false))) { final = last; final.escaped = escaped; placed = true; }
+    var breakdown = 'Disc ' + s.ds + (rb ? ' + ' + rb + ' ranks' : '') + (penalty && !fearless ? ' − ' + penalty : '') + (fearless && penalty ? ' (Fearless)' : '');
+    if (isReanimated(u)) {
+      var test0 = { dice: [], total: 0, ok: true, reanimated: true, value: value, rankBonus: rb, fearless: fearless };
+      test0.log = this.addLog(u.name + ' (' + why + '): Reanimated never fail Discipline tests.', 'test');
+      this.emit({ type: 'roll', spec: { kind: 'discipline', n: 0, target: value, label: u.name + ' — ' + why, sub: 'Reanimated: never fails', uid: u.uid, side: u.side, why: why }, res: test0 });
+      cb(test0); return;
     }
-    if (!placed) {
-      // every heading collides at full distance: take the first heading and slide back until clear
-      var f0 = G.fwd(ang);
-      for (var s0 = dist; s0 >= 0 && !placed; s0 -= 0.5) {
-        var r0 = { x: from.x + f0.x * s0, y: from.y + f0.y * s0, a: ang, w: u.w, d: u.d };
-        if (G.rectInsideTable(r0, TABLE.w, TABLE.h, 0) && !this.collides(u, r0, [], false)) { final = r0; final.escaped = false; placed = true; }
-      }
-    }
-    if (!final) final = { x: from.x, y: from.y, a: ang, escaped: false };
-    u.x = final.x; u.y = final.y; u.a = final.a;
-    this.addLog(u.name + ' ' + why + ' ' + dist + '" (' + dice.join('+') + ').', 'flee', { dice: dice });
-    this.emit({ type: 'flee', uid: u.uid, from: from, to: { x: u.x, y: u.y, a: u.a }, dice: dice });
-    if (final.escaped) { this.destroyUnit(u, 'fled'); return { escaped: true, dist: dist }; }
-    return { escaped: false, dist: dist };
+    this.requestRoll({ kind: 'discipline', n: 2, target: value, label: u.name + ' — ' + why, sub: value + ' or lower to ' + (why === 'rally' ? 'rally' : 'hold') + ' (' + breakdown + ')', uid: u.uid, side: u.side, why: why, reroll: reroll }, function () { return R.disciplineTest(value, { reroll: reroll }); }, function (test) {
+      test.value = value; test.rankBonus = rb; test.fearless = fearless;
+      var txt = u.name + ' tests Discipline (' + why + '): needs ' + value + ' (' + breakdown + '), rolls ' + test.total + (test.rerolled ? ' after re-roll' : '') + ' — ' + (test.ok ? 'holds' : 'FAILS') + '.';
+      test.log = self.addLog(txt, test.ok ? 'test' : 'fail', { discDice: test.dice, target: value });
+      cb(test);
+    });
   };
-
+  // Flight move: d6 per 4" of base movement, in direction `ang`; cb({escaped, dist}).
+  BP.flightMove = function (u, ang, why, cb) {
+    var self = this, base = isFlying(u) ? 20 : (commanderOnly(u) ? 8 : u.typeInfo.move), n = Math.max(1, Math.floor(base / 4));
+    cb = cb || function () {};
+    this.requestRoll({ kind: 'flight', n: n, label: u.name + ' ' + why, sub: n + 'D6 inches', uid: u.uid, side: u.side }, function () { return { dice: R.dice(n) }; }, function (res) {
+      var dice = res.dice, dist = R.sum(dice), from = { x: u.x, y: u.y, a: u.a };
+      var tried = [0, 0.35, -0.35, 0.7, -0.7, 1.05, -1.05], placed = false, final = null;
+      for (var i = 0; i < tried.length && !placed; i++) {
+        var a = ang + tried[i], f = G.fwd(a), last = null, escaped = false;
+        for (var s = 0.5; s <= dist + 1e-9; s += 0.5) {
+          var r = { x: from.x + f.x * s, y: from.y + f.y * s, a: a, w: u.w, d: u.d };
+          if (G.rectTouchesEdge(r, TABLE.w, TABLE.h)) { escaped = true; last = r; break; }
+          var hit = null;
+          if (!isFlying(u)) for (var j = 0; j < self.terrain.length; j++) { var t = self.terrain[j]; if (SOVL.TERRAIN_TYPES[t.kind].impassable && G.rectOverlapsAabb(r, t, -0.05)) { hit = t; break; } }
+          if (hit) break;
+          last = r;
+        }
+        if (last && (escaped || !self.collides(u, last, [], false))) { final = last; final.escaped = escaped; placed = true; }
+      }
+      if (!placed) {
+        var f0 = G.fwd(ang);
+        for (var s0 = dist; s0 >= 0 && !placed; s0 -= 0.5) {
+          var r0 = { x: from.x + f0.x * s0, y: from.y + f0.y * s0, a: ang, w: u.w, d: u.d };
+          if (G.rectInsideTable(r0, TABLE.w, TABLE.h, 0) && !self.collides(u, r0, [], false)) { final = r0; final.escaped = false; placed = true; }
+        }
+      }
+      if (!final) final = { x: from.x, y: from.y, a: ang, escaped: false };
+      u.x = final.x; u.y = final.y; u.a = final.a;
+      self.addLog(u.name + ' ' + why + ' ' + dist + '" (' + dice.join('+') + ').', 'flee', { dice: dice });
+      self.emit({ type: 'flee', uid: u.uid, from: from, to: { x: u.x, y: u.y, a: u.a }, dice: dice });
+      if (final.escaped) { self.destroyUnit(u, 'fled'); cb({ escaped: true, dist: dist }); return; }
+      cb({ escaped: false, dist: dist });
+    });
+  };
   // ---------- Spells & abilities ----------
   BP.spellTargets = function (u, spellName) {
     var sp = SOVL.SPELLS[spellName], self = this, out = [];
@@ -994,36 +1047,48 @@
     return u.commander && u.commander.alive && u.commander.spells.length > 0 && !u.usedSpell && !u.fleeing;
   };
   BP.cast = function (uid, spellName, targetUid) {
-    var u = this.unit(uid), t = this.unit(targetUid), sp = SOVL.SPELLS[spellName];
+    var u = this.unit(uid), t = this.unit(targetUid), sp = SOVL.SPELLS[spellName], self = this;
     if (!u || !sp || this.activeUnit !== uid) return { ok: false, reason: 'Not active' };
+    if (this.pendingRoll) return { ok: false, reason: 'Roll the dice first' };
     if (!this.canCast(u) || u.commander.spells.indexOf(spellName) < 0) return { ok: false, reason: 'Cannot cast' };
     if (u.spellsCastThisTurn[spellName]) return { ok: false, reason: 'Already cast this turn' };
     if (!t || this.spellTargets(u, spellName).indexOf(t) < 0) return { ok: false, reason: 'Invalid target' };
     u.usedSpell = true; u.spellsCastThisTurn[spellName] = true;
-    var lvl = u.commander.caster + itemBonus(u, 'casting'), dice = R.dice(2), total = R.sum(dice) + lvl, ok = total >= sp.cv;
-    var miscast = dice[0] === 1 && dice[1] === 1;
-    var txt = u.commander.name + ' casts ' + spellName + ' (needs ' + sp.cv + '): rolls ' + dice.join('+') + ' + ' + lvl + ' = ' + total + ' — ';
-    if (miscast) { txt += 'MISCAST! The caster is wracked by the winds of magic.'; this.addLog(txt, 'fail', { dice: dice }); this.woundCommander(u, 1); this.emit({ type: 'spell', from: u.uid, to: t.uid, spell: spellName, ok: false }); return { ok: true, cast: false, miscast: true }; }
-    if (!ok) { txt += 'the spell fizzles.'; this.addLog(txt, 'fail', { dice: dice }); this.emit({ type: 'spell', from: u.uid, to: t.uid, spell: spellName, ok: false }); return { ok: true, cast: false }; }
-    txt += 'success!'; this.addLog(txt, 'spell', { dice: dice });
-    var result = { ok: true, cast: true };
-    if (sp.kind === 'bolt') {
-      var hits = R.rollExpr(sp.hits).total, dmg = this.applyHits(t, hits, sp.pow, { lethal: !!sp.lethal, source: u });
-      this.addLog(spellName + ' strikes ' + t.name + ' with ' + hits + ' hits (Power ' + sp.pow + '): ' + dmg.wounds + ' wounds' + (dmg.killed ? ', ' + dmg.killed + ' slain' : '') + '.', 'spell', { saveDice: dmg.saveDice, saveTarget: dmg.saveTarget });
-      result.dmg = dmg; this.afterCasualties(t, dmg, u);
-    } else if (sp.kind === 'hex') {
-      if (sp.effect.hits) { var h2 = R.rollExpr(sp.effect.hits).total, d2 = this.applyHits(t, h2, sp.effect.pow, { source: u }); this.addLog(spellName + ' inflicts ' + h2 + ' hits on ' + t.name + ': ' + d2.wounds + ' wounds.', 'spell', { saveDice: d2.saveDice, saveTarget: d2.saveTarget }); result.dmg = d2; this.afterCasualties(t, d2, u); }
-      if (unitAlive(t) && !t.removed) t.effects.push({ name: spellName, effect: sp.effect, until: this.turn + (sp.effect.rooted ? 1 : 0), untilPhase: 'end' });
-    } else if (sp.kind === 'buff') {
-      t.effects.push({ name: spellName, effect: sp.effect, until: this.turn, untilPhase: 'end' });
-    } else if (sp.kind === 'heal') {
-      var heal = R.rollExpr(sp.heal).total; this.healUnit(t, heal);
-      this.addLog(t.name + ' recovers ' + heal + ' wounds.', 'spell');
-    } else if (sp.kind === 'summon') {
-      var placed = this.summonUnit(u, sp.summon, sp.count);
-      this.addLog(placed ? 'A unit of ' + sp.count + ' ' + placed.name + ' claws its way out of the ground!' : 'There is no room for the dead to rise.', 'spell');
-    }
-    this.emit({ type: 'spell', from: u.uid, to: t.uid, spell: spellName, ok: true });
+    var lvl = u.commander.caster + itemBonus(u, 'casting'), result = { ok: true, pending: true };
+    this.seq(u.commander.name + ' casts ' + spellName, 'needs ' + sp.cv + ' on 2D6 + ' + lvl, { uids: [u.uid, t.uid], kind: 'spell' });
+    var finish = function (cast) { result.pending = false; result.cast = cast; self.emit({ type: 'spell', from: u.uid, to: t.uid, spell: spellName, ok: cast }); self.emit({ type: 'seqEnd' }); };
+    this.requestRoll({ kind: 'casting', n: 2, target: sp.cv, bonus: lvl, label: u.commander.name + ' casts ' + spellName, sub: 'needs ' + sp.cv + ' on 2D6 + ' + lvl, uid: u.uid, targetUid: t.uid, side: u.side }, function () { var d = R.dice(2); return { dice: d, total: R.sum(d) + lvl, ok: R.sum(d) + lvl >= sp.cv, miscast: d[0] === 1 && d[1] === 1 }; }, function (cr) {
+      var txt = u.commander.name + ' casts ' + spellName + ' (needs ' + sp.cv + '): rolls ' + cr.dice.join('+') + ' + ' + lvl + ' = ' + cr.total + ' — ';
+      if (cr.miscast) { txt += 'MISCAST! The caster is wracked by the winds of magic.'; self.addLog(txt, 'fail', { dice: cr.dice }); self.woundCommander(u, 1); result.miscast = true; finish(false); return; }
+      if (!cr.ok) { txt += 'the spell fizzles.'; self.addLog(txt, 'fail', { dice: cr.dice }); finish(false); return; }
+      txt += 'success!'; self.addLog(txt, 'spell', { dice: cr.dice });
+      var damageWith = function (expr, pow, lethal, then) {
+        self.requestRoll({ kind: 'expr', n: 1, expr: expr, label: spellName + ' hits', sub: expr.toUpperCase() + ' hits, Power ' + pow, uid: u.uid, targetUid: t.uid, side: u.side }, function () { return R.rollExpr(expr); }, function (ex) {
+          self.applyHits(t, ex.total, pow, { lethal: lethal, source: u }, function (dmg) {
+            self.addLog(spellName + ' strikes ' + t.name + ' with ' + ex.total + ' hits (Power ' + pow + '): ' + dmg.wounds + ' wounds' + (dmg.killed ? ', ' + dmg.killed + ' slain' : '') + '.', 'spell', { saveDice: dmg.saveDice, saveTarget: dmg.saveTarget });
+            result.dmg = dmg;
+            self.afterCasualties(t, dmg, u, then);
+          });
+        });
+      };
+      if (sp.kind === 'bolt') { damageWith(sp.hits, sp.pow, !!sp.lethal, function () { finish(true); }); return; }
+      if (sp.kind === 'hex') {
+        var applyHex = function () { if (unitAlive(t) && !t.removed) t.effects.push({ name: spellName, effect: sp.effect, until: self.turn + (sp.effect.rooted ? 1 : 0), untilPhase: 'end' }); finish(true); };
+        if (sp.effect.hits) damageWith(sp.effect.hits, sp.effect.pow, false, applyHex); else applyHex();
+        return;
+      }
+      if (sp.kind === 'buff') { t.effects.push({ name: spellName, effect: sp.effect, until: self.turn, untilPhase: 'end' }); finish(true); return; }
+      if (sp.kind === 'heal') {
+        self.requestRoll({ kind: 'expr', n: 1, expr: sp.heal, label: spellName, sub: sp.heal.toUpperCase() + ' wounds restored', uid: u.uid, targetUid: t.uid, side: u.side }, function () { return R.rollExpr(sp.heal); }, function (ex) { self.healUnit(t, ex.total); self.addLog(t.name + ' recovers ' + ex.total + ' wounds.', 'spell'); finish(true); });
+        return;
+      }
+      if (sp.kind === 'summon') {
+        var placed = self.summonUnit(u, sp.summon, sp.count);
+        self.addLog(placed ? 'A unit of ' + sp.count + ' ' + placed.name + ' claws its way out of the ground!' : 'There is no room for the dead to rise.', 'spell');
+        finish(true); return;
+      }
+      finish(true);
+    });
     return result;
   };
   BP.woundCommander = function (u, n) {
@@ -1109,30 +1174,41 @@
     return { ok: true };
   };
   BP.rally = function (uid) {
-    var u = this.unit(uid); if (!u || this.activeUnit !== uid || !u.fleeing) return { ok: false, reason: 'Not fleeing' };
-    var test = this.disciplineTest(u, 0, 'rally');
-    if (test.ok) { u.fleeing = false; this.addLog(u.name + ' rallies!', 'test'); }
-    this.endActivation();
-    return { ok: true, rallied: test.ok };
+    var u = this.unit(uid), self = this; if (!u || this.activeUnit !== uid || !u.fleeing) return { ok: false, reason: 'Not fleeing' };
+    if (this.pendingRoll) return { ok: false, reason: 'Roll the dice first' };
+    this.seq(u.name + ' tries to rally', 'Discipline test', { uids: [u.uid], kind: 'rally' });
+    var result = { ok: true, pending: true };
+    this.disciplineTest(u, 0, 'rally', function (test) {
+      if (test.ok) { u.fleeing = false; self.addLog(u.name + ' rallies!', 'test'); }
+      result.rallied = test.ok; result.pending = false;
+      self.emit({ type: 'seqEnd' });
+      self.endActivation();
+    });
+    return result;
   };
   BP.endStrategicPhase = function () {
     var self = this;
-    // fleeing units that did not rally flee toward the nearest table edge
-    this.units.slice().forEach(function (u) {
-      if (!u.fleeing || u.removed) return;
+    this.autoRoll = false;
+    this.phase = 'strategic-end'; this.activeUnit = null;
+    // fleeing units that did not rally flee toward the nearest table edge, one roll each
+    var fleeing = this.units.filter(function (u) { return u.fleeing && !u.removed; }), i = 0;
+    var next = function () {
+      if (i >= fleeing.length) { self.beginCombatPhase(); return; }
+      var u = fleeing[i++]; if (u.removed || !u.fleeing) { next(); return; }
       var dl = u.x, dr = TABLE.w - u.x, dt = u.y, db = TABLE.h - u.y, m = Math.min(dl, dr, dt, db), ang = m === dl ? Math.PI : m === dr ? 0 : m === dt ? -Math.PI / 2 : Math.PI / 2;
-      self.flightMove(u, ang, 'keeps fleeing');
-    });
-    this.beginCombatPhase();
+      self.seq(u.name + ' keeps fleeing', 'Flight move toward the table edge', { uids: [u.uid] });
+      self.flightMove(u, ang, 'keeps fleeing', next);
+    };
+    next();
   };
-
   // ---------- Combat phase ----------
   BP.beginCombatPhase = function () {
-    this.phase = 'combat'; this.activeUnit = null;
+    var self = this;
+    this.phase = 'combat'; this.activeUnit = null; this.autoRoll = false;
     this.addLog('— Turn ' + this.turn + ': Combat Phase —', 'phase');
     this.emit({ type: 'phase', phase: 'combat', turn: this.turn });
-    this.combatReports = this.resolveCombat();
-    this.endTurn();
+    this.combatReports = [];
+    this.resolveCombat(function (reports) { self.combatReports = reports; self.endTurn(); });
   };
   BP.engagements = function () {
     // connected components of contacts
@@ -1189,40 +1265,53 @@
     }
     return out;
   };
-  BP.resolveCombat = function () {
+  BP.resolveCombat = function (done) {
     var self = this, reports = [];
     var groups = this.engagements(), inCombat = {};
     groups.forEach(function (g) { g.forEach(function (u) { inCombat[u.uid] = true; }); });
     this.units.forEach(function (u) { if (!inCombat[u.uid]) u.combatRounds = 0; });
-    groups.forEach(function (group) {
-      var report = { units: group.map(function (u) { return u.uid; }), rounds: [], score: [0, 0], breakTests: [], names: group.map(function (u) { return u.name; }) };
-      self.addLog('Engagement: ' + group.map(function (u) { return u.name; }).join(' vs ') + '.', 'combat');
-      // 1. everyone rolls (simultaneous): compute all attacks before applying wounds
-      var pending = [];
-      group.forEach(function (u) {
-        self.meleeAttacks(u).forEach(function (atk) {
-          var t = atk.target, ts = effStats(t, self);
-          var target = R.meleeHitTarget(atk.skill, ts.sk);
-          var roll = R.rollAgainst(atk.dice, target, { rerollMiss: atk.rerollMiss, rerollHit: hasProp(t, 'Putrid Stench') });
-          pending.push({ attacker: u, atk: atk, target: t, hitRoll: roll, hitTarget: target });
+    var gi = 0;
+    var nextGroup = function () {
+      if (gi >= groups.length) { self.contacts.forEach(function (c) { c.age++; }); done(reports); return; }
+      self.resolveEngagement(groups[gi++], function (report) { reports.push(report); nextGroup(); });
+    };
+    nextGroup();
+  };
+  // One engagement: attacks are simultaneous (dice counts fixed up front), then combat score, then break tests.
+  BP.resolveEngagement = function (group, done) {
+    var self = this;
+    var report = { units: group.map(function (u) { return u.uid; }), rounds: [], score: [0, 0], breakTests: [], names: group.map(function (u) { return u.name; }), turn: this.turn };
+    this.addLog('Engagement: ' + group.map(function (u) { return u.name; }).join(' vs ') + '.', 'combat');
+    var sideNames = [group.filter(function (u) { return u.side === 0; }).map(function (u) { return u.name; }).join(', '), group.filter(function (u) { return u.side === 1; }).map(function (u) { return u.name; }).join(', ')];
+    this.seq(sideNames[0] + '  vs  ' + sideNames[1], 'Combat', { uids: report.units, kind: 'engagement' });
+    var pending = [];
+    group.forEach(function (u) {
+      self.meleeAttacks(u).forEach(function (atk) {
+        var t = atk.target, ts = effStats(t, self);
+        pending.push({ attacker: u, atk: atk, target: t, hitTarget: R.meleeHitTarget(atk.skill, ts.sk) });
+      });
+    });
+    var woundsBy = {}, pi = 0;
+    var nextAttack = function () {
+      if (pi >= pending.length) { scoreAndBreak(); return; }
+      var p = pending[pi++];
+      if (p.target.removed) { self.addLog(p.atk.who + ' finds no enemy left to fight.', 'combat'); nextAttack(); return; }
+      var notes = []; if (p.atk.rerollMiss) notes.push('re-roll misses'); if (hasProp(p.target, 'Putrid Stench')) notes.push('Putrid Stench: re-roll hits');
+      self.requestRoll({ kind: 'hits', n: p.atk.dice, target: p.hitTarget, label: p.atk.who + ' attacks ' + p.target.name, sub: p.atk.dice + ' dice, ' + p.hitTarget + '+ to hit' + (notes.length ? ' (' + notes.join(', ') + ')' : ''), uid: p.attacker.uid, targetUid: p.target.uid, side: p.attacker.side, who: p.atk.who, targetName: p.target.name }, function () { return R.rollAgainst(p.atk.dice, p.hitTarget, { rerollMiss: p.atk.rerollMiss, rerollHit: hasProp(p.target, 'Putrid Stench') }); }, function (roll) {
+        self.applyHits(p.target, roll.hits, p.atk.power, { melee: true, halberd: p.atk.halberd, poison: p.atk.poison, lethal: p.atk.lethal, source: p.attacker }, function (dmg) {
+          woundsBy[p.attacker.side] = (woundsBy[p.attacker.side] || 0) + dmg.wounds;
+          var txt = p.atk.who + ' attacks ' + p.target.name + ': ' + p.atk.dice + ' dice, ' + roll.hits + ' hits (' + p.hitTarget + '+), ' + dmg.wounds + ' wounds' + (dmg.killed ? ', ' + dmg.killed + ' slain' : '') + '.';
+          self.addLog(txt, 'combat', { hitDice: roll.dice, hitTarget: p.hitTarget, saveDice: dmg.saveDice, saveTarget: dmg.saveTarget });
+          report.rounds.push({ who: p.atk.who, attacker: p.attacker.uid, target: p.target.uid, targetName: p.target.name, dice: p.atk.dice, hits: roll.hits, hitTarget: p.hitTarget, hitDice: roll.dice, wounds: dmg.wounds, killed: dmg.killed, saveDice: dmg.saveDice, saveTarget: dmg.saveTarget, commanderKilled: dmg.commanderKilled });
+          nextAttack();
         });
       });
-      // 2. apply wounds
-      var woundsBy = {};
-      pending.forEach(function (p) {
-        if (p.target.removed) { self.addLog(p.atk.who + ' finds no enemy left to fight.', 'combat'); return; }
-        var dmg = self.applyHits(p.target, p.hitRoll.hits, p.atk.power, { melee: true, halberd: p.atk.halberd, poison: p.atk.poison, lethal: p.atk.lethal, source: p.attacker });
-        woundsBy[p.attacker.side] = (woundsBy[p.attacker.side] || 0) + dmg.wounds;
-        var txt = p.atk.who + ' attacks ' + p.target.name + ': ' + p.atk.dice + ' dice, ' + p.hitRoll.hits + ' hits (' + p.hitTarget + '+), ' + dmg.wounds + ' wounds' + (dmg.killed ? ', ' + dmg.killed + ' slain' : '') + '.';
-        var e = self.addLog(txt, 'combat', { hitDice: p.hitRoll.dice, hitTarget: p.hitTarget, saveDice: dmg.saveDice, saveTarget: dmg.saveTarget });
-        report.rounds.push({ who: p.atk.who, attacker: p.attacker.uid, target: p.target.uid, targetName: p.target.name, dice: p.atk.dice, hits: p.hitRoll.hits, hitTarget: p.hitTarget, hitDice: p.hitRoll.dice, wounds: dmg.wounds, killed: dmg.killed, saveDice: dmg.saveDice, saveTarget: dmg.saveTarget, commanderKilled: dmg.commanderKilled });
-      });
-      // 3. combat score
-      var score = [0, 0];
-      score[0] += woundsBy[0] || 0; score[1] += woundsBy[1] || 0;
+    };
+    var scoreAndBreak = function () {
+      var score = [woundsBy[0] || 0, woundsBy[1] || 0];
       group.forEach(function (u) {
         if (u.removed) return;
-        self.contactsOf(u).forEach(function (c) { if (c.enemySide === 'left' || c.enemySide === 'right') score[u.side] += 1; else if (c.enemySide === 'rear') score[u.side] += 1; });
+        self.contactsOf(u).forEach(function (c) { if (c.enemySide === 'left' || c.enemySide === 'right' || c.enemySide === 'rear') score[u.side] += 1; });
         if (u.banner && u.banner.effect.combatScore) score[u.side] += u.banner.effect.combatScore;
       });
       for (var s = 0; s < 2; s++) if (self.armyEffects[s].combatScore) score[s] += self.armyEffects[s].combatScore;
@@ -1231,32 +1320,39 @@
       var sides = [alive.some(function (u) { return u.side === 0; }), alive.some(function (u) { return u.side === 1; })];
       self.addLog('Combat score: ' + self.names[0] + ' ' + score[0] + ' — ' + self.names[1] + ' ' + score[1] + '.', 'combat');
       group.forEach(function (u) { if (!u.removed) u.combatRounds++; });
-      if (!sides[0] || !sides[1] || score[0] === score[1]) { if (score[0] === score[1] && sides[0] && sides[1]) self.addLog('The combat is a draw; both sides hold.', 'combat'); reports.push(report); return; }
-      var loser = score[0] > score[1] ? 1 : 0, diff = Math.abs(score[0] - score[1]);
-      // 4. break tests for the losing side
-      alive.filter(function (u) { return u.side === loser; }).forEach(function (u) {
-        var test = self.disciplineTest(u, diff, 'break test');
-        var bt = { uid: u.uid, name: u.name, ok: test.ok, dice: test.dice, value: test.value, reanimated: !!test.reanimated };
-        if (test.reanimated) {
-          var crumble = Math.max(0, R.d3() - ((u.commander && u.commander.alive && cmdHasProp(u, 'Eternal Reign')) ? 1 : 0));
-          if (crumble > 0) { var cd = self.applyWounds(u, crumble, {}); self.addLog(u.name + ' crumbles: ' + cd.wounds + ' wounds lost.', 'fail'); bt.crumble = cd.wounds; }
-        } else if (!test.ok) {
-          var enemies = self.contactsOf(u).map(function (c) { return c.enemy; });
-          var cx = 0, cy = 0; enemies.forEach(function (e) { cx += e.x; cy += e.y; }); cx /= enemies.length || 1; cy /= enemies.length || 1;
-          var away = enemies.length ? Math.atan2(u.y - cy, u.x - cx) : u.a + Math.PI;
-          u.fleeing = true;
-          self.contacts = self.contacts.filter(function (c) { return c.a !== u.uid && c.b !== u.uid; });
-          var fm = self.flightMove(u, away, 'breaks and flees');
-          bt.fled = true; bt.escaped = fm.escaped;
-        }
-        report.breakTests.push(bt);
-      });
-      reports.push(report);
-    });
-    this.contacts.forEach(function (c) { c.age++; });
-    return reports;
+      var winner = score[0] === score[1] ? null : (score[0] > score[1] ? 0 : 1), diff = Math.abs(score[0] - score[1]);
+      var cx = 0, cy = 0; group.forEach(function (u) { cx += u.x; cy += u.y; }); cx /= group.length; cy /= group.length;
+      self.emit({ type: 'score', score: score, winner: winner, diff: diff, x: cx, y: cy, uids: report.units, decided: sides[0] && sides[1] });
+      if (!sides[0] || !sides[1] || winner == null) { if (winner == null && sides[0] && sides[1]) self.addLog('The combat is a draw; both sides hold.', 'combat'); done(report); return; }
+      var loser = 1 - winner, losers = alive.filter(function (u) { return u.side === loser; }), li = 0;
+      var nextLoser = function () {
+        if (li >= losers.length) { done(report); return; }
+        var u = losers[li++];
+        if (u.removed) { nextLoser(); return; }
+        self.disciplineTest(u, diff, 'break test', function (test) {
+          var bt = { uid: u.uid, name: u.name, ok: test.ok, dice: test.dice, value: test.value, reanimated: !!test.reanimated };
+          if (test.reanimated) {
+            var reduce = (u.commander && u.commander.alive && cmdHasProp(u, 'Eternal Reign')) ? 1 : 0;
+            self.requestRoll({ kind: 'crumble', n: 1, label: u.name + ' crumbles', sub: 'D3 wounds' + (reduce ? ' − 1 (Eternal Reign)' : ''), uid: u.uid, side: u.side }, function () { return { dice: [R.d6()] }; }, function (res) {
+              var crumble = Math.max(0, Math.ceil(res.dice[0] / 2) - reduce);
+              if (crumble > 0) { var cd = self.applyWounds(u, crumble, {}); self.addLog(u.name + ' crumbles: ' + cd.wounds + ' wounds lost.', 'fail'); bt.crumble = cd.wounds; self.emit({ type: 'wounds', uid: u.uid, wounds: cd.wounds, killed: cd.killed }); }
+              else self.addLog(u.name + ' holds together.', 'test');
+              report.breakTests.push(bt); nextLoser();
+            });
+          } else if (!test.ok) {
+            var enemies = self.contactsOf(u).map(function (c) { return c.enemy; });
+            var ex = 0, ey = 0; enemies.forEach(function (e) { ex += e.x; ey += e.y; }); ex /= enemies.length || 1; ey /= enemies.length || 1;
+            var away = enemies.length ? Math.atan2(u.y - ey, u.x - ex) : u.a + Math.PI;
+            u.fleeing = true;
+            self.contacts = self.contacts.filter(function (c) { return c.a !== u.uid && c.b !== u.uid; });
+            self.flightMove(u, away, 'breaks and flees', function (fm) { bt.fled = true; bt.escaped = fm.escaped; report.breakTests.push(bt); nextLoser(); });
+          } else { report.breakTests.push(bt); nextLoser(); }
+        });
+      };
+      nextLoser();
+    };
+    nextAttack();
   };
-
   // ---------- End of turn ----------
   BP.endTurn = function () {
     var self = this;

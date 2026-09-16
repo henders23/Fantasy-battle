@@ -41,10 +41,19 @@ function expect(c, msg) { checks++; if (!c) { errors.push('CHECK FAILED: ' + msg
   await page.keyboard.press('q');
   await page.click('#deploy-tray button.primary'); await page.waitForTimeout(400);
   // play a few turns with mouse
-  var t0 = Date.now(), didMove = false, didCharge = false, didShoot = false, didEnd = false;
+  var t0 = Date.now(), didMove = false, didCharge = false, didShoot = false, didEnd = false, rollsSeen = 0;
   while (Date.now() - t0 < 400000) {
-    var st = await page.evaluate(function () { var UI = SOVL.UI, b = UI.battle; return { phase: b.phase, active: b.active, turn: b.turn, modal: UI.modalOpen, activeUnit: b.activeUnit }; });
+    var st = await page.evaluate(function () { var UI = SOVL.UI, b = UI.battle; return { phase: b.phase, active: b.active, turn: b.turn, modal: UI.modalOpen, activeUnit: b.activeUnit, pending: !!b.pendingRoll, panelOn: document.getElementById('dice-panel').classList.contains('on') }; });
     if (st.phase === 'end') break;
+    if (st.pending) {
+      rollsSeen++;
+      if (!st.panelOn) expect(false, 'dice panel visible while a roll is pending');
+      if (rollsSeen % 3 === 0) await page.keyboard.press(' '); else if (rollsSeen % 3 === 1) await page.click('#dice-panel button.primary'); else await page.mouse.click(box.x + box.w * 0.5, box.y + box.h * 0.4);
+      await page.waitForTimeout(270);
+      var still = await page.evaluate(function () { return !!SOVL.UI.battle.pendingRoll && SOVL.UI.battle.pendingRoll === window.__lastPending; });
+      await page.evaluate(function () { window.__lastPending = SOVL.UI.battle.pendingRoll; });
+      continue;
+    }
     if (st.modal) { var btn = await page.$('#modal-body button.primary'); if (btn) await btn.click(); await page.waitForTimeout(100); continue; }
     if (st.active !== 0) { await page.waitForTimeout(150); continue; }
     if (st.phase === 'charge') {
@@ -83,6 +92,7 @@ function expect(c, msg) { checks++; if (!c) { errors.push('CHECK FAILED: ' + msg
           if (tgt) { await page.mouse.click(box.x + tgt.sx, box.y + tgt.sy); await page.waitForTimeout(80); var used = await page.evaluate(function (uid) { var u = SOVL.UI.battle.unit(uid); return u && u.usedRanged; }, pick.uid); expect(used, 'shooting via click marks usedRanged'); didShoot = true; }
           else await page.keyboard.press('Escape');
         }
+        for (var k = 0; k < 12; k++) { var pend = await page.evaluate(function () { return !!SOVL.UI.battle.pendingRoll; }); if (!pend) break; rollsSeen++; await page.keyboard.press(' '); await page.waitForTimeout(270); }
         await page.keyboard.press('Enter'); await page.waitForTimeout(80);
         var ended = await page.evaluate(function (uid) { var b = SOVL.UI.battle; var u = b.unit(uid); return !u || u.activated || b.activeUnit !== uid; }, pick.uid);
         expect(ended, 'Enter ends the activation'); didEnd = true;
@@ -95,8 +105,9 @@ function expect(c, msg) { checks++; if (!c) { errors.push('CHECK FAILED: ' + msg
   expect(end === 'end', 'battle finished: ' + end);
   expect(didMove, 'at least one mouse-driven move happened');
   expect(didEnd, 'activations ended by keyboard');
+  expect(rollsSeen > 10, 'dice were rolled by clicking: ' + rollsSeen);
   console.log('charged:', didCharge, 'shot:', didShoot, 'moved:', didMove);
-  await page.waitForTimeout(800);
+  await page.waitForTimeout(1800);
   var modal = await page.$('#modal.active'); expect(!!modal, 'result modal shown');
   await page.screenshot({ path: '/tmp/sovl-shots/interact-end.png' });
   await browser.close();

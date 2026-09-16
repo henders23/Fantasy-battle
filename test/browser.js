@@ -35,7 +35,7 @@ var errors = [];
   await page.click('#deploy-tray button.primary'); await page.waitForTimeout(500);
   await page.screenshot({ path: path.join(shots, '06-battle-start.png') });
   await playBattle(page, 'skirmish');
-  await page.waitForTimeout(800);
+  await page.waitForTimeout(1800);
   await page.screenshot({ path: path.join(shots, '09-result.png') });
   await page.click('#modal-body button.primary'); await page.waitForTimeout(300);
 
@@ -61,7 +61,7 @@ var errors = [];
       await page.click('#deploy-tray button:has-text("Auto-deploy")'); await page.waitForTimeout(100);
       await page.click('#deploy-tray button.primary'); await page.waitForTimeout(300);
       await playBattle(page, 'campaign-' + step);
-      await page.waitForTimeout(800);
+      await page.waitForTimeout(1800);
       await page.screenshot({ path: path.join(shots, '13-camp-result-' + step + '.png') });
       await page.click('#modal-body button.primary'); await page.waitForTimeout(400);
       var runOver = await page.evaluate(function () { return SOVL.UI.campaign && SOVL.UI.campaign.over; });
@@ -72,7 +72,7 @@ var errors = [];
       var btns = await page.$$('#modal-body .choices button:not([disabled])');
       await btns[btns.length - 1].click(); await page.waitForTimeout(300);
       var m2 = await page.$('#modal.active #m-ok'); if (m2) await m2.click();
-      var fight = await page.$('#modal.active #m-fight'); if (fight) { await fight.click(); await page.waitForTimeout(300); await page.click('#deploy-tray button:has-text("Auto-deploy")'); await page.click('#deploy-tray button.primary'); await playBattle(page, 'event-' + step); await page.waitForTimeout(800); await page.click('#modal-body button.primary'); await page.waitForTimeout(400); var m3 = await page.$('#modal.active #m-ok'); if (m3) await m3.click(); }
+      var fight = await page.$('#modal.active #m-fight'); if (fight) { await fight.click(); await page.waitForTimeout(300); await page.click('#deploy-tray button:has-text("Auto-deploy")'); await page.click('#deploy-tray button.primary'); await playBattle(page, 'event-' + step); await page.waitForTimeout(1800); await page.click('#modal-body button.primary'); await page.waitForTimeout(400); var m3 = await page.$('#modal.active #m-ok'); if (m3) await m3.click(); }
     } else if (type === 'merchant') {
       var buy = await page.$('#modal-body .shop-item button:not([disabled])'); if (buy) await buy.click();
       await page.waitForTimeout(200); await page.screenshot({ path: path.join(shots, '12-merchant.png') });
@@ -101,6 +101,7 @@ async function playBattle(page, tag) {
     var st = await page.evaluate(function () {
       var UI = SOVL.UI, b = UI.battle; if (!b) return { done: true };
       if (UI.modalOpen) return { modal: true, phase: b.phase };
+      if (b.pendingRoll) { UI.rollLock = false; UI.rollDice(); return { rolled: true, phase: b.phase }; }
       if (b.phase === 'end') return { done: true, phase: b.phase };
       if (b.active !== UI.playerSide) return { waiting: true, phase: b.phase, turn: b.turn };
       if (!UI.playerAI) UI.playerAI = new SOVL.AI(b, UI.playerSide, { aggression: 0.55 });

@@ -47,6 +47,8 @@
     return Math.max(2, Math.min(7, t)); // 7 = impossible
   };
   R.pHit = function (target) { return target >= 7 ? 0 : (7 - target) / 6; };
+  // Probability that 2d6 <= n
+  R.p2d6AtMost = function (n) { if (n < 2) return 0; if (n >= 12) return 1; var c = 0; for (var a = 1; a <= 6; a++) for (var b = 1; b <= 6; b++) if (a + b <= n) c++; return c / 36; };
   // Roll n dice against target with optional re-roll rules. Returns detail.
   // opts: rerollMiss (bool), rerollHit (bool - opponent forces re-roll of successes)
   R.rollAgainst = function (n, target, opts) {
@@ -62,10 +64,15 @@
     return { dice: dice, hits: hits, target: target, rerolled: rerolled };
   };
   // Damage saves: n saves at target; poison forces re-roll of 6s; rerollFail lets defender re-roll failures; halberd caps at 4+.
-  R.rollSaves = function (n, target, opts) {
+  R.adjustSaveTarget = function (target, opts) {
     opts = opts || {};
     if (opts.saveBonus) target = Math.max(2, target - opts.saveBonus);
     if (opts.halberd && target < 4) target = 4;
+    return target;
+  };
+  R.rollSaves = function (n, target, opts) {
+    opts = opts || {};
+    target = R.adjustSaveTarget(target, opts);
     var dice = [], saved = 0;
     for (var i = 0; i < n; i++) {
       var v = R.d6(), ok = v >= target;
