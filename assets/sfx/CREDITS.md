@@ -18,7 +18,7 @@ dedicated to the public domain under [CC0 1.0](https://creativecommons.org/publi
 
 ## Supplied clips
 
-`ui_select_1.mp3` is "Mouse Click" by Universfield (sound 117076), supplied with the project;
+`ui_select_1.mp3` (the click for every button, card and map stop) is "Mouse Click" by Universfield (sound 117076), supplied with the project;
 the original is kept in `tools/sfx-src/`. The file name follows Pixabay's download naming, so it
 is presumably used under the [Pixabay Content License](https://pixabay.com/service/license-summary/).
 

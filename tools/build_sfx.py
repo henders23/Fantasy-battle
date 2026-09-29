@@ -53,11 +53,7 @@ CLIPS = {
     # ambience
     "amb_wind":   ("0ad", ["ambient/weather/wind_11.ogg"], 40.0, 2.0),
     # interface (uisfx, organic and cinematic styles)
-    "ui_press":   ("ui", ["organic/press.mp3"], 0.5, 0.05),
     "ui_select":  ("local", ["universfield-mouse-click-117076.mp3"], 0.32, 0.05),
-    "ui_back":    ("ui", ["organic/back.mp3"], 0.6, 0.05),
-    "ui_open":    ("ui", ["organic/open.mp3"], 0.8, 0.1),
-    "ui_close":   ("ui", ["organic/close.mp3"], 0.8, 0.1),
     "ui_error":   ("ui", ["organic/error.mp3"], 0.8, 0.1),
     "ui_drop":    ("ui", ["organic/drop.mp3"], 0.6, 0.05),
     "ui_toggle":  ("ui", ["organic/toggle-on.mp3"], 0.5, 0.05),

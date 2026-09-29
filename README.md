@@ -124,7 +124,8 @@ bolt throwers and stone throwers, marching feet, galloping horses, war horns and
 from 0 A.D. (CC BY-SA 3.0), and interface sounds from uisfx (CC0). Each event picks the
 sound that fits the unit's weapon and mount, with small variations in pitch and level.
 Wind blows over the campaign map; the battlefield has no ambient bed, so the fighting is heard
-clearly. Selecting things plays a crisp mouse click. Dice are modelled as small
+clearly. Buttons, cards and map stops all answer with the same crisp mouse click, and dialogs open
+and close silently. Dice are modelled as small
 wooden cubes bouncing on a table. Clips are built from their sources by
 `tools/build_sfx.py`; credits and licences are in `assets/sfx/CREDITS.md`.
 

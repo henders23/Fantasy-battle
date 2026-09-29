@@ -146,23 +146,11 @@
  "turn": [
   "turn_1.mp3"
  ],
- "ui_back": [
-  "ui_back_1.mp3"
- ],
- "ui_close": [
-  "ui_close_1.mp3"
- ],
  "ui_drop": [
   "ui_drop_1.mp3"
  ],
  "ui_error": [
   "ui_error_1.mp3"
- ],
- "ui_open": [
-  "ui_open_1.mp3"
- ],
- "ui_press": [
-  "ui_press_1.mp3"
  ],
  "ui_select": [
   "ui_select_1.mp3"

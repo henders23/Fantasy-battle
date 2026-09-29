@@ -94,7 +94,7 @@ function ok(c, m) { if (!c) { errors.push('FAIL: ' + m); console.log('FAIL: ' + 
   await page.evaluate(function () { SOVL.UI.battle = null; SOVL.UI.show('menu'); });
   await page.click('#btn-campaign'); await page.waitForTimeout(200);
   var sfx = await page.evaluate(function () { return SOVL.UI.sfx && SOVL.UI.sfx.loaded(); });
-  ok(sfx && sfx.loaded === 98 && !sfx.missing.length, 'all sound clips decoded: ' + (sfx && sfx.loaded) + ' missing ' + (sfx && sfx.missing.join(',')));
+  ok(sfx && sfx.loaded === 94 && !sfx.missing.length, 'all sound clips decoded: ' + (sfx && sfx.loaded) + ' missing ' + (sfx && sfx.missing.join(',')));
   var diffs = await page.$$eval('#setup-difficulty option', function (o) { return o.map(function (x) { return x.value; }); });
   ok(diffs.join(',') === 'easy,normal,hard', 'difficulty select populated: ' + diffs);
   await page.selectOption('#setup-difficulty', 'hard');
