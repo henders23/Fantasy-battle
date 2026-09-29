@@ -168,9 +168,23 @@ woods, hills, marsh, mountains and a river that change with each act, a winding 
 between the stops, wax-seal markers for each kind of stop, the route already marched in
 red ink, and a banner where the army stands.
 
-The **Guide** explains each phase. **Settings** controls music and effects (each with its
-own volume), enemy action speed, motion and persistent unit labels. Audio starts after
-the first click or key press. Settings and campaign saves stay on the device.
+The **Guide** (the Guide button, or **?** in battle) walks through a first battle in five
+illustrated steps: deploying, declaring charges, moving and shooting, fighting, and answering
+a charge. It opens on the step for the current phase, and the arrow keys page through it.
+
+**Settings** are grouped into sound, battle and motion cards:
+- switches for battle sounds, music, and animation and effects;
+- volume sliders from 0 to 100%, with a test sound for effects;
+- choices for enemy action speed (with what each speed means) and for regiment labels;
+- a link to restore the defaults.
+
+Changes apply at once. Audio starts after the first click or key press. Settings and
+campaign saves stay on the device.
+
+The **Field Manual** on the title screen is a chaptered rulebook with a contents rail that
+follows your place. It covers the game and turn structure (as phase cards), combat step by
+step, shooting modifiers, magic with every spell and its casting value, terrain, dice colours,
+controls as keycaps, the Trail of Death's map stops, and the five factions.
 Layouts adapt to smaller screens; on phones, the orders panels appear below the field.
 
 ## Rules
@@ -227,6 +241,8 @@ js/screens.js     army builder and campaign screen dressing
 css/screens.css   army builder, campaign screen and campaign dialog styles
 js/fieldscreens.js deployment dock, zone markings, field verdict and battle result screen
 css/fieldscreens.css deployment dock and battle result styles
+js/helpscreens.js settings, battle guide and field manual
+css/helpscreens.css settings, guide and field manual styles
 tools/build_sfx.py builds assets/sfx from the 0 A.D. and uisfx libraries
 css/experience.css illustrated edition theme and responsive layouts
 assets/          original paintings, portraits and functional sprite atlases

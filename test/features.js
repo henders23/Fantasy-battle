@@ -147,6 +147,32 @@ function ok(c, m) { if (!c) { errors.push('FAIL: ' + m); console.log('FAIL: ' + 
   var rs = await page.evaluate(function () { var m = document.getElementById('modal-body'), btn = m.querySelector('.res-foot button.primary'), r = btn.getBoundingClientRect(); return { cls: m.className, word: m.querySelector('.res-word').textContent, rows: m.querySelectorAll('.res-unit').length, units: window.__resUnits, spoils: (m.querySelector('.res-spoils') || {}).textContent || '', text: m.textContent, btnVisible: r.bottom <= window.innerHeight && r.top >= 0, label: btn.textContent }; });
   ok(/m-result/.test(rs.cls) && rs.word === 'Victory' && rs.rows === rs.units && /Plunder/.test(rs.spoils) && /Battle Over/.test(rs.text) && rs.btnVisible && rs.label === 'Onward', 'result screen: verdict, both rolls, spoils, visible button: ' + JSON.stringify({ cls: rs.cls, word: rs.word, rows: rs.rows, units: rs.units, btn: rs.btnVisible }));
   await page.click('#modal-body .res-foot button.primary'); await page.waitForTimeout(100);
+  // settings: switches, sliders and segmented choices change and persist the settings
+  await page.evaluate(function () { SOVL.UI.showSettings(); }); await page.waitForTimeout(200);
+  await page.screenshot({ path: path.join(shots, 'f9-settings.png') });
+  var st0 = await page.evaluate(function () { return { n: document.querySelectorAll('#modal-body .st-switch').length, sliders: document.querySelectorAll('#modal-body input[type=range]').length, motion: SOVL.UI.settings.motion }; });
+  ok(st0.n === 3 && st0.sliders === 2, 'settings has 3 switches and 2 volume sliders: ' + JSON.stringify(st0));
+  await page.click('#modal-body .st-card:last-child .st-switch'); await page.waitForTimeout(50);
+  await page.click('#modal-body .st-seg button:has-text("Fast")');
+  await page.$eval('#modal-body input[type=range]', function (r) { r.value = 25; r.dispatchEvent(new Event('input')); });
+  var st1 = await page.evaluate(function () { var s = SOVL.UI.settings, saved = JSON.parse(localStorage.getItem('sovl-experience-settings')); return { motion: s.motion, reduce: SOVL.UI.renderer ? SOVL.UI.renderer.reduceMotion : null, pace: s.pace, delay: SOVL.UI.aiDelay, lvl: s.soundLevel, savedLvl: saved.soundLevel, savedPace: saved.pace }; });
+  ok(st1.motion === !st0.motion && st1.pace === 'fast' && st1.delay === 180 && st1.lvl === 25 && st1.savedLvl === 25 && st1.savedPace === 'fast', 'settings controls apply and persist: ' + JSON.stringify(st1));
+  await page.click('#modal-body .st-reset'); await page.waitForTimeout(100);
+  var st2 = await page.evaluate(function () { var s = SOVL.UI.settings; return { pace: s.pace, lvl: s.soundLevel, open: SOVL.UI.modalOpen }; });
+  ok(st2.pace === 'normal' && st2.lvl === 60 && st2.open, 'restore defaults: ' + JSON.stringify(st2));
+  await page.evaluate(function () { SOVL.UI.closeModal(); });
+  // guide: five illustrated steps, arrow keys page through them
+  await page.evaluate(function () { SOVL.UI.showGuide(0); }); await page.waitForTimeout(200);
+  await page.keyboard.press('ArrowRight'); await page.keyboard.press('ArrowRight'); await page.waitForTimeout(100);
+  var gd = await page.evaluate(function () { var m = document.getElementById('modal-body'); return { steps: m.querySelectorAll('.gd-pane').length, art: m.querySelectorAll('.gd-pane svg').length, on: m.querySelector('.gd-pane.on h3').textContent, text: m.textContent }; });
+  ok(gd.steps === 5 && gd.art === 5 && gd.on === 'Move and shoot' && /Fight on the field/.test(gd.text), 'guide steps and keyboard paging: ' + gd.on);
+  await page.screenshot({ path: path.join(shots, 'f10-guide.png') });
+  await page.evaluate(function () { SOVL.UI.closeModal(); });
+  // field manual: chapters, a contents rail and every spell
+  await page.evaluate(function () { SOVL.UI.showRules(); }); await page.waitForTimeout(200);
+  var fm = await page.evaluate(function () { return { secs: document.querySelectorAll('#rules-body .fm-sec').length, toc: document.querySelectorAll('#rules-body .fm-toc a').length, spells: document.querySelectorAll('#rules-body .fm-spell').length, all: Object.keys(SOVL.SPELLS).length, facs: document.querySelectorAll('#rules-body .fm-fac').length }; });
+  ok(fm.secs === fm.toc && fm.secs >= 10 && fm.spells === fm.all && fm.facs === 5, 'field manual chapters, spells and factions: ' + JSON.stringify(fm));
+  await page.screenshot({ path: path.join(shots, 'f11-manual.png') });
   ok(await page.evaluate(function () { return window.__resDone && !SOVL.UI.modalOpen; }), 'result continue closes the screen and runs onDone');
   await browser.close();
   console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'FEATURE TEST OK');

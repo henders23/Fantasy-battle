@@ -24,7 +24,7 @@
     return Math.min(4, Math.pow(10, (-20 - m) / 20)) * (MIX[name] == null ? 0.7 : MIX[name]);
   }
   function enabled() { return UI.settings && UI.settings.sound && !document.hidden; }
-  function level() { return LEVEL[UI.settings && UI.settings.soundVolume] || LEVEL.medium; }
+  function level() { var s = UI.settings || {}; return typeof s.soundLevel === "number" ? s.soundLevel / 100 : LEVEL[s.soundVolume] || LEVEL.medium; }
 
   // ---------- audio graph ----------
   function impulse(ac, seconds, decay) {

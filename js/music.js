@@ -20,7 +20,7 @@
     }
     return players[id];
   }
-  function level() { return UI.settings && UI.settings.music ? LEVEL[UI.settings.musicVolume] || LEVEL.medium : 0; }
+  function level() { var s = UI.settings; if (!s || !s.music) return 0; return typeof s.musicLevel === "number" ? 0.5 * s.musicLevel / 100 : LEVEL[s.musicVolume] || LEVEL.medium; }
   function wanted() {
     if (!unlocked || document.hidden || !UI.settings || !UI.settings.music) return null;
     return UI.screen === "battle" ? "battle" : "trail";

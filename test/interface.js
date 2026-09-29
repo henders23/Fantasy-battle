@@ -181,7 +181,7 @@ function capture(name) {
   assert($("modal-body").textContent.includes("Fight on the field"));
   U.closeModal();
   U.showSettings();
-  assert($("modal-body").querySelectorAll("select").length === 4);
+  assert($("modal-body").querySelectorAll(".st-switch").length === 3);
   U.closeModal();
   U.beginBattle();
   cancelAI();
