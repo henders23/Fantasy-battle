@@ -248,8 +248,8 @@
         if (u && ev.how !== "fled") play(mounted(u) ? "horse_death" : "death", { pan: panOf(u), max: 1 });
         break;
       case "commanderDeath": play("hero_dead", { max: 1 }); break;
-      case "spell": if (ev.ok) { var S = SOVL.SPELLS[ev.spell] || {}; play(S.kind === "bolt" ? "fire" : "spell", { pan: panOf(unitOf(b, ev.to)) }); } break;
-      case "summon": play("spell", { rate: 0.8 }); break;
+      case "spell": if (ev.ok && !SOVL.FX) { var S = SOVL.SPELLS[ev.spell] || {}; play(S.kind === "bolt" ? "fire" : "spell", { pan: panOf(unitOf(b, ev.to)) }); } break;
+      case "summon": if (!SOVL.FX) play("spell", { rate: 0.8 }); break;
       case "ability": play("horn", { rate: 1.1, vol: 0.6, max: 1 }); break;
       case "phase":
         if (ev.phase === "charge" && ev.turn > 1) play("turn", { max: 1, vol: 0.8 });

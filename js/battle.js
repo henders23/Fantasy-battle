@@ -1079,7 +1079,7 @@
     var lvl = u.commander.caster + itemBonus(u, 'casting'), result = { ok: true, pending: true };
     this.seq(u.commander.name + ' casts ' + spellName, 'needs ' + sp.cv + ' on 2D6 + ' + lvl, { uids: [u.uid, t.uid], kind: 'spell' });
     var finish = function (cast) { result.pending = false; result.cast = cast; self.emit({ type: 'spell', from: u.uid, to: t.uid, spell: spellName, ok: cast }); self.emit({ type: 'seqEnd' }); };
-    this.requestRoll({ kind: 'casting', n: 2, target: sp.cv, bonus: lvl, label: u.commander.name + ' casts ' + spellName, sub: 'needs ' + sp.cv + ' on 2D6 + ' + lvl, uid: u.uid, targetUid: t.uid, side: u.side }, function () { var d = R.dice(2); return { dice: d, total: R.sum(d) + lvl, ok: R.sum(d) + lvl >= sp.cv, miscast: d[0] === 1 && d[1] === 1 }; }, function (cr) {
+    this.requestRoll({ kind: 'casting', spell: spellName, n: 2, target: sp.cv, bonus: lvl, label: u.commander.name + ' casts ' + spellName, sub: 'needs ' + sp.cv + ' on 2D6 + ' + lvl, uid: u.uid, targetUid: t.uid, side: u.side }, function () { var d = R.dice(2); return { dice: d, total: R.sum(d) + lvl, ok: R.sum(d) + lvl >= sp.cv, miscast: d[0] === 1 && d[1] === 1 }; }, function (cr) {
       var txt = u.commander.name + ' casts ' + spellName + ' (needs ' + sp.cv + '): rolls ' + cr.dice.join('+') + ' + ' + lvl + ' = ' + cr.total + ' — ';
       if (cr.miscast) { txt += 'MISCAST! The caster is wracked by the winds of magic.'; self.addLog(txt, 'fail', { dice: cr.dice }); self.woundCommander(u, 1); result.miscast = true; finish(false); return; }
       if (!cr.ok) { txt += 'the spell fizzles.'; self.addLog(txt, 'fail', { dice: cr.dice }); finish(false); return; }

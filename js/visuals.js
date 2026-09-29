@@ -290,7 +290,7 @@
           (u.commander ? "★ " : "");
       var n = SOVL.commanderOnly(u)
         ? Math.max(0, u.commander.maxWounds - u.commander.wounds) + " W"
-        : String(u.models);
+        : String(SOVL.FX ? SOVL.FX.shownModels(u) : u.models);
       text += "  " + n;
       ctx.font =
         (selected ? "600 " : "500 ") +
@@ -332,7 +332,7 @@
       }
       var fraction = SOVL.commanderOnly(u)
         ? (u.commander.maxWounds - u.commander.wounds) / u.commander.maxWounds
-        : u.models / Math.max(1, u.maxModels);
+        : (SOVL.FX ? SOVL.FX.shownModels(u) : u.models) / Math.max(1, u.maxModels);
       ctx.fillStyle = mine ? "#8fbfdc" : "#d58b85";
       ctx.fillRect(x + 1, y + h - 2, Math.max(0, (w - 2) * fraction), 2);
       self.labelRects.push({ x: x, y: y, w: w, h: h, uid: u.uid });

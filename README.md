@@ -88,7 +88,31 @@ weapon, with a shadow on the ground:
 Hits and misses land where the dice say. In melee, sparks mark each blow along the contact
 line. Saved wounds glance off shields, and failed saves spill blood (or bone dust from the
 undead). Fallen models tip over, darken and fade, leaving a stain. Combat numbers pop and
-rise over the field. The **Motion** setting turns animation and effects off.
+rise over the field. Missiles and spells land before their damage shows: the target keeps
+its models, its strength on the label, and its place on the table (even if the volley
+destroys it) until the shot strikes.
+
+Every spell starts with a rune circle glowing under the caster while motes spiral in. A
+miscast collapses into violet lightning and smoke; a failed cast sputters out. Each spell
+then looks different:
+
+- Fireball: a roaring ball of flame that bursts, leaving fire and a scorch mark.
+- Shadow Bolt: a dark orb ringed with light, trailing shadow.
+- Reality Rift: a tear opens over the target, draws in the light and slams shut.
+- Thousand Mouths: a swarm of snapping jaws.
+- Plague: a slow green cloud full of flies.
+- Hex Of Ruin: a sigil of ruin stamped over the target.
+- Arcane Web: glowing threads shoot out and bind the target.
+- Frost Ward: ice shards that burst into frost.
+- Blessings: a beam of light to the unit and a pillar of light over it.
+- Reanimate: soul wisps rise from the ground and pour into the unit.
+- Raise Dead: a grave portal cracks the earth and the zombies climb out of it.
+
+Lasting spells show on the unit until they end: a web over rooted troops, frost around a
+frozen unit, a shimmering dome for Radiant Shield, mist for Shroud, burning front ranks for
+Fiery Blades, a turning red sigil for Hex Of Ruin, a plague cloud, swirling leaves for
+Wildform and glows for the other blessings. Commander abilities have their own rings,
+steam or sparks. The **Motion** setting turns animation and effects off.
 
 Two orchestral themes play in the background: a brooding march on the menus and the
 campaign trail, and a battle theme on the field. They crossfade between screens and fade
@@ -167,6 +191,7 @@ js/ai.js          the AI opponent
 js/campaign.js    Trail of Death campaign model
 js/render.js      canvas renderer
 js/fx.js          battle animation and effects (tweens, strides, lunges, casualties, missiles, particles)
+js/spellfx.js     spell effects (casting circles, per-spell missiles and impacts, auras, summoning)
 js/ui.js          screens, input, campaign flow
 js/experience.js  title, onboarding, orders, interactive combat and accessibility
 js/visuals.js     artwork, formation labels, previews and impact effects

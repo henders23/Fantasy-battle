@@ -490,13 +490,13 @@
         case 'rollRequest': UI.dicePending(ev.spec); break;
         case 'roll': UI.diceRolled(ev.spec, ev.res); break;
         case 'score': { UI.diceBanner(ev); r.addFloater(ev.x, ev.y - 2, ev.winner == null ? 'Drawn combat' : (ev.winner === UI.playerSide ? 'You win by ' : b.names[ev.winner] + ' wins by ') + ev.diff, ev.winner == null ? '#ddd' : ev.winner === UI.playerSide ? '#9fd0ff' : '#ff9c9c'); break; }
-        case 'spell': { var c = b.unit(ev.from), tt = b.unit(ev.to) || findDead(ev.to); if (tt) { r.addFlash(tt.x, tt.y, 2, ev.ok ? '#c090ff' : '#666'); r.addFloater(tt.x, tt.y - 1, ev.ok ? ev.spell : 'fizzle', ev.ok ? '#d8b0ff' : '#999'); } break; }
+        case 'spell': { var c = b.unit(ev.from), tt = b.unit(ev.to) || findDead(ev.to); if (tt) { if (!SOVL.FX) r.addFlash(tt.x, tt.y, 2, ev.ok ? '#c090ff' : '#666'); r.addFloater(tt.x, tt.y - 1, ev.ok ? ev.spell : 'fizzle', ev.ok ? '#d8b0ff' : '#999'); } break; }
         case 'charge': { var cu = b.unit(ev.uid); if (cu) r.addFloater(cu.x, cu.y - 1, 'CHARGE!', '#ffd24a'); break; }
         case 'flee': { var fu = b.unit(ev.uid) || findDead(ev.uid); if (fu) r.addFloater(ev.from.x, ev.from.y - 1, 'flees ' + (ev.dice ? ev.dice.reduce(function (s, d) { return s + d; }, 0) + '"' : ''), '#f7f7a0'); break; }
         case 'destroy': { var du = findDead(ev.uid); if (du) { r.addFlash(du.x, du.y, 2.5, '#ff6b3b'); r.addFloater(du.x, du.y - 1, ev.how === 'fled' ? 'FLED THE FIELD' : ev.how === 'run down' ? 'RUN DOWN' : 'DESTROYED', '#ff9a6b'); } break; }
         case 'commanderDeath': { var cd = b.unit(ev.uid) || findDead(ev.uid); if (cd) r.addFloater(cd.x, cd.y - 2, 'COMMANDER SLAIN', '#ff6b6b'); break; }
         case 'rundown': break;
-        case 'summon': { var su = b.unit(ev.uid); if (su) { su._rx = su.x; su._ry = su.y; su._ra = su.a; r.addFlash(su.x, su.y, 3, '#9060ff'); } break; }
+        case 'summon': { var su = b.unit(ev.uid); if (su) { su._rx = su.x; su._ry = su.y; su._ra = su.a; if (!SOVL.FX) r.addFlash(su.x, su.y, 3, '#9060ff'); } break; }
         case 'endTurn': break;
         case 'phase': if (ev.phase === 'charge' || ev.phase === 'strategic') UI.diceHide(); if (ev.phase === 'charge') UI.hint('Turn ' + ev.turn + ' — Charge Phase. Select a unit and click an enemy within its arc to declare a charge, or Pass.'); if (ev.phase === 'strategic') UI.hint('Strategic Phase. Click one of your units to activate it, click the ground to move, or use the action buttons.'); break;
       }

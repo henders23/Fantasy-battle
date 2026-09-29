@@ -8,7 +8,11 @@
 (function () {
   if (typeof document === "undefined" || !SOVL.Renderer) return;
   var P = SOVL.Renderer.prototype, G = SOVL.G;
-  var FX = { parts: [], shots: [], fallen: [], floats: [], shake: { t0: 0, dur: 0, amp: 0 }, contact: {} };
+  var FX = { parts: [], shots: [], fallen: [], floats: [], shake: { t0: 0, dur: 0, amp: 0 }, contact: {}, gen: 0,
+    // missiles and spells in flight: their target's casualties, floaters and removal wait for the impact
+    incoming: {}, hold: {}, ghosts: [],
+    // extension points used by js/spellfx.js
+    ground: [], overlay: [], shotKinds: {}, partKinds: {}, eventHooks: [], underUnit: [], overUnit: [] };
   SOVL.FX = FX;
   var MAX_PARTS = 700;
   function now() { return performance.now(); }
@@ -20,6 +24,22 @@
   function mounted(u) { return /Cavalry|Chariot|Hounds|Wagon/.test(u.type) || SOVL.isFlying && SOVL.isFlying(u); }
   function undead(u) { return u.faction === "dead_nations"; }
   function rpos(u) { return { x: u._rx == null ? u.x : u._rx, y: u._ry == null ? u.y : u._ry, a: u._ra == null ? u.a : u._ra, w: u.w, d: u.d }; }
+  function at(time, fn) { var g = FX.gen, w = time - now(); var go = function () { if (g === FX.gen) try { fn(); } catch (e) { /* effects only */ } }; if (w > 0) setTimeout(go, w); else go(); }
+  function expect(u, until) { var e = FX.incoming[u.uid]; if (!e || e.until < until) FX.incoming[u.uid] = { until: until, u: u }; }
+  function pending(uid) { var e = FX.incoming[uid]; return e && e.until > now() ? e.until : 0; }
+  function later(uid, fn) { at(pending(uid), fn); }
+  // the models a unit still shows while the missile that kills some of them is in the air
+  FX.shownModels = function (u) { var h = FX.hold[u.uid]; return u.models + (h && h.until > now() ? h.killed : 0); };
+  // the latest impact due on a unit near this point (floaters and flashes wait for it)
+  function arrivalNear(x, y) {
+    var best = 0, t = now();
+    for (var k in FX.incoming) {
+      var e = FX.incoming[k]; if (e.until <= t) { delete FX.incoming[k]; continue; }
+      var p = rpos(e.u), rad = Math.max(e.u.w || 1, e.u.d || 1) / 2 + 1.5;
+      if (Math.hypot(p.x - x, p.y - y) < rad && e.until > best) best = e.until;
+    }
+    return best;
+  }
 
   // ---------- movement tweens ----------
   function speed(u, kind) {
@@ -176,11 +196,15 @@
         to = { x: target.x + Math.cos(ang) * rad, y: target.y + Math.sin(ang) * rad };
       }
       var dist = Math.hypot(to.x - from.x, to.y - from.y), dur = clamp(dist / cfg.speed * 1000, 90, 1500) * rnd(0.92, 1.08);
-      FX.shots.push({ kind: kind, from: from, to: to, t0: start + (kind === "bullet" ? rnd(0, 140) : i * rnd(25, 55)), dur: dur, arc: cfg.arc * dist, hit: hit, target: t, last: i === count - 1, onAll: onAll, side: u.side });
+      var t0 = start + (kind === "bullet" ? rnd(0, 140) : i * rnd(25, 55));
+      FX.shots.push({ kind: kind, from: from, to: to, t0: t0, dur: dur, arc: cfg.arc * dist, hit: hit, target: t, last: i === count - 1, onAll: onAll, side: u.side });
+      if (hit) expect(t, t0 + dur + 40);
     }
   }
   function land(r, s) {
-    var t = s.target, x = s.to.x, y = s.to.y;
+    var t = s.target, x = s.to.x, y = s.to.y, K = FX.shotKinds[s.kind];
+    if (s.onLand) s.onLand(r, s);
+    if (K && K.land) return K.land(r, s);
     if (s.kind === "ball" || s.kind === "mortar" || s.kind === "stone" || s.kind === "bomb") {
       for (var i = 0; i < 6; i++) dust(x + rnd(-0.4, 0.4), y + rnd(-0.4, 0.4), 1.6);
       ring(x, y, 1.6, [230, 200, 150], 450, 0.14);
@@ -208,10 +232,12 @@
       if (p >= 1) { land(r, s); return false; }
       var gx = s.from.x + (s.to.x - s.from.x) * p, gy = s.from.y + (s.to.y - s.from.y) * p, h = s.arc * 4 * p * (1 - p);
       var dx = s.to.x - s.from.x, dy = s.to.y - s.from.y, len = Math.hypot(dx, dy) || 1, ux = dx / len, uy = dy / len;
+      if (s.wob) { var wo = Math.sin(p * Math.PI * (s.wobN || 3) + (s.wobP || 0)) * s.wob * Math.sin(Math.PI * p); gx -= uy * wo; gy += ux * wo; }
+      var K = FX.shotKinds[s.kind];
       // the missile rises toward the viewer: drawn up-left of its ground track, shadow on the ground
       var ox = -h * 0.28, oy = -h * 0.42, x = gx + ox, y = gy + oy, slope = s.arc * 4 * (1 - 2 * p) / len;
       var vx = ux - 0.28 * slope * len / Math.max(1, len), vy = uy - 0.42 * slope * len / Math.max(1, len), vl = Math.hypot(vx, vy) || 1; vx /= vl; vy /= vl;
-      if (s.arc > 0.2 || s.kind === "ball" || s.kind === "stone" || s.kind === "mortar") {
+      if (s.arc > 0.2 || s.kind === "ball" || s.kind === "stone" || s.kind === "mortar" || (K && K.shadow)) {
         ctx.fillStyle = "rgba(0,0,0," + (0.28 - Math.min(0.2, h * 0.02)) + ")";
         ctx.beginPath(); ctx.ellipse(gx + 0.1, gy + 0.12, s.kind === "arrow" || s.kind === "bolt" ? 0.22 : 0.3, 0.07 + (s.kind === "arrow" ? 0 : 0.12), Math.atan2(uy, ux), 0, 6.283); ctx.fill();
       }
@@ -257,6 +283,7 @@
           if (Math.random() < 0.8) add({ kind: "glow", x: x, y: y, vx: rnd(-0.4, 0.4), vy: rnd(-0.4, 0.4), r: rnd(0.12, 0.25), grow: 0.1, dur: rnd(250, 450), col: col, a: 0.7, add: s.kind !== "steam" });
           break;
         }
+        default: if (K && K.draw) K.draw(ctx, s, p, x, y, r, t);
       }
       ctx.restore();
       return true;
@@ -333,17 +360,19 @@
 
   // ---------- floating text and flashes ----------
   P.addFloater = function (x, y, text, color) {
-    var t = now(), stack = FX.floats.filter(function (f) { return Math.abs(f.x - x) < 2 && Math.abs(f.y - y) < 2 && t - f.t0 < 500; }).length;
-    FX.floats.push({ x: x, y: y, text: text, color: color || "#fff", t0: t, dur: 1600, stack: stack, big: /SLAIN|DESTROYED|BREAKS|FLED|RUN DOWN|CHARGE|wins by|win by/i.test(text) });
+    var t = Math.max(now(), arrivalNear(x, y)), stack = FX.floats.filter(function (f) { return Math.abs(f.x - x) < 2 && Math.abs(f.y - y) < 2 && Math.abs(t - f.t0) < 500; }).length;
+    FX.floats.push({ x: x, y: y, text: text, color: color || "#fff", t0: t, dur: 1600, stack: stack, big: /SLAIN|DESTROYED|BREAKS|FLED|RUN DOWN|CHARGE|MISCAST|wins by|win by/i.test(text) });
   };
   P.addFlash = function (x, y, r, color) {
-    var c = hexRgb(color || "#ffb347");
-    glow(x, y, (r || 1.5) * 0.8, c, 500); ring(x, y, (r || 1.5) * 1.4, c, 600, 0.1);
+    var c = hexRgb(color || "#ffb347"), t0 = arrivalNear(x, y) || now();
+    add({ kind: "glow", x: x, y: y, vx: 0, vy: 0, r: (r || 1.5) * 0.8, grow: (r || 1.5) * 0.5, dur: 500, col: c, a: 0.9, add: true, t0: t0 });
+    add({ kind: "ring", x: x, y: y, vx: 0, vy: 0, r: (r || 1.5) * 0.28, grow: (r || 1.5) * 1.4, dur: 600, col: c, a: 0.8, w: 0.1, t0: t0 });
   };
   function hexRgb(h) { if (!/^#/.test(h)) return [255, 200, 120]; if (h.length === 4) h = "#" + h[1] + h[1] + h[2] + h[2] + h[3] + h[3]; var n = parseInt(h.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; }
   function drawFloats(ctx, r, t) {
     FX.floats = FX.floats.filter(function (f) { return t - f.t0 < f.dur; });
     FX.floats.forEach(function (f) {
+      if (t < f.t0) return;
       var p = (t - f.t0) / f.dur, s = r.toScreen(f.x, f.y), pop = p < 0.12 ? 0.6 + 0.6 * (p / 0.12) : p < 0.2 ? 1.2 - 0.2 * ((p - 0.12) / 0.08) : 1;
       var rise = (1 - Math.pow(1 - Math.min(1, p * 1.4), 3)) * 34, a = p > 0.65 ? 1 - (p - 0.65) / 0.35 : 1;
       var size = f.big ? 18 : 15;
@@ -360,6 +389,7 @@
     FX.parts = FX.parts.filter(function (p) {
       var el = t - p.t0; if (el < 0) return true; if (el > p.dur) return false;
       var q = el / p.dur, sec = dt;
+      if (p.update) { p.update(p, el, sec); if (p.kind === "glow" || p.kind === "dust") { p.vx = 0; p.vy = 0; } }
       p.x += p.vx * sec; p.y += p.vy * sec;
       if (p.kind === "spark") { p.z += p.vz * sec; p.vz -= 18 * sec; if (p.z < 0) { p.z = 0; p.vz *= -0.3; p.vx *= 0.5; p.vy *= 0.5; } p.vx *= 0.92; p.vy *= 0.92; }
       else { p.vx *= 0.95; p.vy *= 0.95; }
@@ -400,9 +430,18 @@
           ctx.fillStyle = "rgba(" + col.join(",") + "," + a + ")"; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.283); ctx.fill();
           break;
         }
+        default: if (FX.partKinds[p.kind]) FX.partKinds[p.kind](ctx, p, q, r, t);
       }
       return true;
     });
+  }
+  function drawTimed(list, ctx, r, t) {
+    for (var i = list.length - 1; i >= 0; i--) {
+      var e = list[i], el = t - e.t0;
+      if (el > e.dur) { list.splice(i, 1); continue; }
+      if (el < 0) continue;
+      ctx.save(); try { e.draw(ctx, r, el / e.dur, el, t); } catch (err) { list.splice(i, 1); } ctx.restore();
+    }
   }
   var lastT = 0;
   var baseDraw = P.draw;
@@ -413,12 +452,22 @@
     var sh = FX.shake, sx = 0, sy = 0;
     if (sh.amp && !reduced(this)) { var q = (t - sh.t0) / sh.dur; if (q < 1) { var m = sh.amp * (1 - q) * (1 - q); sx = Math.sin(t * 0.09) * m; sy = Math.cos(t * 0.11) * m; } else sh.amp = 0; }
     this.panX += sx; this.panY += sy;
-    try { baseDraw.call(this, b, st, t); } finally { this.panX -= sx; this.panY -= sy; }
+    // regiments destroyed by a missile still in the air stay on the table until it lands
+    var extra = [];
+    if (b && b.units) {
+      FX.ghosts = FX.ghosts.filter(function (g) { return g.until > t; });
+      FX.ghosts.forEach(function (g) { if (b.units.indexOf(g.u) < 0 && extra.indexOf(g.u) < 0) extra.push(g.u); });
+      extra.forEach(function (u) { b.units.push(u); });
+    }
+    try { baseDraw.call(this, b, st, t); } finally {
+      this.panX -= sx; this.panY -= sy;
+      extra.forEach(function (u) { var i = b.units.lastIndexOf(u); if (i >= 0) b.units.splice(i, 1); });
+    }
     if (!b) return;
     var ctx = this.ctx;
     ctx.save();
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); ctx.translate(this.ox, this.oy); ctx.scale(this.scale, this.scale);
-    try { drawFallen(ctx, this, t); drawParts(ctx, this, t, dt); drawShots(ctx, this, t); } catch (e) { /* effects only */ }
+    try { drawFallen(ctx, this, t); drawParts(ctx, this, t, dt); drawTimed(FX.overlay, ctx, this, t); drawShots(ctx, this, t); } catch (e) { /* effects only */ }
     ctx.restore();
     ctx.save(); ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     try { drawFloats(ctx, this, t); } catch (e) { /* effects only */ }
@@ -443,66 +492,82 @@
         u = unitOf(b, sp.uid); t = sp.targetUid != null ? unitOf(b, sp.targetUid) : null;
         if (sp.kind === "hits" && sp.ranged && u && t) launch(r, u, t, res.hits || 0, sp.n || 1, /fires/.test(sp.label || "") && !u.ranged);
         else if (sp.kind === "hits" && u && t) strike(r, u, t, res.hits || 0);
-        else if (sp.kind === "saves" && u) saves(r, u, res.failed || 0, Math.max(0, (sp.n || 0) - (res.failed || 0)));
+        else if (sp.kind === "saves" && u) { var su = u, sf = res.failed || 0, ss = Math.max(0, (sp.n || 0) - sf); later(u.uid, function () { saves(r, su, sf, ss); }); }
         else if (sp.kind === "discipline" && u && sp.n && !res.ok) { var rp = rpos(u); for (var i = 0; i < 6; i++) dust(rp.x + rnd(-u.w / 2, u.w / 2), rp.y + rnd(-u.d / 2, u.d / 2), 0.8); }
         break;
       }
-      case "wounds":
-        u = unitOf(b, ev.uid); if (u && !calm) casualties(r, u, ev.killed || 0);
-        break;
-      case "destroy":
+      case "wounds": {
         u = unitOf(b, ev.uid); if (!u || calm) break;
-        var dp = rpos(u);
-        for (var d = 0; d < 12; d++) dust(dp.x + rnd(-u.w / 2, u.w / 2), dp.y + rnd(-u.d / 2, u.d / 2), ev.how === "fled" ? 1 : 1.5);
-        if (ev.how !== "fled" && SOVL.isSingle(u.type)) { casualties(r, Object.assign(Object.create(u), { models: 1 }), 1); shake(5, 300); }
+        var due = pending(u.uid), wu = u, killed = ev.killed || 0;
+        if (due && killed) { var h = FX.hold[u.uid]; if (!h || h.until <= now()) h = FX.hold[u.uid] = { until: due, killed: 0 }; h.killed += killed; h.until = Math.max(h.until, due); }
+        later(u.uid, function () { casualties(r, wu, killed); });
         break;
+      }
+      case "destroy": {
+        u = unitOf(b, ev.uid); if (!u || calm) break;
+        if (pending(u.uid)) FX.ghosts.push({ u: u, until: pending(u.uid) });
+        var du = u, how = ev.how;
+        later(u.uid, function () {
+          var dp = rpos(du);
+          for (var d = 0; d < 12; d++) dust(dp.x + rnd(-du.w / 2, du.w / 2), dp.y + rnd(-du.d / 2, du.d / 2), how === "fled" ? 1 : 1.5);
+          if (how !== "fled" && SOVL.isSingle(du.type)) { casualties(r, Object.assign(Object.create(du), { models: 1 }), 1); shake(5, 300); }
+        });
+        break;
+      }
       case "commanderDeath":
         u = unitOf(b, ev.uid); if (!u || calm) break;
         var cp = rpos(u); ring(cp.x, cp.y, 3, [255, 210, 120], 700, 0.15); glow(cp.x, cp.y, 1.5, [255, 190, 90], 600);
         break;
-      case "spell": {
-        u = unitOf(b, ev.from); t = unitOf(b, ev.to); if (!u || !t || calm) break;
-        var S = SOVL.SPELLS[ev.spell] || {}, cpos = rpos(u), tpos = rpos(t);
-        if (!ev.ok) { smoke(cpos.x, cpos.y, 1); break; }
-        var col = S.kind === "bolt" ? [255, 130, 50] : S.kind === "hex" ? [170, 90, 255] : S.kind === "heal" ? [120, 255, 150] : [255, 220, 120];
-        motes(cpos.x, cpos.y, 8, col, 0.6, 0.6);
-        if (S.kind === "bolt" || S.kind === "hex") {
-          var dist = Math.hypot(tpos.x - cpos.x, tpos.y - cpos.y);
-          FX.shots.push({ kind: "orb", col: col, from: { x: cpos.x, y: cpos.y }, to: { x: tpos.x, y: tpos.y }, t0: now() + 150, dur: clamp(dist / 16 * 1000, 250, 1200), arc: 0.05 * dist, hit: true, target: t, last: true, side: u.side, spell: S.kind });
-        } else {
-          ring(tpos.x, tpos.y, Math.max(t.w, t.d) * 0.7, col, 700, 0.12); motes(tpos.x, tpos.y, 18, col, Math.max(t.w, t.d) * 0.45, 1);
-        }
-        break;
-      }
-      case "summon":
-        u = b.unit(ev.uid); if (!u || calm) break;
-        var sp2 = rpos(u); ring(sp2.x, sp2.y, 3, [150, 90, 255], 800, 0.16); motes(sp2.x, sp2.y, 24, [170, 120, 255], Math.max(u.w, u.d) * 0.5, 0.8);
-        for (var z = 0; z < 8; z++) dust(sp2.x + rnd(-u.w / 2, u.w / 2), sp2.y + rnd(-u.d / 2, u.d / 2), 1.2);
-        break;
     }
   }
-  // spell orbs burst on arrival
-  var landBase = land;
-  land = function (r, s) {
-    if (s.kind !== "orb") return landBase(r, s);
-    var t = s.target, x = s.to.x, y = s.to.y;
-    ring(x, y, 2.4, s.col, 520, 0.16); glow(x, y, 1.6, s.col, 480);
-    for (var i = 0; i < 16; i++) add({ kind: "glow", x: x, y: y, vx: rnd(-5, 5), vy: rnd(-5, 5), r: rnd(0.1, 0.22), grow: 0, dur: rnd(300, 600), col: s.col, a: 0.9, add: true });
-    if (s.spell === "bolt") shake(3, 220);
-  };
+  function runHooks(r, b, ev) { var calm = reduced(r); FX.eventHooks.forEach(function (fn) { try { fn(r, b, ev, calm); } catch (e) { /* effects only */ } }); }
+  FX.h = { add: add, dust: dust, smoke: smoke, sparks: sparks, blood: blood, glow: glow, ring: ring, motes: motes, shake: shake, rpos: rpos, now: now, rnd: rnd, clamp: clamp, ease: ease, easeIn: easeIn,
+    reduced: reduced, at: at, expect: expect, pending: pending, later: later, casualties: casualties, undead: undead, mounted: mounted, unitOf: unitOf, hexRgb: hexRgb, UI: UI };
 
   window.addEventListener("load", function () {
     var ui = UI(); if (!ui) return;
     var pe = ui.processEvents;
     ui.processEvents = function () {
       var b = ui.battle, r = ui.renderer;
-      if (b && r && b.events && b.events.length) { var evs = b.events.slice(); evs.forEach(function (ev) { try { onEvent(r, b, ev); } catch (e) { /* effects only */ } }); }
+      if (b && r && b.events && b.events.length) { var evs = b.events.slice(); evs.forEach(function (ev) { try { onEvent(r, b, ev); } catch (e) { /* effects only */ } runHooks(r, b, ev); }); }
       return pe.apply(ui, arguments);
     };
     // replace the old square spark burst with metal sparks and dust
     P.addImpact = function (x, y) { if (reduced(this)) return; sparks(x, y, 10, [255, 225, 160]); dust(x, y, 1); };
     // a new battle starts with a clean slate
     var start = ui.startBattle;
-    ui.startBattle = function () { FX.parts = []; FX.shots = []; FX.fallen = []; FX.floats = []; FX.contact = {}; return start.apply(ui, arguments); };
+    ui.startBattle = function () {
+      FX.gen++; FX.parts = []; FX.shots = []; FX.fallen = []; FX.floats = []; FX.contact = {};
+      FX.incoming = {}; FX.hold = {}; FX.ghosts = []; FX.ground = []; FX.overlay = []; FX.auraStart = {};
+      return start.apply(ui, arguments);
+    };
+    // ground effects (rune circles, portals) are painted under the regiments
+    var overlays = P.drawTacticalOverlays;
+    P.drawTacticalOverlays = function (b, st, t) {
+      if (overlays) overlays.apply(this, arguments);
+      if (FX.ground.length) try { drawTimed(FX.ground, this.ctx, this, now()); } catch (e) { /* effects only */ }
+    };
+    // regiments: held casualties, rising summons and spell auras under and over the models
+    var drawUnit = P.drawUnit;
+    P.drawUnit = function (u, battle, st, t) {
+      var ctx = this.ctx, tt = now(), h = FX.hold[u.uid], keep = null, rise = u._rise, lift = null;
+      if (h && h.until <= tt) { delete FX.hold[u.uid]; h = null; }
+      if (rise) { var q = (tt - rise.t0) / rise.dur; if (q < 0) return; if (q >= 1) u._rise = null; else lift = ease(q); }
+      if (h && h.killed && SOVL.refreshFootprint) {
+        keep = { models: u.models, x: u.x, y: u.y, w: u.w, d: u.d, rx: u._rx, ry: u._ry };
+        u.models += h.killed; SOVL.refreshFootprint(u, true); u._rx += u.x - keep.x; u._ry += u.y - keep.y;
+      }
+      var self = this;
+      ctx.save();
+      try {
+        if (lift != null) { var rp = rpos(u), sc = 0.82 + 0.18 * lift; ctx.globalAlpha = lift; ctx.translate(rp.x, rp.y + (1 - lift) * 0.5); ctx.scale(sc, sc); ctx.translate(-rp.x, -rp.y); }
+        FX.underUnit.forEach(function (fn) { try { ctx.save(); fn(ctx, self, u, tt); } catch (e) { /* effects only */ } finally { ctx.restore(); } });
+        drawUnit.call(this, u, battle, st, t);
+        FX.overUnit.forEach(function (fn) { try { ctx.save(); fn(ctx, self, u, tt); } catch (e) { /* effects only */ } finally { ctx.restore(); } });
+      } finally {
+        ctx.restore();
+        if (keep) { u.models = keep.models; u.x = keep.x; u.y = keep.y; u.w = keep.w; u.d = keep.d; u._rx = keep.rx; u._ry = keep.ry; }
+      }
+    };
   });
 })();
