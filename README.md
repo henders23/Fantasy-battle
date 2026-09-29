@@ -143,6 +143,26 @@ side by side with a points comparison; the merchant shows wares as cards with mo
 icons; events appear as parchment scrolls; and camp, trait and run-over dialogs each have
 their own look.
 
+Deployment opens a muster dock beside the table. It shows the scenario, the turn limit, the
+depth of the zones and the gap between the armies, and compares the two armies' points. A
+checklist counts regiments in position. Each regiment card shows its painted model and
+formation; the selected one gets frontage (−/+) and facing (Q/E) controls. The scouts' report
+lists the enemy's regiments before they take the field. Auto-deploy and Begin Battle stay in
+reach at the foot of the dock. On the table, each deployment zone is edged with a marked
+front line and named, and the distance between the zones is measured at the side. Regiment
+labels move above their unit or beside a neighbour's label instead of piling up.
+
+When a battle ends, the verdict sweeps across the field, then the result screen opens:
+
+- a Victory, Defeat or Draw banner with laurels and the reason the battle ended;
+- both armies' scores, counting up, with a bar showing the balance;
+- the enemy slain and broken, your own losses, and commanders slain on each side;
+- a roll of both armies, one row per regiment with its model, remaining strength and fate
+  (unscathed, holding, battered, routing, fled or destroyed, and any commander slain);
+- in the campaign, the spoils or losses on a parchment panel.
+
+The continue button stays in view however long the lists are.
+
 The Trail of Death map is drawn as an old campaign chart: a parchment sheet with inked
 woods, hills, marsh, mountains and a river that change with each act, a winding road
 between the stops, wax-seal markers for each kind of stop, the route already marched in
@@ -205,6 +225,8 @@ js/theme.js       title screen and battle panel dressing
 css/theme.css     type, panels, title screen, dice and battle interface styles
 js/screens.js     army builder and campaign screen dressing
 css/screens.css   army builder, campaign screen and campaign dialog styles
+js/fieldscreens.js deployment dock, zone markings, field verdict and battle result screen
+css/fieldscreens.css deployment dock and battle result styles
 tools/build_sfx.py builds assets/sfx from the 0 A.D. and uisfx libraries
 css/experience.css illustrated edition theme and responsive layouts
 assets/          original paintings, portraits and functional sprite atlases

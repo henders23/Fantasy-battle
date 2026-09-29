@@ -299,22 +299,42 @@
       var w = Math.ceil(ctx.measureText(text).width) + 18,
         h = selected && state ? 39 : 26;
       var x = G.clamp(p.x - w / 2, 3, Math.max(3, self.cw - w - 3)),
-        y = p.y + (Math.max(u.w, u.d) * self.scale) / 2 + 5;
-      if (y + h > self.ch - 40)
-        y = p.y - (Math.max(u.w, u.d) * self.scale) / 2 - h - 5;
-      for (var attempt = 0; attempt < 6; attempt++) {
-        var overlap = self.labelRects.some(function (r) {
+        half = (Math.max(u.w, u.d) * self.scale) / 2,
+        below = p.y + half + 5,
+        above = p.y - half - h - 5,
+        bottom = Math.min(self.ch - 40, self.toScreen(0, SOVL.TABLE.h).y + 4),
+        y = null;
+      // below the regiment first, then above it, then stepping further out on both sides
+      var tries = [];
+      for (var step = 0; step < 4; step++) {
+        tries.push(below + step * (h + 3), above - step * (h + 3));
+      }
+      if (below + h > bottom) tries.sort(function (m, n) { return (m + h > bottom) - (n + h > bottom); });
+      var hits = function (tx, ty) {
+        return self.labelRects.filter(function (r) {
           return (
-            x < r.x + r.w + 2 &&
-            x + w > r.x - 2 &&
-            y < r.y + r.h + 2 &&
-            y + h > r.y - 2
+            tx < r.x + r.w + 2 &&
+            tx + w > r.x - 2 &&
+            ty < r.y + r.h + 2 &&
+            ty + h > r.y - 2
           );
         });
-        if (!overlap) break;
-        y += h + 3;
+      };
+      for (var attempt = 0; attempt < tries.length && y == null; attempt++) {
+        var ty = tries[attempt];
+        if (ty < 2 || ty + h > self.ch - 12) continue;
+        var blocking = hits(x, ty);
+        if (!blocking.length) { y = ty; break; }
+        // slide beside a neighbouring label on the same row, if that keeps it close to its regiment
+        for (var bi = 0; bi < blocking.length && y == null; bi++) {
+          var r0 = blocking[bi];
+          [r0.x + r0.w + 4, r0.x - w - 4].forEach(function (tx) {
+            if (y != null || tx < 3 || tx + w > self.cw - 3 || Math.abs(tx + w / 2 - p.x) > w * 0.9 + 12) return;
+            if (!hits(tx, ty).length) { x = tx; y = ty; }
+          });
+        }
       }
-      if (y + h > self.ch - 12 || y < 0) return;
+      if (y == null) return;
       ctx.fillStyle = selected ? "#22394bf5" : "#0b1726eb";
       ctx.strokeStyle = selected ? "#f4d89c" : mine ? "#91b9d8" : "#d2938f";
       ctx.lineWidth = selected ? 1.5 : 1;

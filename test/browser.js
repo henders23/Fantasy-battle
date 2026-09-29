@@ -47,6 +47,8 @@ var errors = [];
   await page.click('#m-ok'); await page.waitForTimeout(200);
   await page.screenshot({ path: path.join(shots, '11-map.png') });
   for (var step = 0; step < 6; step++) {
+    // a won battle can raise the commander a rank: pick the first trait offered
+    var trait = await page.$('#modal.active #modal-body.m-trait .choices button'); if (trait) { await trait.click(); await page.waitForTimeout(300); }
     var over = await page.evaluate(function () { return !SOVL.UI.campaign || SOVL.UI.campaign.over; });
     if (over) break;
     var avail = await page.$$('.node.avail'); if (!avail.length) break;

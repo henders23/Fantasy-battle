@@ -25,6 +25,8 @@ function ok(c, m) { if (!c) { errors.push('FAIL: ' + m); console.log('FAIL: ' + 
   ok(/Meeting/.test(turnTxt), 'deploy header shows scenario: ' + turnTxt);
   var dz = await page.evaluate(function () { var b = SOVL.UI.battle; return [b.deployDepth, b.deployZone(0), b.deployZone(1)]; });
   ok(dz[0] === 14, 'meeting deploy depth 14: ' + JSON.stringify(dz));
+  var dock = await page.evaluate(function () { var t = document.getElementById('deploy-tray'), b = SOVL.UI.battle; return { muster: t.classList.contains('muster-dock'), cards: t.querySelectorAll('.tray-unit').length, mine: b.unitsOf(0).length, scouts: t.querySelectorAll('.md-scout-row').length, theirs: b.unitsOf(1).length, facts: t.querySelector('.md-facts').textContent, go: !!t.querySelector('.md-actions button.primary') }; });
+  ok(dock.muster && dock.cards === dock.mine && dock.scouts === dock.theirs && /14" deep/.test(dock.facts) && dock.go, 'muster dock lists regiments, scouts and zone depth: ' + JSON.stringify(dock));
   // rotation handle in deployment
   var h = await page.evaluate(function () { var UI = SOVL.UI, r = UI.renderer, h = UI.handlePoint(); if (!h) return null; var s = r.toScreen(h.x, h.y); var u = UI.battle.unit(h.uid); var c = r.toScreen(u.x, u.y); return { sx: s.x, sy: s.y, uid: h.uid, a: u.a, cx: c.x, cy: c.y }; });
   ok(h, 'handle present in deployment: ' + JSON.stringify(h));
@@ -132,6 +134,20 @@ function ok(c, m) { if (!c) { errors.push('FAIL: ' + m); console.log('FAIL: ' + 
   await page.waitForTimeout(150); await page.screenshot({ path: path.join(shots, 'f7-runover.png') });
   var ro = await page.$eval('#modal-body', function (e) { return e.textContent; });
   ok(/Battle honours/.test(ro) && /Dwarf/.test(ro) && /Legend/.test(ro), 'run-over shows honours table and difficulty');
+  // battle result screen
+  await page.evaluate(function () {
+    SOVL.UI.closeModal();
+    var A = SOVL.Army, b = new SOVL.Battle({ armies: [A.randomArmy({ faction: 'empires_of_men', pts: 500 }), A.randomArmy({ faction: 'greenskin_tribes', pts: 500 })], terrain: [], scenario: 'pitched', names: ['Us', 'Them'] });
+    b.autoDeploy(0); b.autoDeploy(1); var foe = b.unitsOf(1); b.destroyUnit(foe[0], 'destroyed'); if (foe[1]) b.destroyUnit(foe[1], 'fled'); b.endGame('rout1');
+    var d = document.createElement('div'); d.textContent = 'Plunder: 40 gold.';
+    window.__resDone = false; SOVL.UI.showResult(b, { extra: d, label: 'Onward', onDone: function () { window.__resDone = true; } });
+    window.__resUnits = b.units.length + b.dead.length;
+  });
+  await page.waitForTimeout(600); await page.screenshot({ path: path.join(shots, 'f8-result.png') });
+  var rs = await page.evaluate(function () { var m = document.getElementById('modal-body'), btn = m.querySelector('.res-foot button.primary'), r = btn.getBoundingClientRect(); return { cls: m.className, word: m.querySelector('.res-word').textContent, rows: m.querySelectorAll('.res-unit').length, units: window.__resUnits, spoils: (m.querySelector('.res-spoils') || {}).textContent || '', text: m.textContent, btnVisible: r.bottom <= window.innerHeight && r.top >= 0, label: btn.textContent }; });
+  ok(/m-result/.test(rs.cls) && rs.word === 'Victory' && rs.rows === rs.units && /Plunder/.test(rs.spoils) && /Battle Over/.test(rs.text) && rs.btnVisible && rs.label === 'Onward', 'result screen: verdict, both rolls, spoils, visible button: ' + JSON.stringify({ cls: rs.cls, word: rs.word, rows: rs.rows, units: rs.units, btn: rs.btnVisible }));
+  await page.click('#modal-body .res-foot button.primary'); await page.waitForTimeout(100);
+  ok(await page.evaluate(function () { return window.__resDone && !SOVL.UI.modalOpen; }), 'result continue closes the screen and runs onDone');
   await browser.close();
   console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'FEATURE TEST OK');
   process.exit(errors.length ? 1 : 0);
