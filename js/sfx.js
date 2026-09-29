@@ -7,11 +7,11 @@
 (function () {
   if (typeof window === "undefined") return;
   var UI = SOVL.UI;
-  var COUNT = {"alarm_horn":1,"amb_field":1,"amb_wind":1,"arrow":4,"arrow_hit":5,"arrow_miss":4,"ballista":2,"bow":4,"catapult":1,"clash":6,"coin":1,"death":6,"defeat":1,"fire":2,"flesh":6,"gallop":6,"gun":3,"hero_dead":1,"horn":3,"horse_death":2,"level_up":1,"march":3,"neigh":3,"reward":1,"run":1,"shield":6,"spell":3,"swing":4,"thrust":4,"travel":1,"turn":1,"ui_back":1,"ui_close":1,"ui_drop":1,"ui_error":1,"ui_open":1,"ui_press":1,"ui_select":1,"ui_tick":2,"ui_toggle":1,"victory":1};
+  var COUNT = {"alarm_horn":1,"amb_wind":1,"arrow":4,"arrow_hit":5,"arrow_miss":4,"ballista":2,"bow":4,"catapult":1,"clash":6,"coin":1,"death":6,"defeat":1,"fire":2,"flesh":6,"gallop":6,"gun":3,"hero_dead":1,"horn":3,"horse_death":2,"level_up":1,"march":3,"neigh":3,"reward":1,"run":1,"shield":6,"spell":3,"swing":4,"thrust":4,"travel":1,"turn":1,"ui_back":1,"ui_close":1,"ui_drop":1,"ui_error":1,"ui_open":1,"ui_press":1,"ui_select":1,"ui_tick":2,"ui_toggle":1,"victory":1};
   // measured mean loudness of each clip group (dB); gains bring them to a common level
-  var MEAN = {alarm_horn:-14,arrow:-16.4,arrow_hit:-22.6,arrow_miss:-22.2,ballista:-24.3,bow:-28.5,catapult:-20.2,clash:-27.6,coin:-12,death:-19.8,defeat:-19.4,fire:-22.5,flesh:-12.9,gallop:-27.6,gun:-17.4,hero_dead:-18.6,horn:-12.2,horse_death:-17.9,level_up:-11.6,march:-22.8,neigh:-16.8,reward:-11.9,run:-22.4,shield:-23.8,spell:-13.3,swing:-20.8,thrust:-16,travel:-14.1,turn:-17.6,victory:-19,amb_wind:-22.6,amb_field:-26};
+  var MEAN = {alarm_horn:-14,arrow:-16.4,arrow_hit:-22.6,arrow_miss:-22.2,ballista:-24.3,bow:-28.5,catapult:-20.2,clash:-27.6,coin:-12,death:-19.8,defeat:-19.4,fire:-22.5,flesh:-12.9,gallop:-27.6,gun:-17.4,hero_dead:-18.6,horn:-12.2,horse_death:-17.9,level_up:-11.6,march:-22.8,neigh:-16.8,reward:-11.9,run:-22.4,shield:-23.8,spell:-13.3,swing:-20.8,thrust:-16,travel:-14.1,turn:-17.6,victory:-19,amb_wind:-22.6};
   // mix: how prominent each group sits against the rest (1 = reference)
-  var MIX = {clash:0.9,swing:0.6,thrust:0.7,shield:0.7,flesh:0.45,death:0.35,horse_death:0.4,bow:0.8,arrow:0.55,arrow_miss:0.6,arrow_hit:0.7,gun:0.8,ballista:0.8,catapult:0.8,march:0.5,run:0.5,gallop:0.6,neigh:0.45,horn:0.75,alarm_horn:0.6,turn:0.6,victory:0.9,defeat:0.9,hero_dead:0.8,spell:0.6,fire:0.6,coin:0.7,reward:0.7,level_up:0.7,travel:0.5,amb_field:0.5,amb_wind:0.35};
+  var MIX = {clash:0.9,swing:0.6,thrust:0.7,shield:0.7,flesh:0.45,death:0.35,horse_death:0.4,bow:0.8,arrow:0.55,arrow_miss:0.6,arrow_hit:0.7,gun:0.8,ballista:0.8,catapult:0.8,march:0.5,run:0.5,gallop:0.6,neigh:0.45,horn:0.75,alarm_horn:0.6,turn:0.6,victory:0.9,defeat:0.9,hero_dead:0.8,spell:0.6,fire:0.6,coin:0.7,reward:0.7,level_up:0.7,travel:0.5,amb_wind:0.35};
   var UI_LEVEL = 0.32;
   var LEVEL = { low: 0.35, medium: 0.6, high: 0.9 };
 
@@ -172,7 +172,8 @@
       ambience = { name: name, node: src, gain: g };
     })();
   }
-  function updateAmbience() { setAmbience(!enabled() ? null : UI.screen === "battle" ? "amb_field" : UI.screen === "campaign" ? "amb_wind" : null); }
+  // wind over the campaign map; the battlefield has no ambient bed (its birdsong was distracting)
+  function updateAmbience() { setAmbience(!enabled() ? null : UI.screen === "campaign" ? "amb_wind" : null); }
 
   // ---------- game events ----------
   function unitOf(b, uid) { return b && (b.unit(uid) || b.dead.find(function (u) { return u.uid === uid; })); }

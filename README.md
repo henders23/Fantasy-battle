@@ -123,7 +123,8 @@ thrusts, shield blocks, bow releases, arrows in flight and striking home, handgu
 bolt throwers and stone throwers, marching feet, galloping horses, war horns and fanfares
 from 0 A.D. (CC BY-SA 3.0), and interface sounds from uisfx (CC0). Each event picks the
 sound that fits the unit's weapon and mount, with small variations in pitch and level.
-Birdsong plays under the battle and wind over the campaign map. Dice are modelled as small
+Wind blows over the campaign map; the battlefield has no ambient bed, so the fighting is heard
+clearly. Selecting things plays a crisp mouse click. Dice are modelled as small
 wooden cubes bouncing on a table. Clips are built from their sources by
 `tools/build_sfx.py`; credits and licences are in `assets/sfx/CREDITS.md`.
 

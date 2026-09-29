@@ -6,6 +6,7 @@ Sources (not stored in this repo):
       git clone --depth 1 --filter=blob:none --sparse https://github.com/0ad/0ad
       git sparse-checkout set --no-cone 'binaries/data/mods/public/audio/*'
   uisfx (npm package, audio under CC0 1.0): npm pack uisfx
+  tools/sfx-src: clips supplied with the project (see assets/sfx/CREDITS.md)
 Each clip has leading silence trimmed, is capped in length, faded out, peak-normalised
 and encoded as mono MP3. Usage: build_sfx.py <0ad audio dir> <uisfx sounds dir> <out dir>
 """
@@ -14,6 +15,7 @@ import imageio_ffmpeg
 
 FF = imageio_ffmpeg.get_ffmpeg_exe()
 OAD, UI, OUT = sys.argv[1], sys.argv[2], sys.argv[3]
+LOCAL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sfx-src")
 
 # name: (library, [source files], max seconds, fade seconds)
 CLIPS = {
@@ -49,11 +51,10 @@ CLIPS = {
     "spell":      ("0ad", ["attack/fire/sp_11.ogg", "attack/fire/sp_12.ogg", "attack/fire/sp_13.ogg"], 1.3, 0.6),
     "fire":       ("0ad", ["attack/fire/c_11.ogg", "attack/fire/c_12.ogg"], 1.4, 0.6),
     # ambience
-    "amb_field":  ("0ad", ["ambient/dayscape/day_temperate_11.ogg"], 23.5, 2.0),
     "amb_wind":   ("0ad", ["ambient/weather/wind_11.ogg"], 40.0, 2.0),
     # interface (uisfx, organic and cinematic styles)
     "ui_press":   ("ui", ["organic/press.mp3"], 0.5, 0.05),
-    "ui_select":  ("ui", ["organic/select.mp3"], 0.6, 0.05),
+    "ui_select":  ("local", ["universfield-mouse-click-117076.mp3"], 0.32, 0.05),
     "ui_back":    ("ui", ["organic/back.mp3"], 0.6, 0.05),
     "ui_open":    ("ui", ["organic/open.mp3"], 0.8, 0.1),
     "ui_close":   ("ui", ["organic/close.mp3"], 0.8, 0.1),
@@ -75,7 +76,7 @@ def peak_db(path):
 os.makedirs(OUT, exist_ok=True)
 manifest = {}
 for name, (lib, files, dur, fade) in CLIPS.items():
-    root = OAD if lib == "0ad" else UI
+    root = OAD if lib == "0ad" else LOCAL if lib == "local" else UI
     manifest[name] = []
     for i, rel in enumerate(files):
         src = os.path.join(root, rel)
