@@ -52,6 +52,8 @@
   var stored = safelyRead("sovl-experience-settings") || {};
   UI.settings = {
     sound: stored.sound === true,
+    music: stored.music !== false,
+    musicVolume: ["low", "medium", "high"].indexOf(stored.musicVolume) >= 0 ? stored.musicVolume : "medium",
     motion: stored.motion !== false,
     labels: stored.labels !== false,
     pace:
@@ -193,6 +195,29 @@
       function (v) {
         UI.settings.sound = v === "on";
         UI.sound("select");
+      },
+    );
+    setting(
+      "Music",
+      [
+        ["on", "On"],
+        ["off", "Off"],
+      ],
+      UI.settings.music ? "on" : "off",
+      function (v) {
+        UI.settings.music = v === "on";
+      },
+    );
+    setting(
+      "Music volume",
+      [
+        ["low", "Low"],
+        ["medium", "Medium"],
+        ["high", "High"],
+      ],
+      UI.settings.musicVolume,
+      function (v) {
+        UI.settings.musicVolume = v;
       },
     );
     setting(
@@ -631,7 +656,7 @@
         (b.phase === "charge"
           ? "Protect your flanks. Turning an enemy before charging it can matter more than superior numbers."
           : "Use the army strip below to find a regiment. Blue fronts are yours; red fronts are the enemy.") +
-        '</div><div class="terrain-key"><span>Forest · blocks sight</span><span>Swamp · slows movement</span><span>Rock · impassable</span></div></div>';
+        '</div><div class="terrain-key"><span>Forest · slows, blocks sight</span><span>Swamp · slows movement</span><span>Cliff, ruin, lake · impassable</span></div></div>';
     }
     if (
       b.phase === "strategic" &&

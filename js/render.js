@@ -50,6 +50,13 @@
     if (this.groundImage && this.groundImage.complete && this.groundImage.naturalWidth) ctx.drawImage(this.groundImage, 0, 0, TABLE.w, TABLE.h);
     else { ctx.save(); ctx.scale(1 / 12, 1 / 12); ctx.fillStyle = this.grass; ctx.fillRect(0, 0, TABLE.w * 12, TABLE.h * 12); ctx.restore(); }
     ctx.fillStyle = 'rgba(11,29,36,0.15)'; ctx.fillRect(0, 0, TABLE.w, TABLE.h);
+    // one sun for the whole table: warm light from the upper left, a soft vignette at the rims
+    var sun = ctx.createLinearGradient(0, 0, TABLE.w, TABLE.h);
+    sun.addColorStop(0, 'rgba(255,226,170,0.07)'); sun.addColorStop(0.55, 'rgba(0,0,0,0)'); sun.addColorStop(1, 'rgba(8,14,24,0.16)');
+    ctx.fillStyle = sun; ctx.fillRect(0, 0, TABLE.w, TABLE.h);
+    var vig = ctx.createRadialGradient(TABLE.w / 2, TABLE.h / 2, Math.min(TABLE.w, TABLE.h) * 0.45, TABLE.w / 2, TABLE.h / 2, Math.hypot(TABLE.w, TABLE.h) * 0.56);
+    vig.addColorStop(0, 'rgba(0,0,0,0)'); vig.addColorStop(1, 'rgba(4,8,14,0.34)');
+    ctx.fillStyle = vig; ctx.fillRect(0, 0, TABLE.w, TABLE.h);
     // deployment zones
     if (battle) {
       for (var s = 0; s < 2; s++) {
@@ -99,6 +106,7 @@
     var order = battle.units.slice().sort(function (a, b) { return (a.uid === st.selected ? 1 : 0) - (b.uid === st.selected ? 1 : 0); });
     order.forEach(function (u) { self.drawUnit(u, battle, st, now); });
     // move preview ghost
+    if (this.drawTerrainHover) this.drawTerrainHover(ctx, battle);
     if (st.preview && sel) this.drawGhost(sel, st.preview);
     if (st.handle && sel && sel.uid === st.handle.uid) this.drawHandle(sel, st.handle, st.rotating);
     // projectiles and floaters
@@ -154,6 +162,11 @@
     var selected = st.selected === u.uid, hovered = st.hover === u.uid, target = st.targets && st.targets.indexOf(u.uid) >= 0;
     var color = info.color, edge = mine ? '#dfe8ff' : '#ffd7d7';
     ctx.save();
+    // soft shadow toward the lower right, matching the terrain's light
+    ctx.save(); ctx.translate(0.2, 0.26);
+    ctx.beginPath(); ctx.moveTo(c[0].x, c[0].y); for (var s0 = 1; s0 < 4; s0++) ctx.lineTo(c[s0].x, c[s0].y); ctx.closePath();
+    ctx.shadowColor = 'rgba(0,0,0,0.55)'; ctx.shadowBlur = 0.35 * this.scale * (this.dpr || 1); ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fill();
+    ctx.restore();
     // base plate
     ctx.beginPath(); ctx.moveTo(c[0].x, c[0].y); for (var i = 1; i < 4; i++) ctx.lineTo(c[i].x, c[i].y); ctx.closePath();
     ctx.fillStyle = mine ? 'rgba(20,40,80,0.55)' : 'rgba(90,20,20,0.55)'; ctx.fill();

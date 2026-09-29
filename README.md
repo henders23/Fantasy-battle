@@ -26,8 +26,8 @@ starts a prepared 488-point Border Guard army against a Greenskin warband; **Cus
 battle** retains the full five-faction army builder. Armies are placed automatically
 at deployment and can still be dragged, rotated, narrowed or widened before battle.
 
-The battlefield includes painted infantry and cavalry miniatures, illustrated terrain,
-readable regiment labels, an army selection strip and a collapsible battle chronicle.
+The battlefield includes painted infantry and cavalry miniatures, relief-painted terrain,
+illustrated tokens for monsters, chariots and war machines, readable regiment labels, an army selection strip and a collapsible battle chronicle.
 The movement ghost shows the legal endpoint and its cost; the larger movement circle
 is an upper bound before pivots and obstacles. Hovering over a charge target shows the
 attack side and approximate wounds dealt/received. Estimates are advisory and do not
@@ -52,8 +52,19 @@ buttons pivot toward the nearest enemies. When the enemy declares a charge again
 your regiments a prompt appears over the field offering the counter-charge, flee or hold
 reactions.
 
-The **Guide** explains each phase. **Settings** controls optional synthesized sound,
-enemy action speed, motion and persistent unit labels. Sound is off initially and starts
+Terrain is painted procedurally for every piece. Each forest, swamp, lake, cliff and ruin
+gets its own heightmap and colour map, lit by one sun from the upper left with cast shadows
+and ambient occlusion, so no two pieces look alike and the art fills the piece's rules
+footprint. Painting runs in a background worker and falls back to the page when workers are
+unavailable. Hovering a piece shows its exact footprint and its rules. Regiments and tokens
+cast shadows from the same sun.
+
+Two orchestral themes play in the background: a brooding march on the menus and the
+campaign trail, and a battle theme on the field. They crossfade between screens and fade
+at each loop. Browsers only allow audio after the first click or key press.
+
+The **Guide** explains each phase. **Settings** controls music and its volume, optional
+synthesized battle sounds, enemy action speed, motion and persistent unit labels. Sound is off initially and starts
 only after it is enabled by the player. Settings and campaign saves stay on the device.
 Layouts adapt to smaller screens; on phones, the orders panels appear below the field.
 
@@ -97,6 +108,9 @@ js/render.js      canvas renderer
 js/ui.js          screens, input, campaign flow
 js/experience.js  title, onboarding, orders, interactive combat and accessibility
 js/visuals.js     artwork, formation labels, previews and impact effects
+js/terrain.js     procedural relief terrain (heightmap, lighting, shadows), painted in a worker
+js/tokens.js      painted tokens for monsters, chariots, the dreadnought and war machines
+js/music.js       background music with crossfades
 css/experience.css illustrated edition theme and responsive layouts
 assets/          original paintings, portraits and functional sprite atlases
 test/sim.js       headless rules tests and AI-vs-AI simulations (node test/sim.js [games] [seed])

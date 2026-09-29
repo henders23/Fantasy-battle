@@ -13,7 +13,9 @@ equipment variant. Machines and monsters retain the existing native symbols.
 | `battlefield-ground.webp` | Clear overhead ground; all actual obstacles come from the battle state |
 | `faction-portraits.webp` | Five faction illustrations in human/dwarf/elf/orc/undead order |
 | `unit-sprites.webp` | Infantry and mounted models in the same faction order |
-| `terrain-sprites.webp` | Forest, rock, ruin, lake and swamp, matching the rules footprints |
+| `terrain-sprites.webp` | Fallback terrain art, used only if the procedural painter fails |
+| `music/trail-theme.mp3` | Menu and campaign theme (2:30) |
+| `music/battle-theme.mp3` | Battle theme (2:30) |
 
 ## Prompt briefs
 
@@ -36,3 +38,15 @@ equipment variant. Machines and monsters retain the existing native symbols.
 - **Terrain:** A transparent strip of overhead painted objects: dense forest cluster,
   rock outcrop, ruined stone building, small blue lake with reed-lined rocky banks, and
   dark marsh pools and reeds. Muted greens and ochres; no background, labels or grid.
+
+## Music
+
+Both themes are original instrumental tracks composed for this project with ElevenLabs
+Music (`eleven_music_v2_5`), 192 kbps MP3.
+
+- **Trail theme:** Brooding dark-fantasy orchestral underscore. Low sustained strings and
+  a soft cello melody over distant frame drums at a slow march, a lone horn call and sparse
+  harp, rising slightly in the middle before settling back.
+- **Battle theme:** Tense medieval battle underscore. Steady war drums and low ostinato
+  strings in a minor key, brass swells, a martial snare and a bold horn theme, with a
+  modest build in the middle.

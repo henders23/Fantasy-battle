@@ -251,13 +251,14 @@
       UI.hover = u ? u.uid : null;
       var tip = $('tip');
       if (u) { tip.innerHTML = UI.unitTip(u); tip.style.display = 'block'; UI.canvasTip = true; positionTip(e.clientX, e.clientY); }
-      else if (UI.canvasTip) { tip.style.display = 'none'; UI.canvasTip = false; }
+      else { var tt = null; if (b.terrain) b.terrain.forEach(function (q) { if (p.x >= q.x && p.x <= q.x + q.w && p.y >= q.y && p.y <= q.y + q.h) tt = q; }); if (tt && SOVL.terrainRulesText) { tip.innerHTML = SOVL.terrainRulesText(tt); tip.style.display = 'block'; UI.canvasTip = true; positionTip(e.clientX, e.clientY); } else if (UI.canvasTip) { tip.style.display = 'none'; UI.canvasTip = false; } }
+      r.pointer = p;
       if (b.phase === 'deploy' && UI.dragging) { var d = UI.dragging; var rect = { x: p.x - d.dx, y: p.y - d.dy, a: d.u.a, w: d.u.w, d: d.u.d }; if (b.placementValid(d.u, rect, [])) { d.u.x = rect.x; d.u.y = rect.y; d.u.placed = true; } return; }
       if (b.phase === 'strategic' && UI.sel && b.activeUnit === UI.sel && UI.mode === 'move' && !u) {
         var su = b.unit(UI.sel); UI.preview = su && (su.moveLeft > 0 || su.typeInfo.pivot === 0) ? b.previewMove(UI.sel, p, e.shiftKey || su.moveLeft <= 0) : null;
       } else UI.preview = null;
     });
-    cv.addEventListener('mouseleave', function () { UI.hover = null; UI.preview = null; $('tip').style.display = 'none'; UI.canvasTip = false; });
+    cv.addEventListener('mouseleave', function () { r.pointer = null; UI.hover = null; UI.preview = null; $('tip').style.display = 'none'; UI.canvasTip = false; });
     cv.addEventListener('mousedown', function (e) {
       if (e.button === 1 || e.button === 2) { UI.panning = true; e.preventDefault(); return; }
       var b = UI.battle; if (!b) return;
