@@ -12,7 +12,7 @@ equipment variant. Machines and monsters retain the existing native symbols.
 | `title-battle.webp` | Title screen, campaign atmosphere, battle briefs and results |
 | `battlefield-ground.webp` | Clear overhead ground; all actual obstacles come from the battle state |
 | `faction-portraits.webp` | Five faction illustrations in human/dwarf/elf/orc/undead order |
-| `unit-sprites.webp` | Infantry and mounted models in the same faction order |
+| `unit-sprites.webp` | Fallback infantry and mounted models, used only if the model painter fails |
 | `terrain-sprites.webp` | Fallback terrain art, used only if the procedural painter fails |
 | `music/trail-theme.mp3` | Menu and campaign theme (2:30) |
 | `music/battle-theme.mp3` | Battle theme (2:30) |

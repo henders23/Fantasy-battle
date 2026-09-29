@@ -169,25 +169,29 @@
     ctx.restore();
     // base plate
     ctx.beginPath(); ctx.moveTo(c[0].x, c[0].y); for (var i = 1; i < 4; i++) ctx.lineTo(c[i].x, c[i].y); ctx.closePath();
-    ctx.fillStyle = mine ? 'rgba(20,40,80,0.55)' : 'rgba(90,20,20,0.55)'; ctx.fill();
+    if (this.drawTray) this.drawTray(ctx, u, c, mine); else { ctx.fillStyle = mine ? 'rgba(20,40,80,0.55)' : 'rgba(90,20,20,0.55)'; ctx.fill(); }
     // models
+    var painted = this.paintsModels && this.paintsModels(u);
     var single = SOVL.isSingle(u.type) && !SOVL.commanderOnly(u), base, files, rk;
     if (SOVL.commanderOnly(u)) { base = (SOVL.UNIT_TYPES[u.commander.def.type] || SOVL.UNIT_TYPES.Infantry).base; files = 1; rk = 1; }
     else { base = u.typeInfo.base; files = Math.min(u.files, Math.max(1, u.models)); rk = Math.max(1, SOVL.ranks(u)); }
     var bw = base[0] * SOVL.MM, bd = base[1] * SOVL.MM, f = G.fwd(r.a), rt = G.right(r.a);
     var count = SOVL.commanderOnly(u) ? 1 : u.models, n = 0;
+    if (painted && this.drawRegiment && this.drawRegiment(ctx, u, r, bw, bd, files, rk, count)) n = count;
     for (var j = 0; j < rk && n < count; j++) {
       for (var k = 0; k < files && n < count; k++, n++) {
         var lx = (k - (files - 1) / 2) * bw, ly = u.d / 2 - (j + 0.5) * bd;
         var cx = r.x + rt.x * lx + f.x * ly, cy = r.y + rt.y * lx + f.y * ly;
         ctx.save(); ctx.translate(cx, cy); ctx.rotate(r.a + Math.PI / 2);
         var isFront = j === 0;
-        ctx.fillStyle = isFront ? color : shade(color, -0.18);
-        if (this.unitAtlas && this.unitAtlas.complete && this.unitAtlas.naturalWidth) ctx.globalAlpha = 0.25;
-        roundRect(ctx, -bw / 2 + 0.03, -bd / 2 + 0.03, bw - 0.06, bd - 0.06, 0.08); ctx.fill();
-        ctx.strokeStyle = 'rgba(0,0,0,0.45)'; ctx.lineWidth = 0.03; ctx.stroke();
-        ctx.globalAlpha = 1;
-        if (!this.drawModelSprite || !this.drawModelSprite(ctx, u, bw, bd)) {
+        if (!painted) {
+          ctx.fillStyle = isFront ? color : shade(color, -0.18);
+          if (this.unitAtlas && this.unitAtlas.complete && this.unitAtlas.naturalWidth) ctx.globalAlpha = 0.25;
+          roundRect(ctx, -bw / 2 + 0.03, -bd / 2 + 0.03, bw - 0.06, bd - 0.06, 0.08); ctx.fill();
+          ctx.strokeStyle = 'rgba(0,0,0,0.45)'; ctx.lineWidth = 0.03; ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+        if (!this.drawModelSprite || !this.drawModelSprite(ctx, u, bw, bd, j, k, files)) {
         // figure: a dot body + weapon tick
         var figR = Math.min(bw, bd) * 0.22;
         ctx.fillStyle = shade(color, 0.35); ctx.beginPath(); ctx.arc(0, 0, figR, 0, Math.PI * 2); ctx.fill();
@@ -198,9 +202,9 @@
         }
         // commander marker in the middle of the front rank
         if (u.commander && u.commander.alive && isFront && k === Math.floor(files / 2)) {
-          ctx.fillStyle = '#ffd24a'; drawStar(ctx, 0, 0, Math.min(bw, bd) * 0.32); ctx.strokeStyle = '#3a2a00'; ctx.lineWidth = 0.03; ctx.stroke();
+          ctx.fillStyle = '#ffd24a'; if (painted) drawStar(ctx, bw * 0.34, bd * 0.34, Math.min(bw, bd) * 0.17); else drawStar(ctx, 0, 0, Math.min(bw, bd) * 0.32); ctx.strokeStyle = '#3a2a00'; ctx.lineWidth = 0.03; ctx.stroke();
         }
-        if (u.banner && isFront && k === Math.max(0, Math.floor(files / 2) - 1) && files > 1) { ctx.fillStyle = info.accent; ctx.fillRect(-0.03, -bd * 0.45, 0.06, bd * 0.6); ctx.beginPath(); ctx.moveTo(0.03, -bd * 0.45); ctx.lineTo(bw * 0.35, -bd * 0.32); ctx.lineTo(0.03, -bd * 0.2); ctx.closePath(); ctx.fill(); }
+        if (!painted && u.banner && isFront && k === Math.max(0, Math.floor(files / 2) - 1) && files > 1) { ctx.fillStyle = info.accent; ctx.fillRect(-0.03, -bd * 0.45, 0.06, bd * 0.6); ctx.beginPath(); ctx.moveTo(0.03, -bd * 0.45); ctx.lineTo(bw * 0.35, -bd * 0.32); ctx.lineTo(0.03, -bd * 0.2); ctx.closePath(); ctx.fill(); }
         ctx.restore();
       }
     }

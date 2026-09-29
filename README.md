@@ -26,7 +26,7 @@ starts a prepared 488-point Border Guard army against a Greenskin warband; **Cus
 battle** retains the full five-faction army builder. Armies are placed automatically
 at deployment and can still be dragged, rotated, narrowed or widened before battle.
 
-The battlefield includes painted infantry and cavalry miniatures, relief-painted terrain,
+The battlefield includes painted miniatures on flocked movement trays, relief-painted terrain,
 illustrated tokens for monsters, chariots and war machines, readable regiment labels, an army selection strip and a collapsible battle chronicle.
 The movement ghost shows the legal endpoint and its cost; the larger movement circle
 is an upper bound before pivots and obstacles. Hovering over a charge target shows the
@@ -58,6 +58,16 @@ and ambient occlusion, so no two pieces look alike and the art fills the piece's
 footprint. Painting runs in a background worker and falls back to the page when workers are
 unavailable. Hovering a piece shows its exact footprint and its rules. Regiments and tokens
 cast shadows from the same sun.
+
+Every regiment is painted model by model. Each faction and unit type has its own look:
+Empire state troops with kite shields, halberds and handguns, bearded dwarves in bronze
+helms, elves with crested silver helms and pennanted lances, green-skinned orcs and
+eared goblins, skeletons, zombies and armoured wights. Weapons, shields and mounts
+(horses, barded warhorses, boars, wolves, skeletal steeds) follow the unit's equipment,
+and each front rank carries a standard and the commander where they fight. Models vary
+slightly and are shaded by the same sun as the terrain. Sprites are cached in atlas sheets
+at three resolutions, and each regiment is baked into one image that is redrawn only when
+it loses models, changes formation or turns through the light.
 
 Two orchestral themes play in the background: a brooding march on the menus and the
 campaign trail, and a battle theme on the field. They crossfade between screens and fade
@@ -110,6 +120,7 @@ js/experience.js  title, onboarding, orders, interactive combat and accessibilit
 js/visuals.js     artwork, formation labels, previews and impact effects
 js/terrain.js     procedural relief terrain (heightmap, lighting, shadows), painted in a worker
 js/tokens.js      painted tokens for monsters, chariots, the dreadnought and war machines
+js/models.js      painted regiment models, movement trays and the regiment image cache
 js/music.js       background music with crossfades
 css/experience.css illustrated edition theme and responsive layouts
 assets/          original paintings, portraits and functional sprite atlases
