@@ -134,6 +134,28 @@ function ok(c, m) { if (!c) { errors.push('FAIL: ' + m); console.log('FAIL: ' + 
   var reinf = await page.evaluate(function () { var m = document.getElementById('modal-body'), b = m.querySelector('.ms-panel.on .ms-price:not([disabled])'); if (!b) return { none: true }; var g0 = SOVL.UI.campaign.gold; b.click(); var m2 = document.getElementById('modal-body'); return { spent: g0 - SOVL.UI.campaign.gold, tab: m2.querySelector('.ms-tabs button.on').textContent, msg: m2.querySelector('.ms-msg').className }; });
   ok(reinf.none || (reinf.spent > 0 && /Reinforce/.test(reinf.tab) && /good/.test(reinf.msg)), 'reinforce spends gold and stays on its tab: ' + JSON.stringify(reinf));
   await page.click('#modal-body button.primary:has-text("Leave")'); await page.waitForTimeout(100);
+  // events: consequence tags, unaffordable choices and the written-up outcome
+  await page.evaluate(function () { var c = SOVL.UI.campaign; c.gold = 50; var orig = SOVL.Campaign.randomEvent; SOVL.Campaign.randomEvent = function () { return SOVL.CAMPAIGN.events.filter(function (e) { return e.id === 'relic_seller'; })[0]; }; try { SOVL.UI.campaignEvent({ type: 'event' }); } finally { SOVL.Campaign.randomEvent = orig; } });
+  await page.waitForTimeout(150); await page.screenshot({ path: path.join(shots, 'f6c-event.png') });
+  var evs = await page.evaluate(function () { var m = document.getElementById('modal-body'); return { tale: m.classList.contains('m-tale'), cards: m.querySelectorAll('.tl-choice').length, disabled: Array.from(m.querySelectorAll('.tl-choice')).map(function (b) { return b.disabled; }), tags: m.querySelector('.tl-choice .tl-tags').textContent, short: (m.querySelector('.tl-short') || {}).textContent }; });
+  ok(evs.tale && evs.cards === 3 && evs.disabled.join() === 'true,true,false' && /110 gold/.test(evs.tags) && /Magic weapon/.test(evs.tags) && /60 more gold/.test(evs.short || ''), 'event choices show costs and block what you cannot afford: ' + JSON.stringify(evs));
+  await page.click('#modal-body .tl-choice:not([disabled])'); await page.waitForTimeout(100);
+  await page.evaluate(function () { var c = SOVL.UI.campaign; c.gold = 50; var orig = SOVL.Campaign.randomEvent; SOVL.Campaign.randomEvent = function () { return SOVL.CAMPAIGN.events.filter(function (e) { return e.id === 'drill'; })[0]; }; try { SOVL.UI.campaignEvent({ type: 'event' }); } finally { SOVL.Campaign.randomEvent = orig; } });
+  await page.click('#modal-body .tl-choice:nth-child(2)'); await page.waitForTimeout(150);
+  var out = await page.evaluate(function () { var m = document.getElementById('modal-body'); return { tale: m.classList.contains('m-tale'), lines: m.querySelectorAll('.tl-lines li').length, text: m.textContent, gold: SOVL.UI.campaign.gold }; });
+  ok(out.tale && out.lines === 1 && /\+45 gold/.test(out.text) && out.gold === 95, 'event outcome is written up: ' + JSON.stringify({ lines: out.lines, gold: out.gold }));
+  await page.click('#modal.active #m-ok'); await page.waitForTimeout(100);
+  // treasure through the real travel path
+  var tr = await page.evaluate(function () {
+    var UI = SOVL.UI, C = SOVL.Campaign, c = UI.campaign, g0 = c.gold, moveTo = C.moveTo;
+    C.moveTo = function () { return { type: 'treasure' }; };
+    try { UI.travel(0); } finally { C.moveTo = moveTo; }
+    var m = document.getElementById('modal-body');
+    return { hoard: m.classList.contains('m-hoard'), gold: c.gold - g0, shown: (m.querySelector('.tr-gold b') || {}).textContent || null, relic: !!m.querySelector('.tr-relic'), ok: !!m.querySelector('#m-ok') };
+  });
+  ok(tr.hoard && tr.ok && (tr.relic || tr.shown === '+' + tr.gold), 'treasure opens the chest and shows the find: ' + JSON.stringify(tr));
+  await page.screenshot({ path: path.join(shots, 'f6d-treasure.png') });
+  await page.click('#modal.active #m-ok'); await page.waitForTimeout(100);
   // camp: the rest preview matches what resting does
   await page.evaluate(function () { var c = SOVL.UI.campaign; c.army.entries.forEach(function (e) { var t = e.kind === 'commander' ? e.retinue : e; if (t.models > 4) t.models -= 3; }); SOVL.UI.campaignCamp({ type: 'camp' }); });
   await page.waitForTimeout(150); await page.screenshot({ path: path.join(shots, 'f6b-camp.png') });

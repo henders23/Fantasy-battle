@@ -1,0 +1,105 @@
+/* Events and treasure (js/talescreens.js). */
+.coin { width: 16px; height: 16px; flex: none; vertical-align: -3px; }
+
+/* ---------- events: a chronicle page ---------- */
+#modal-body.m-tale {
+  width: min(720px, 94vw); padding: 30px 36px 26px; color: #33240f; text-align: center;
+  background:
+    radial-gradient(120% 70% at 50% 0%, rgba(255, 250, 230, 0.6), transparent 60%),
+    radial-gradient(90% 60% at 50% 100%, rgba(120, 80, 30, 0.22), transparent 70%),
+    linear-gradient(180deg, #ecdfbd, #d8c597);
+  border: 1px solid #8a6a33;
+  box-shadow: inset 0 0 60px rgba(110, 75, 25, 0.4), inset 0 0 0 6px rgba(236, 223, 189, 0.6), inset 0 0 0 7px rgba(138, 106, 51, 0.5), 0 30px 80px rgba(0, 0, 0, 0.7);
+}
+.tl-seal { width: 86px; height: 86px; margin: -4px auto 10px; padding: 16px; border-radius: 50%; color: #5a3a14;
+  background: radial-gradient(circle at 50% 45%, rgba(255, 248, 225, 0.8), rgba(214, 190, 140, 0.5) 70%);
+  box-shadow: 0 0 0 2px #8a6a33, 0 0 0 6px rgba(138, 106, 51, 0.18), inset 0 2px 6px rgba(90, 58, 20, 0.35); }
+.tl-seal.small { width: 64px; height: 64px; padding: 12px; }
+.tl-seal svg { width: 100%; height: 100%; display: block; }
+.tl-eyebrow { font-family: var(--head); font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; color: #8a5a22; }
+#modal-body.m-tale h2 { margin: 6px 0 0; font-size: 30px; color: #6e1f16; letter-spacing: 0.04em; }
+#modal-body.m-tale h2:after { content: "❦"; display: block; margin: 6px auto 0; font-size: 16px; color: #8a6a33; }
+#modal-body.m-tale .text { margin: 10px auto 0; max-width: 560px; font-size: 18px; line-height: 1.6; font-style: italic; color: #3a2a16; }
+#modal-body.m-tale .tl-story:first-letter { float: left; margin: 4px 8px 0 0; font-family: "Cinzel Decorative", var(--head); font-style: normal; font-size: 46px; line-height: 0.8; color: #6e1f16; }
+.tl-story { text-align: left; }
+.tl-choices { display: flex; flex-direction: column; gap: 10px; margin-top: 22px !important; }
+#modal-body.m-tale .tl-choice { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; padding: 12px 16px; text-align: left; border-radius: 4px;
+  color: #33240f; background: linear-gradient(180deg, rgba(255, 251, 238, 0.7), rgba(236, 222, 186, 0.7)); border: 1px solid #8a6a33; box-shadow: 0 2px 0 rgba(90, 58, 20, 0.25); transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s; }
+#modal-body.m-tale .tl-choice:hover:not(:disabled) { transform: translateY(-1px); border-color: #6e1f16; background: rgba(255, 250, 232, 0.95); box-shadow: 0 4px 10px rgba(90, 58, 20, 0.3); }
+#modal-body.m-tale .tl-choice:focus-visible { outline: 2px solid #6e1f16; outline-offset: 2px; }
+#modal-body.m-tale .tl-choice:disabled { opacity: 0.55; cursor: not-allowed; }
+.tl-say { font-family: var(--head); font-size: 16px; font-weight: 700; color: #3a1a0c; }
+.tl-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.tl-tags i { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 10px; font-style: normal; font-size: 12.5px; font-weight: 600; border: 1px solid; }
+.tl-tags i.good { color: #2f5a24; border-color: #7aa267; background: rgba(160, 205, 140, 0.3); }
+.tl-tags i.cost { color: #7a2418; border-color: #c07a6a; background: rgba(230, 150, 130, 0.25); }
+.tl-tags i.war { color: #4a2a0a; border-color: #8a6a33; background: rgba(217, 180, 106, 0.35); }
+.tl-tags i.none { color: #6a5a3e; border-color: #b7a177; background: transparent; font-weight: 500; font-style: italic; }
+.tl-tags .coin { width: 13px; height: 13px; vertical-align: -2px; }
+.tl-short { font-size: 12.5px; color: #7a2418; font-style: italic; }
+.tl-purse { display: inline-flex; align-items: center; gap: 6px; margin-top: 16px; padding: 4px 12px; border-radius: 14px; border: 1px solid rgba(138, 106, 51, 0.6); font-size: 13px; color: #5a4020; background: rgba(255, 250, 235, 0.4); }
+.tl-purse b { font-family: var(--head); font-size: 15px; color: #3a2a16; }
+.tl-chosen { font-size: 15px !important; color: #6a4a22 !important; }
+.tl-lines { list-style: none; margin: 16px auto 0; padding: 0; max-width: 480px; text-align: left; }
+.tl-lines li { display: flex; align-items: center; gap: 12px; padding: 9px 4px; border-top: 1px solid rgba(138, 106, 51, 0.35); font-size: 16px; color: #2f5a24; }
+.tl-lines li:last-child { border-bottom: 1px solid rgba(138, 106, 51, 0.35); }
+.tl-lines li.bad { color: #7a2418; }
+.tl-li { width: 26px; height: 26px; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; border: 1px solid #8a6a33; background: rgba(255, 250, 235, 0.6); color: #5a3a14; font-size: 14px; }
+.tl-li .coin { width: 16px; height: 16px; }
+#modal-body.m-tale .choices:not(.tl-choices) { margin-top: 18px; }
+#modal-body.m-tale .choices .primary { padding: 12px; font-family: var(--head); font-size: 16px; letter-spacing: 0.05em; text-align: center; }
+
+/* ---------- treasure: a chest in the dark ---------- */
+#modal-body.m-hoard { width: min(640px, 94vw); padding: 0; overflow: hidden; text-align: center; }
+.tr-scene { position: relative; height: 210px; overflow: hidden; background: radial-gradient(60% 80% at 50% 70%, #3a2a14, #120c07 70%); border-bottom: 1px solid rgba(217, 180, 106, 0.4); }
+.tr-rays { position: absolute; left: 50%; top: 58%; width: 520px; height: 520px; margin: -260px 0 0 -260px; border-radius: 50%; opacity: 0;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 214, 120, 0.22) 0deg 6deg, transparent 6deg 18deg); -webkit-mask: radial-gradient(circle, #000 20%, transparent 65%); mask: radial-gradient(circle, #000 20%, transparent 65%);
+  animation: tr-rays 1s ease-out 0.5s forwards, tr-spin 30s linear 0.5s infinite; }
+@keyframes tr-rays { to { opacity: 1; } }
+@keyframes tr-spin { to { transform: rotate(360deg); } }
+.tr-chest { position: absolute; left: 50%; bottom: 6px; width: 190px; margin-left: -95px; }
+.tr-lid { transform-origin: 30px 58px; transform-box: view-box; animation: tr-open 0.7s cubic-bezier(0.3, 1.4, 0.5, 1) 0.3s forwards; }
+@keyframes tr-open { to { transform: rotate(-24deg) translate(-4px, -10px); } }
+.tr-sparks { position: absolute; left: 50%; bottom: 70px; width: 0; height: 0; }
+.tr-sparks i { position: absolute; width: 8px; height: 8px; border-radius: 50%; background: radial-gradient(circle, #fff6d0, #e0b85a 60%, transparent 70%); opacity: 0; animation: tr-spark 1.3s ease-out forwards; }
+.tr-sparks i:nth-child(1) { --x: -70px; --y: -110px; animation-delay: 0.55s; } .tr-sparks i:nth-child(2) { --x: 60px; --y: -120px; animation-delay: 0.6s; }
+.tr-sparks i:nth-child(3) { --x: -30px; --y: -140px; animation-delay: 0.65s; } .tr-sparks i:nth-child(4) { --x: 20px; --y: -150px; animation-delay: 0.7s; }
+.tr-sparks i:nth-child(5) { --x: -100px; --y: -70px; animation-delay: 0.62s; } .tr-sparks i:nth-child(6) { --x: 95px; --y: -80px; animation-delay: 0.68s; }
+.tr-sparks i:nth-child(7) { --x: 40px; --y: -100px; animation-delay: 0.75s; } .tr-sparks i:nth-child(8) { --x: -50px; --y: -90px; animation-delay: 0.8s; } .tr-sparks i:nth-child(9) { --x: 5px; --y: -120px; animation-delay: 0.85s; }
+@keyframes tr-spark { 0% { opacity: 1; transform: translate(0, 0) scale(0.6); } 100% { opacity: 0; transform: translate(var(--x), var(--y)) scale(1.3); } }
+body.reduce-motion .tr-lid { animation: none; transform: rotate(-24deg) translate(-4px, -10px); }
+body.reduce-motion .tr-rays { animation: none; opacity: 1; }
+body.reduce-motion .tr-sparks { display: none; }
+@media (prefers-reduced-motion: reduce) { .tr-lid { animation: none; transform: rotate(-24deg) translate(-4px, -10px); } .tr-rays { animation: none; opacity: 1; } .tr-sparks { display: none; } }
+.tr-find { padding: 20px 32px 24px; background: linear-gradient(180deg, #1a150f, #0f1822); }
+.tr-find .tl-eyebrow { color: var(--gild); }
+#modal-body.m-hoard h2 { margin: 4px 0 12px; font-size: 26px; color: #f4e9cf; }
+.tr-gold { display: inline-flex; align-items: center; gap: 12px; margin: 2px 0 8px; animation: tr-pop 0.5s cubic-bezier(0.3, 1.5, 0.5, 1) 0.8s both; }
+.tr-gold .coin { width: 42px; height: 42px; }
+.tr-gold b { font-family: var(--head); font-size: 48px; line-height: 1; color: var(--gild-hi); text-shadow: 0 0 24px rgba(240, 200, 110, 0.45); }
+.tr-gold span { font-size: 16px; color: #c9b58a; }
+@keyframes tr-pop { from { opacity: 0; transform: scale(0.6); } }
+body.reduce-motion .tr-gold, body.reduce-motion .tr-relic { animation: none; }
+.tr-relic { display: flex; align-items: flex-start; gap: 16px; margin: 0 auto 8px; max-width: 460px; padding: 14px 16px; text-align: left; border: 1px solid #8a6a33; border-radius: 6px; background: linear-gradient(180deg, #221a2e, #141019); box-shadow: 0 0 24px rgba(176, 122, 208, 0.25); animation: tr-pop 0.5s cubic-bezier(0.3, 1.5, 0.5, 1) 0.8s both; }
+.tr-relic.k-weapon { background: linear-gradient(180deg, #2a1d14, #15100b); box-shadow: 0 0 24px rgba(224, 150, 80, 0.25); }
+.tr-relic-ic { flex: none; width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 24px; color: #f3dca3; background: radial-gradient(circle at 40% 35%, #4a3a5a, #1a1422 70%); box-shadow: 0 0 0 1px #8a6a33; }
+.tr-relic b { display: block; font-family: var(--head); font-size: 18px; color: #f4e9cf; }
+.tr-relic em { font-style: normal; font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: #b9a57a; }
+.tr-relic p { margin: 6px 0 4px; font-size: 15px; color: #e6dcc8; }
+.tr-relic small { font-size: 13px; color: #a9b6c2; font-style: italic; }
+#modal-body.m-hoard .text { margin: 0 0 6px; font-size: 15px; font-style: italic; color: #c9b58a; }
+.tr-purse { font-size: 13px; color: #93a2b1; margin-top: 6px; }
+.tr-purse b { color: #f3dca3; font-family: var(--head); }
+#modal-body.m-hoard .choices { margin-top: 16px; }
+#modal-body.m-hoard .choices .primary { padding: 12px; font-family: var(--head); font-size: 16px; letter-spacing: 0.05em; text-align: center; }
+
+@media (max-width: 760px) {
+  #modal-body.m-tale { padding: 22px 18px 18px; }
+  #modal-body.m-tale h2 { font-size: 24px; }
+  #modal-body.m-tale .text { font-size: 16px; }
+  .tl-seal { width: 66px; height: 66px; padding: 12px; }
+  .tr-scene { height: 170px; }
+  .tr-chest { width: 150px; margin-left: -75px; }
+  .tr-find { padding: 16px 16px 18px; }
+  .tr-gold b { font-size: 40px; }
+}

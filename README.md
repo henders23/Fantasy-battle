@@ -139,8 +139,22 @@ stats and options, and a points gauge that turns green near the limit and red ov
 Army entries show their model, and options are labelled fields. On the campaign screen the
 top bar tracks progress through the act, the roster shows each unit's model, strength and
 veterancy, and the log reads as a parchment chronicle. Battle briefings set the two armies
-side by side with a points comparison; events appear as parchment scrolls; and trait and
-run-over dialogs each have their own look.
+side by side with a points comparison, and trait and run-over dialogs each have their own
+look.
+
+Events read as a page of the campaign chronicle. The page shows:
+
+- an engraved emblem for the kind of encounter and the act it happens in;
+- the story, with a drop capital;
+- each choice as a card with tags for what it costs and brings (gold, a battle and its
+  reward, recruits, relics, veterancy, discipline, losses);
+- "You need X more gold" when you can't afford a choice.
+
+The outcome is written up line by line on the same page, with your purse.
+
+Treasure opens a chest in the dark: the lid lifts, light and sparks spill out, and the find
+appears. Gold shows as a large number with the new purse. A relic shows as a card with its
+effect, who now carries it and what it replaced.
 
 The merchant's wagon splits its business into three tabs:
 
@@ -261,6 +275,8 @@ js/helpscreens.js settings, battle guide and field manual
 css/helpscreens.css settings, guide and field manual styles
 js/campscreens.js  merchant and camp
 css/campscreens.css merchant and camp styles
+js/talescreens.js  campaign events and treasure
+css/talescreens.css event and treasure styles
 tools/build_sfx.py builds assets/sfx from the 0 A.D. and uisfx libraries
 css/experience.css illustrated edition theme and responsive layouts
 assets/          original paintings, portraits and functional sprite atlases
