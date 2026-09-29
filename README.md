@@ -139,9 +139,25 @@ stats and options, and a points gauge that turns green near the limit and red ov
 Army entries show their model, and options are labelled fields. On the campaign screen the
 top bar tracks progress through the act, the roster shows each unit's model, strength and
 veterancy, and the log reads as a parchment chronicle. Battle briefings set the two armies
-side by side with a points comparison; the merchant shows wares as cards with models or
-icons; events appear as parchment scrolls; and camp, trait and run-over dialogs each have
-their own look.
+side by side with a points comparison; events appear as parchment scrolls; and trait and
+run-over dialogs each have their own look.
+
+The merchant's wagon splits its business into three tabs:
+
+- **Wares:** recruits show their painted model and stat profile; relics and banners show
+  their effect.
+- **Reinforce:** each unit's strength, with +1 and fill-to-full buttons.
+- **Re-arm:** options grouped by regiment, each saying what the weapon or upgrade does.
+
+Before you pay, a ware says why it can't be used (no commander magic, no unit able to carry a
+banner, the army already at its limit for that section), how much more gold you need, or what
+it would replace. The purse, a note on the last purchase and the Leave button stay in view.
+
+The camp is a night scene by a fire:
+
+- **Rest** lists exactly which units will recover and by how many models.
+- **Drill** lets you choose a unit and shows the rank and bonus it will gain.
+- **Dawn** then reports what changed.
 
 Deployment opens a muster dock beside the table. It shows the scenario, the turn limit, the
 depth of the zones and the gap between the armies, and compares the two armies' points. A
@@ -243,6 +259,8 @@ js/fieldscreens.js deployment dock, zone markings, field verdict and battle resu
 css/fieldscreens.css deployment dock and battle result styles
 js/helpscreens.js settings, battle guide and field manual
 css/helpscreens.css settings, guide and field manual styles
+js/campscreens.js  merchant and camp
+css/campscreens.css merchant and camp styles
 tools/build_sfx.py builds assets/sfx from the 0 A.D. and uisfx libraries
 css/experience.css illustrated edition theme and responsive layouts
 assets/          original paintings, portraits and functional sprite atlases

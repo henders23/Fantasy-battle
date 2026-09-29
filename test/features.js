@@ -128,7 +128,26 @@ function ok(c, m) { if (!c) { errors.push('FAIL: ' + m); console.log('FAIL: ' + 
   var afterW = await page.evaluate(function () { var e = SOVL.UI.campaign.army.entries; return e.map(function (x) { return (x.kind === 'commander' ? x.retinue : x).weapon + '|' + (x.weapon || ''); }); });
   ok(JSON.stringify(beforeW) !== JSON.stringify(afterW) || /add/.test(clicked || ''), 're-arm changed equipment: ' + clicked + ' :: ' + beforeW + ' -> ' + afterW);
   var err = await page.$eval('#modal-body .text', function (e) { return e.textContent; }); console.log('merchant text:', err.slice(0, 160));
+  var shop = await page.evaluate(function () { var m = document.getElementById('modal-body'); return { tabs: m.querySelectorAll('.ms-tabs button').length, gold: +m.querySelector('.ms-gold').textContent, real: SOVL.UI.campaign.gold, msg: m.querySelector('.ms-msg').textContent, leaveVisible: m.querySelector('.ms-foot .primary').getBoundingClientRect().bottom <= window.innerHeight }; });
+  ok(shop.tabs === 3 && shop.gold === shop.real && shop.leaveVisible && /re-armed|takes|now fights|with/.test(shop.msg + (clicked || '')), 'merchant tabs, purse and purchase message: ' + JSON.stringify(shop));
+  await page.click('#modal-body .ms-tabs button:nth-child(2)'); await page.waitForTimeout(100);
+  var reinf = await page.evaluate(function () { var m = document.getElementById('modal-body'), b = m.querySelector('.ms-panel.on .ms-price:not([disabled])'); if (!b) return { none: true }; var g0 = SOVL.UI.campaign.gold; b.click(); var m2 = document.getElementById('modal-body'); return { spent: g0 - SOVL.UI.campaign.gold, tab: m2.querySelector('.ms-tabs button.on').textContent, msg: m2.querySelector('.ms-msg').className }; });
+  ok(reinf.none || (reinf.spent > 0 && /Reinforce/.test(reinf.tab) && /good/.test(reinf.msg)), 'reinforce spends gold and stays on its tab: ' + JSON.stringify(reinf));
   await page.click('#modal-body button.primary:has-text("Leave")'); await page.waitForTimeout(100);
+  // camp: the rest preview matches what resting does
+  await page.evaluate(function () { var c = SOVL.UI.campaign; c.army.entries.forEach(function (e) { var t = e.kind === 'commander' ? e.retinue : e; if (t.models > 4) t.models -= 3; }); SOVL.UI.campaignCamp({ type: 'camp' }); });
+  await page.waitForTimeout(150); await page.screenshot({ path: path.join(shots, 'f6b-camp.png') });
+  var preview = await page.$$eval('#modal-body .cp-card:first-child .cp-delta', function (d) { return d.map(function (x) { return x.textContent.split('→').map(function (n) { return +n; }); }); });
+  await page.click('#modal-body .choices button'); await page.waitForTimeout(150);
+  var after = await page.evaluate(function () { return { dawn: !!document.querySelector('#modal-body.m-dawn'), deltas: Array.from(document.querySelectorAll('#modal-body .cp-change .cp-delta')).map(function (d) { return +d.textContent; }) }; });
+  ok(after.dawn && preview.length === after.deltas.length && preview.every(function (p, i) { return p[1] - p[0] === after.deltas[i]; }), 'camp rest preview matches the result: ' + JSON.stringify({ preview: preview, after: after.deltas }));
+  await page.click('#modal.active #m-ok'); await page.waitForTimeout(100);
+  await page.evaluate(function () { SOVL.UI.campaignCamp({ type: 'camp' }); }); await page.waitForTimeout(100);
+  var drill0 = await page.evaluate(function () { var c = SOVL.UI.campaign, i = c.army.entries.findIndex(function (e) { return ((e.kind === 'commander' ? e.retinue : e).vet || 0) < 3; }); return { i: i, v: (function (e) { return (e.kind === 'commander' ? e.retinue : e).vet || 0; })(c.army.entries[i]), disabled: document.querySelector('#modal-body .cp-drill').disabled }; });
+  await page.click('#modal-body .cp-opt:nth-child(' + (drill0.i + 1) + ')'); await page.click('#modal-body .cp-drill'); await page.waitForTimeout(100);
+  var drill1 = await page.evaluate(function (i) { var e = SOVL.UI.campaign.army.entries[i]; return (e.kind === 'commander' ? e.retinue : e).vet || 0; }, drill0.i);
+  ok(drill0.disabled && drill1 === drill0.v + 1, 'drill needs a choice, then raises that unit a rank: ' + drill0.v + ' -> ' + drill1);
+  await page.click('#modal.active #m-ok'); await page.waitForTimeout(100);
   // run-over screen with history
   await page.evaluate(function () { var c = SOVL.UI.campaign; c.history.push({ act: 0, type: 'battle', enemy: 'dwarf_holds', pts: 480, won: true, draw: false, turn: 6, why: 'rout' }); c.over = true; SOVL.UI.showRunOver(); });
   await page.waitForTimeout(150); await page.screenshot({ path: path.join(shots, 'f7-runover.png') });
