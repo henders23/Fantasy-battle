@@ -82,6 +82,13 @@ Birdsong plays under the battle and wind over the campaign map. Dice are modelle
 wooden cubes bouncing on a table. Clips are built from their sources by
 `tools/build_sfx.py`; credits and licences are in `assets/sfx/CREDITS.md`.
 
+The interface is set in Cinzel and Alegreya Sans, bundled with the game (SIL Open Font
+License), so it looks the same offline. The title screen has drifting embers over the
+painting and shows the saved campaign on its Continue card. In battle, the top bar tracks
+the turn and the score, the unit profile highlights stats raised or lowered by effects,
+ranks, veterancy or items, the army strip shows each regiment's painted model with a
+strength bar, and dice show pips: gold for hits, green for saves, red for failed saves.
+
 The Trail of Death map is drawn as an old campaign chart: a parchment sheet with inked
 woods, hills, marsh, mountains and a river that change with each act, a winding road
 between the stops, wax-seal markers for each kind of stop, the route already marched in
@@ -138,6 +145,8 @@ js/models.js      painted regiment models, movement trays and the regiment image
 js/music.js       background music with crossfades
 js/sfx.js         sound effects: clip player, event mapping, ambience and synthesised dice
 js/campmap.js     the parchment campaign map
+js/theme.js       title screen and battle panel dressing
+css/theme.css     type, panels, title screen, dice and battle interface styles
 tools/build_sfx.py builds assets/sfx from the 0 A.D. and uisfx libraries
 css/experience.css illustrated edition theme and responsive layouts
 assets/          original paintings, portraits and functional sprite atlases

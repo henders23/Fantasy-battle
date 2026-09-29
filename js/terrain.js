@@ -536,7 +536,7 @@
     ctx.setLineDash([0.3, 0.22]); ctx.lineWidth = 0.08; ctx.strokeStyle = "rgba(246,228,176,0.85)";
     ctx.strokeRect(t.x, t.y, t.w, t.h); ctx.setLineDash([]);
     var name = info.name.toUpperCase();
-    ctx.font = "600 " + 11 / this.scale + 'px "IBM Plex Mono", monospace';
+    ctx.font = "600 " + 11 / this.scale + 'px "Cinzel", Georgia, serif';
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     var tw = ctx.measureText(name).width + 0.6, cx = t.x + t.w / 2, cy = t.y - 0.55;
     ctx.fillStyle = "rgba(10,14,20,0.82)"; ctx.fillRect(cx - tw / 2, cy - 0.4, tw, 0.8);

@@ -121,7 +121,7 @@
     ctx.restore();
     // floating text in screen space
     this.floaters = this.floaters.filter(function (f) { return now - f.t0 < f.dur; });
-    ctx.font = 'bold 14px "IBM Plex Mono", monospace'; ctx.textAlign = 'center';
+    ctx.font = '700 15px "Cinzel", Georgia, serif'; ctx.textAlign = 'center';
     this.floaters.forEach(function (f) {
       var t = (now - f.t0) / f.dur, p = self.toScreen(f.x, f.y);
       ctx.globalAlpha = 1 - t * t; ctx.fillStyle = f.color; ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ctx.lineWidth = 3;
@@ -226,7 +226,7 @@
     // label
     if (!this.drawRegimentLabels && (this.scale > 9 || selected || hovered)) {
       var label = (SOVL.commanderOnly(u) ? u.commander.name : u.name) + (u.models > 0 && !single ? ' ×' + u.models : ''), lp = { x: r.x, y: r.y };
-      ctx.font = '0.55px "IBM Plex Mono", monospace'; ctx.textAlign = 'center';
+      ctx.font = '600 0.6px "Alegreya Sans", sans-serif'; ctx.textAlign = 'center';
       var tw = ctx.measureText(label).width;
       ctx.fillStyle = 'rgba(0,0,0,0.55)'; roundRect(ctx, lp.x - tw / 2 - 0.15, lp.y + u.d / 2 + 0.15, tw + 0.3, 0.75, 0.12); ctx.fill();
       ctx.fillStyle = mine ? '#dfe8ff' : '#ffd7d7'; ctx.fillText(label, lp.x, lp.y + u.d / 2 + 0.72); ctx.textAlign = 'left';
