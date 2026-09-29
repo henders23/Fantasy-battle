@@ -72,8 +72,8 @@ function ok(c, m) { if (!c) { errors.push('FAIL: ' + m); console.log('FAIL: ' + 
       return { other: b.phase };
     });
     if (st.done) break;
-    if (st.prompt && !sawPrompt) { sawPrompt = true; await page.screenshot({ path: path.join(shots, 'f3-reaction.png') }); var txt = await page.$eval('#reaction-prompt', function (e) { return e.textContent; }); console.log('prompt:', txt); await page.click('#reaction-prompt button:last-child'); await page.waitForTimeout(50); continue; }
-    if (st.prompt) { await page.click('#reaction-prompt button:last-child'); await page.waitForTimeout(50); continue; }
+    if (st.prompt && !sawPrompt) { sawPrompt = true; await page.screenshot({ path: path.join(shots, 'f3-reaction.png') }); var txt = await page.$eval('#reaction-prompt', function (e) { return e.textContent; }); console.log('prompt:', txt); await page.click('#reaction-prompt button:has-text("Hold")'); await page.waitForTimeout(50); continue; }
+    if (st.prompt) { await page.click('#reaction-prompt button:has-text("Hold")'); await page.waitForTimeout(50); continue; }
     if (st.handle) sawHandle = true; if (st.faceBtn) sawFace = true; if (st.moved && st.undone) sawUndo = true;
     if (st.moved && !st.undone) errors.push('undo failed: ' + JSON.stringify(st));
     if (st.combat) { if (!st.animating) await page.click('#engagement-panel button.primary'); await page.waitForTimeout(150); continue; }
@@ -91,12 +91,16 @@ function ok(c, m) { if (!c) { errors.push('FAIL: ' + m); console.log('FAIL: ' + 
   // ---- campaign: difficulty, trait modal, honours, re-arm ----
   await page.evaluate(function () { SOVL.UI.battle = null; SOVL.UI.show('menu'); });
   await page.click('#btn-campaign'); await page.waitForTimeout(200);
+  var sfx = await page.evaluate(function () { return SOVL.UI.sfx && SOVL.UI.sfx.loaded(); });
+  ok(sfx && sfx.loaded === 99 && !sfx.missing.length, 'all sound clips decoded: ' + (sfx && sfx.loaded) + ' missing ' + (sfx && sfx.missing.join(',')));
   var diffs = await page.$$eval('#setup-difficulty option', function (o) { return o.map(function (x) { return x.value; }); });
   ok(diffs.join(',') === 'easy,normal,hard', 'difficulty select populated: ' + diffs);
   await page.selectOption('#setup-difficulty', 'hard');
   await page.click('#setup-next'); await page.waitForTimeout(300);
   await page.click('#m-ok'); await page.waitForTimeout(200);
   var camp = await page.evaluate(function () { var c = SOVL.UI.campaign; return { gold: c.gold, diff: c.difficulty, v: c.version }; });
+  var map = await page.evaluate(function () { var m = document.getElementById('camp-map'); return { canvas: !!m.querySelector('.trail-map canvas'), stops: m.querySelectorAll('.trail-map .node.avail').length, svg: !!m.querySelector('svg') }; });
+  ok(map.canvas && map.stops > 0 && !map.svg, 'campaign map drawn as a chart with reachable stops: ' + JSON.stringify(map));
   ok(camp.gold === 110 && camp.diff === 'hard', 'hard campaign gold/difficulty: ' + JSON.stringify(camp));
   // trait modal
   await page.evaluate(function () { SOVL.UI.campaign.pendingTrait = true; SOVL.UI.traitModal(); });

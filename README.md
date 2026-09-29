@@ -73,9 +73,23 @@ Two orchestral themes play in the background: a brooding march on the menus and 
 campaign trail, and a battle theme on the field. They crossfade between screens and fade
 at each loop. Browsers only allow audio after the first click or key press.
 
-The **Guide** explains each phase. **Settings** controls music and its volume, optional
-synthesized battle sounds, enemy action speed, motion and persistent unit labels. Sound is off initially and starts
-only after it is enabled by the player. Settings and campaign saves stay on the device.
+Battle sounds are recorded effects drawn from open libraries: sword clashes, spear
+thrusts, shield blocks, bow releases, arrows in flight and striking home, handguns,
+bolt throwers and stone throwers, marching feet, galloping horses, war horns and fanfares
+from 0 A.D. (CC BY-SA 3.0), and interface sounds from uisfx (CC0). Each event picks the
+sound that fits the unit's weapon and mount, with small variations in pitch and level.
+Birdsong plays under the battle and wind over the campaign map. Dice are modelled as small
+wooden cubes bouncing on a table. Clips are built from their sources by
+`tools/build_sfx.py`; credits and licences are in `assets/sfx/CREDITS.md`.
+
+The Trail of Death map is drawn as an old campaign chart: a parchment sheet with inked
+woods, hills, marsh, mountains and a river that change with each act, a winding road
+between the stops, wax-seal markers for each kind of stop, the route already marched in
+red ink, and a banner where the army stands.
+
+The **Guide** explains each phase. **Settings** controls music and effects (each with its
+own volume), enemy action speed, motion and persistent unit labels. Audio starts after
+the first click or key press. Settings and campaign saves stay on the device.
 Layouts adapt to smaller screens; on phones, the orders panels appear below the field.
 
 ## Rules
@@ -122,6 +136,9 @@ js/terrain.js     procedural relief terrain (heightmap, lighting, shadows), pain
 js/tokens.js      painted tokens for monsters, chariots, the dreadnought and war machines
 js/models.js      painted regiment models, movement trays and the regiment image cache
 js/music.js       background music with crossfades
+js/sfx.js         sound effects: clip player, event mapping, ambience and synthesised dice
+js/campmap.js     the parchment campaign map
+tools/build_sfx.py builds assets/sfx from the 0 A.D. and uisfx libraries
 css/experience.css illustrated edition theme and responsive layouts
 assets/          original paintings, portraits and functional sprite atlases
 test/sim.js       headless rules tests and AI-vs-AI simulations (node test/sim.js [games] [seed])

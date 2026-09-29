@@ -67,7 +67,7 @@ function expect(c, msg) { checks++; if (!c) { errors.push('CHECK FAILED: ' + msg
         var sel = await page.evaluate(function () { return { sel: SOVL.UI.sel, targets: SOVL.UI.targets.length }; });
         expect(sel.sel === pair.uid && sel.targets > 0, 'charge phase: unit selected with targets');
         await page.mouse.click(box.x + pair.tx, box.y + pair.ty); await page.waitForTimeout(80);
-        var declared = await page.evaluate(function (uid) { var b = SOVL.UI.battle; return b.charges.some(function (c) { return c.charger === uid; }) || b.phase !== 'charge'; }, pair.uid);
+        var declared = await page.evaluate(function (uid) { var b = SOVL.UI.battle, u = b.unit(uid); /* the AI may already have intercepted the charger, which cancels its charge */ var intercepted = u && JSON.stringify(b.log.slice(-6)).indexOf('intercepts ' + u.name) >= 0; return b.charges.some(function (c) { return c.charger === uid; }) || b.phase !== 'charge' || intercepted; }, pair.uid);
         expect(declared, 'charge declared by clicking target'); didCharge = didCharge || declared;
       } else { await page.keyboard.press('Enter'); await page.waitForTimeout(60); }
       continue;
@@ -80,7 +80,7 @@ function expect(c, msg) { checks++; if (!c) { errors.push('CHECK FAILED: ' + msg
         var act = await page.evaluate(function () { return SOVL.UI.battle.activeUnit; });
         expect(act === pick.uid, 'clicking own unit activates it');
         // move preview + click ground 5" ahead-left
-        var ground = await page.evaluate(function (uid) { var UI = SOVL.UI, b = UI.battle, u = b.unit(uid), r = UI.renderer; var f = SOVL.G.fwd(u.a); var w = { x: u.x + f.x * 4 + 1, y: u.y + f.y * 4 }; var p = r.toScreen(w.x, w.y); return { sx: p.x, sy: p.y, onUnit: !!r.unitAt(b, w), canMove: u.moveLeft > 0 && w.x > 1 && w.y > 1 && w.x < SOVL.TABLE.w - 1 && w.y < SOVL.TABLE.h - 1 }; }, pick.uid);
+        var ground = await page.evaluate(function (uid) { var UI = SOVL.UI, b = UI.battle, u = b.unit(uid), r = UI.renderer; var f = SOVL.G.fwd(u.a); var w = { x: u.x + f.x * 4 + 1, y: u.y + f.y * 4 }; var p = r.toScreen(w.x, w.y); var cr = document.getElementById('battle-canvas').getBoundingClientRect(), hit = document.elementFromPoint(cr.x + p.x, cr.y + p.y); return { sx: p.x, sy: p.y, onUnit: !!r.unitAt(b, w) || !hit || hit.id !== 'battle-canvas', canMove: u.moveLeft > 0 && w.x > 1 && w.y > 1 && w.x < SOVL.TABLE.w - 1 && w.y < SOVL.TABLE.h - 1 }; }, pick.uid);
         await page.mouse.move(box.x + ground.sx, box.y + ground.sy); await page.waitForTimeout(60);
         var pv = await page.evaluate(function () { return SOVL.UI.preview ? SOVL.UI.preview.ok : null; });
         if (!ground.onUnit && ground.canMove) expect(pv !== null, 'move preview shown on hover');

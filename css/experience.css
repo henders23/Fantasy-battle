@@ -1502,3 +1502,62 @@ body.reduce-motion *:after {
 body.reduce-motion #phase-banner.show {
   display: none;
 }
+
+/* Trail of Death map: a parchment chart drawn on canvas, with real buttons over reachable stops */
+.trail-map {
+  position: relative;
+  margin: 6px auto 18px;
+}
+.trail-map canvas {
+  display: block;
+}
+.trail-map .node.avail {
+  position: absolute;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+}
+.trail-map .node.avail:hover {
+  background: transparent;
+}
+.trail-map .node.avail:focus-visible {
+  outline: 3px solid #f0c75e;
+  outline-offset: 2px;
+}
+#screen-campaign .topbar {
+  flex-wrap: wrap;
+}
+@media (max-width: 700px) {
+  #screen-campaign .page {
+    overflow-x: hidden;
+  }
+  #screen-campaign .body {
+    min-width: 0;
+  }
+  #camp-map {
+    width: 100%;
+  }
+}
+/* the map carries its own act cartouche; the heading keeps only the instruction */
+#camp-map .campaign-heading {
+  position: static;
+  background: none;
+  padding: 14px 20px 2px;
+}
+#camp-map .campaign-heading .eyebrow,
+#camp-map .campaign-heading h3 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+#camp-map .campaign-heading p {
+  margin: 0;
+}

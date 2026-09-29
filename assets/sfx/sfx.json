@@ -1,0 +1,183 @@
+{
+ "alarm_horn": [
+  "alarm_horn_1.mp3"
+ ],
+ "amb_field": [
+  "amb_field_1.mp3"
+ ],
+ "amb_wind": [
+  "amb_wind_1.mp3"
+ ],
+ "arrow": [
+  "arrow_1.mp3",
+  "arrow_2.mp3",
+  "arrow_3.mp3",
+  "arrow_4.mp3"
+ ],
+ "arrow_hit": [
+  "arrow_hit_1.mp3",
+  "arrow_hit_2.mp3",
+  "arrow_hit_3.mp3",
+  "arrow_hit_4.mp3",
+  "arrow_hit_5.mp3"
+ ],
+ "arrow_miss": [
+  "arrow_miss_1.mp3",
+  "arrow_miss_2.mp3",
+  "arrow_miss_3.mp3",
+  "arrow_miss_4.mp3"
+ ],
+ "ballista": [
+  "ballista_1.mp3",
+  "ballista_2.mp3"
+ ],
+ "bow": [
+  "bow_1.mp3",
+  "bow_2.mp3",
+  "bow_3.mp3",
+  "bow_4.mp3"
+ ],
+ "catapult": [
+  "catapult_1.mp3"
+ ],
+ "clash": [
+  "clash_1.mp3",
+  "clash_2.mp3",
+  "clash_3.mp3",
+  "clash_4.mp3",
+  "clash_5.mp3",
+  "clash_6.mp3"
+ ],
+ "coin": [
+  "coin_1.mp3"
+ ],
+ "death": [
+  "death_1.mp3",
+  "death_2.mp3",
+  "death_3.mp3",
+  "death_4.mp3",
+  "death_5.mp3",
+  "death_6.mp3"
+ ],
+ "defeat": [
+  "defeat_1.mp3"
+ ],
+ "fire": [
+  "fire_1.mp3",
+  "fire_2.mp3"
+ ],
+ "flesh": [
+  "flesh_1.mp3",
+  "flesh_2.mp3",
+  "flesh_3.mp3",
+  "flesh_4.mp3",
+  "flesh_5.mp3",
+  "flesh_6.mp3"
+ ],
+ "gallop": [
+  "gallop_1.mp3",
+  "gallop_2.mp3",
+  "gallop_3.mp3",
+  "gallop_4.mp3",
+  "gallop_5.mp3",
+  "gallop_6.mp3"
+ ],
+ "gun": [
+  "gun_1.mp3",
+  "gun_2.mp3",
+  "gun_3.mp3"
+ ],
+ "hero_dead": [
+  "hero_dead_1.mp3"
+ ],
+ "horn": [
+  "horn_1.mp3",
+  "horn_2.mp3",
+  "horn_3.mp3"
+ ],
+ "horse_death": [
+  "horse_death_1.mp3",
+  "horse_death_2.mp3"
+ ],
+ "level_up": [
+  "level_up_1.mp3"
+ ],
+ "march": [
+  "march_1.mp3",
+  "march_2.mp3",
+  "march_3.mp3"
+ ],
+ "neigh": [
+  "neigh_1.mp3",
+  "neigh_2.mp3",
+  "neigh_3.mp3"
+ ],
+ "reward": [
+  "reward_1.mp3"
+ ],
+ "run": [
+  "run_1.mp3"
+ ],
+ "shield": [
+  "shield_1.mp3",
+  "shield_2.mp3",
+  "shield_3.mp3",
+  "shield_4.mp3",
+  "shield_5.mp3",
+  "shield_6.mp3"
+ ],
+ "spell": [
+  "spell_1.mp3",
+  "spell_2.mp3",
+  "spell_3.mp3"
+ ],
+ "swing": [
+  "swing_1.mp3",
+  "swing_2.mp3",
+  "swing_3.mp3",
+  "swing_4.mp3"
+ ],
+ "thrust": [
+  "thrust_1.mp3",
+  "thrust_2.mp3",
+  "thrust_3.mp3",
+  "thrust_4.mp3"
+ ],
+ "travel": [
+  "travel_1.mp3"
+ ],
+ "turn": [
+  "turn_1.mp3"
+ ],
+ "ui_back": [
+  "ui_back_1.mp3"
+ ],
+ "ui_close": [
+  "ui_close_1.mp3"
+ ],
+ "ui_drop": [
+  "ui_drop_1.mp3"
+ ],
+ "ui_error": [
+  "ui_error_1.mp3"
+ ],
+ "ui_open": [
+  "ui_open_1.mp3"
+ ],
+ "ui_press": [
+  "ui_press_1.mp3"
+ ],
+ "ui_select": [
+  "ui_select_1.mp3"
+ ],
+ "ui_tick": [
+  "ui_tick_1.mp3",
+  "ui_tick_2.mp3"
+ ],
+ "ui_toggle": [
+  "ui_toggle_1.mp3"
+ ],
+ "victory": [
+  "victory_1.mp3"
+ ]
+}

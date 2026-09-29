@@ -179,7 +179,7 @@ kbd { background: #2a2e25; border: 1px solid #555; border-radius: 3px; padding: 
 @keyframes dice-shake { 0% { transform: rotate(-8deg) translateY(-1px); } 50% { transform: rotate(8deg) translateY(1px); } 100% { transform: rotate(-4deg); } }
 
 /* charge reaction prompt */
-#reaction-prompt { position: absolute; left: 14px; top: 14px; z-index: 21; background: rgba(12,14,11,0.96); border: 1px solid #b8901c; border-radius: 6px; padding: 8px 10px; width: 250px; box-shadow: 0 10px 30px rgba(0,0,0,0.6); font-size: 12px; }
+#reaction-prompt { margin: 10px 10px 0; background: rgba(40,30,8,0.92); border: 1px solid #d4a52a; border-radius: 6px; padding: 10px 12px; box-shadow: 0 0 0 3px rgba(212,165,42,0.18), 0 8px 24px rgba(0,0,0,0.5); font-size: 13px; }
 #reaction-prompt[hidden] { display: none; }
 #reaction-prompt .rp-title { font-family: var(--head); color: var(--accent); font-size: 13px; margin-bottom: 4px; }
 #reaction-prompt .rp-sub { color: var(--muted); font-size: 11px; margin-bottom: 8px; line-height: 1.4; }

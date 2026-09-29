@@ -51,7 +51,8 @@
   };
   var stored = safelyRead("sovl-experience-settings") || {};
   UI.settings = {
-    sound: stored.sound === true,
+    sound: stored.sound !== false,
+    soundVolume: ["low", "medium", "high"].indexOf(stored.soundVolume) >= 0 ? stored.soundVolume : "medium",
     music: stored.music !== false,
     musicVolume: ["low", "medium", "high"].indexOf(stored.musicVolume) >= 0 ? stored.musicVolume : "medium",
     motion: stored.motion !== false,
@@ -82,92 +83,8 @@
     }
   };
 
-  // Short, quiet impact cues. Sound starts only after the player enables it.
-  var audioContext = null,
-    noise = null;
-  UI.sound = function (kind) {
-    if (!UI.settings.sound || document.hidden) return;
-    try {
-      var AC = window.AudioContext || window.webkitAudioContext;
-      if (!AC) return;
-      if (!audioContext) audioContext = new AC();
-      if (audioContext.state === "suspended")
-        audioContext.resume().catch(function () {});
-      var t = audioContext.currentTime,
-        impact = kind === "combat" || kind === "destroy",
-        dur = impact ? 0.36 : kind === "shoot" ? 0.15 : kind === "horn" ? 0.7 : kind === "dice" ? 0.2 : 0.1;
-      if (kind === "dice") { diceRattle(t); return; }
-      var gain = audioContext.createGain();
-      gain.gain.setValueAtTime(0.0001, t);
-      gain.gain.exponentialRampToValueAtTime(impact ? 0.12 : 0.05, t + 0.005);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      gain.connect(audioContext.destination);
-      var osc = audioContext.createOscillator();
-      osc.type = kind === "horn" ? "sawtooth" : "triangle";
-      if (kind === "horn") {
-        gain.gain.cancelScheduledValues(t);
-        gain.gain.setValueAtTime(0.0001, t);
-        gain.gain.exponentialRampToValueAtTime(0.07, t + 0.12);
-        gain.gain.setValueAtTime(0.07, t + 0.45);
-        gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-        osc.frequency.setValueAtTime(156, t);
-        osc.frequency.linearRampToValueAtTime(208, t + 0.16);
-        osc.frequency.setValueAtTime(208, t + 0.4);
-        osc.frequency.linearRampToValueAtTime(196, t + dur);
-        var lp = audioContext.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 900;
-        osc.connect(lp); lp.connect(gain); osc.start(t); osc.stop(t + dur);
-        return;
-      }
-      osc.frequency.setValueAtTime(
-        impact ? 125 : kind === "phase" ? 220 : 175,
-        t,
-      );
-      osc.frequency.exponentialRampToValueAtTime(impact ? 45 : 85, t + dur);
-      osc.connect(gain);
-      osc.start(t);
-      osc.stop(t + dur);
-      if (impact || kind === "shoot") {
-        if (!noise) {
-          noise = audioContext.createBuffer(
-            1,
-            Math.floor(audioContext.sampleRate * 0.4),
-            audioContext.sampleRate,
-          );
-          var data = noise.getChannelData(0);
-          for (var i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-        }
-        var source = audioContext.createBufferSource(),
-          filter = audioContext.createBiquadFilter();
-        source.buffer = noise;
-        filter.type = "lowpass";
-        filter.frequency.value = kind === "shoot" ? 2200 : 1300;
-        source.connect(filter);
-        filter.connect(gain);
-        source.start(t);
-        source.stop(t + dur);
-      }
-    } catch (e) {
-      /* Audio availability never blocks an order. */
-    }
-  };
-  // Three quick clicks of noise: dice shaken and thrown.
-  function diceRattle(t) {
-    if (!noise) {
-      noise = audioContext.createBuffer(1, Math.floor(audioContext.sampleRate * 0.4), audioContext.sampleRate);
-      var d = noise.getChannelData(0);
-      for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-    }
-    for (var k = 0; k < 3; k++) {
-      var at = t + k * 0.055 + Math.random() * 0.01, g = audioContext.createGain();
-      g.gain.setValueAtTime(0.0001, at);
-      g.gain.exponentialRampToValueAtTime(k === 2 ? 0.09 : 0.05, at + 0.004);
-      g.gain.exponentialRampToValueAtTime(0.0001, at + (k === 2 ? 0.09 : 0.04));
-      var src = audioContext.createBufferSource(), f = audioContext.createBiquadFilter();
-      src.buffer = noise; f.type = "bandpass"; f.frequency.value = 2600 + k * 500; f.Q.value = 1.2;
-      src.connect(f); f.connect(g); g.connect(audioContext.destination);
-      src.start(at); src.stop(at + 0.1);
-    }
-  }
+  // Sound effects live in js/sfx.js; this placeholder keeps early calls harmless.
+  UI.sound = function () {};
   UI.showSettings = function () {
     var box = elem("div");
     box.appendChild(elem("h2", null, "Battle settings"));
@@ -195,6 +112,18 @@
       function (v) {
         UI.settings.sound = v === "on";
         UI.sound("select");
+      },
+    );
+    setting(
+      "Effects volume",
+      [
+        ["low", "Low"],
+        ["medium", "Medium"],
+        ["high", "High"],
+      ],
+      UI.settings.soundVolume,
+      function (v) {
+        UI.settings.soundVolume = v;
       },
     );
     setting(
@@ -862,10 +791,8 @@
       if (ev.type === "move") {
         UI.lessons = UI.lessons || {};
         UI.lessons.move = true;
-        UI.sound("move");
       }
       if (ev.type === "shoot") {
-        UI.sound("shoot");
         var t =
           b.unit(ev.to) ||
           b.dead.find(function (u) {
@@ -873,12 +800,8 @@
           });
         if (t && ev.wounds) UI.renderer.addImpact(t.x, t.y, "#e8c397");
       }
-      if (ev.type === "destroy") UI.sound("destroy");
       if (ev.type === "engagementResolved" && b.phase === "combat")
         UI.finishEngagement(ev.report);
-      if (ev.type === "roll") UI.sound("dice");
-      if (ev.type === "charge") UI.sound("horn");
-      if (ev.type === "declare" && b.unit(ev.from) && b.unit(ev.from).side !== UI.playerSide) UI.sound("horn");
       if (ev.type === "phase") {
         var key = ev.turn + ":" + ev.phase;
         if (UI.lastPhaseKey !== key) {
@@ -914,7 +837,6 @@
               banner.classList.remove("show");
             }, 2900);
           }
-          UI.sound("phase");
         }
       }
     });
