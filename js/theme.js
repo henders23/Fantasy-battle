@@ -146,10 +146,11 @@
 
   // ---------- army strip: painted thumbnails ----------
   var thumbs = {};
-  function thumbFor(u) {
-    var cmdOnly = SOVL.commanderOnly(u), key = [u.faction, u.id, u.weapon, u.ranged, cmdOnly ? u.commander.def.id : "", u.commander && u.commander.alive ? 1 : 0].join("|");
+  function thumbFor(u, W, H) {
+    W = W || 50; H = H || 58;
+    var cmdOnly = SOVL.commanderOnly(u), key = [u.faction, u.id, u.weapon, u.ranged, cmdOnly ? u.commander.def.id : "", u.commander && u.commander.alive ? 1 : 0, W, H].join("|");
     if (thumbs[key]) return thumbs[key];
-    var d = Math.min(2, window.devicePixelRatio || 1), W = 50, H = 58, cv = document.createElement("canvas");
+    var d = Math.min(2, window.devicePixelRatio || 1), cv = document.createElement("canvas");
     cv.width = W * d; cv.height = H * d;
     var g = cv.getContext("2d"), P = SOVL.Renderer.prototype;
     var type = cmdOnly ? u.commander.def.type : u.type, info = SOVL.UNIT_TYPES[type] || SOVL.UNIT_TYPES.Infantry, bw = info.base[0] * SOVL.MM, bd = info.base[1] * SOVL.MM;
@@ -161,6 +162,20 @@
     thumbs[key] = cv;
     return cv;
   }
+  // A stand-in unit built from a faction list entry, so screens outside battle can show models.
+  function unitFromDef(fid, id, opts) {
+    opts = opts || {};
+    var def = SOVL.findUnitDef(fid, id); if (!def) return null;
+    var weapon = opts.weapon || (def.weapons[0] && def.weapons[0].name) || "Hand Weapon", ranged = opts.ranged || (def.ranged && def.ranged[0] && def.ranged[0].name) || null;
+    var h = 0; for (var i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+    return { uid: 10000 + (h % 50000), faction: fid, id: def.id, def: def, name: def.name, type: def.type, weapon: weapon, ranged: ranged, props: (def.props || []).slice(), models: def.per ? Math.max(3, def.size[0]) : 1, maxModels: def.per ? def.size[1] : 1, files: 3, commander: null, banner: null, a: -Math.PI / 2 };
+  }
+  // Paint a copy of a cached thumbnail into a fresh canvas element.
+  function thumbCanvas(src, cls) {
+    var cv = document.createElement("canvas"); cv.className = cls || "thumb"; cv.width = src.width; cv.height = src.height; cv.setAttribute("aria-hidden", "true");
+    cv.getContext("2d").drawImage(src, 0, 0); return cv;
+  }
+  SOVL.Thumbs = { unit: thumbFor, fromDef: unitFromDef, canvas: thumbCanvas, forDef: function (fid, id, W, H, opts) { var u = unitFromDef(fid, id, opts); return u ? thumbCanvas(thumbFor(u, W, H)) : null; } };
   var roster = UI.renderRoster;
   UI.renderRoster = function () {
     var r = roster.apply(UI, arguments), b = UI.battle;

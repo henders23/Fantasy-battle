@@ -89,6 +89,15 @@ the turn and the score, the unit profile highlights stats raised or lowered by e
 ranks, veterancy or items, the army strip shows each regiment's painted model with a
 strength bar, and dice show pips: gold for hits, green for saves, red for failed saves.
 
+The army builder lays each section out as a grid of cards with the unit's painted model,
+stats and options, and a points gauge that turns green near the limit and red over it.
+Army entries show their model, and options are labelled fields. On the campaign screen the
+top bar tracks progress through the act, the roster shows each unit's model, strength and
+veterancy, and the log reads as a parchment chronicle. Battle briefings set the two armies
+side by side with a points comparison; the merchant shows wares as cards with models or
+icons; events appear as parchment scrolls; and camp, trait and run-over dialogs each have
+their own look.
+
 The Trail of Death map is drawn as an old campaign chart: a parchment sheet with inked
 woods, hills, marsh, mountains and a river that change with each act, a winding road
 between the stops, wax-seal markers for each kind of stop, the route already marched in
@@ -147,6 +156,8 @@ js/sfx.js         sound effects: clip player, event mapping, ambience and synthe
 js/campmap.js     the parchment campaign map
 js/theme.js       title screen and battle panel dressing
 css/theme.css     type, panels, title screen, dice and battle interface styles
+js/screens.js     army builder and campaign screen dressing
+css/screens.css   army builder, campaign screen and campaign dialog styles
 tools/build_sfx.py builds assets/sfx from the 0 A.D. and uisfx libraries
 css/experience.css illustrated edition theme and responsive layouts
 assets/          original paintings, portraits and functional sprite atlases
