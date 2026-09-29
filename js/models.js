@@ -461,14 +461,17 @@
     // commanders who share a regiment's base size are painted on it; others keep the unit's model
     if (cmd && !cmdOnly) { var ct = cmd.def.type; if (ct !== u.type && !(ct === "Infantry" && u.type === "Infantry Large")) cmd = null; }
     // model space is the screen turned by th, so the sun sits at SUN - th there; quantise th to 45 degrees
-    var th = (u._ra != null ? u._ra : u.a) + Math.PI / 2, bucket = ((Math.round(th / (Math.PI / 4)) % 8) + 8) % 8;
+    // while a unit turns, light it for its final facing so no sprites are painted mid-turn
+    var th = (u._tw ? u.a : u._ra != null ? u._ra : u.a) + Math.PI / 2, bucket = ((Math.round(th / (Math.PI / 4)) % 8) + 8) % 8;
     var seed = u.uid * 131 + rank * 17 + file, v = Math.floor(hash(seed, 3) * 3);
     var ppi = levelFor(r); // the sprite resolution closest above what the screen shows, like a mipmap
     var sp = spriteFor(u, role, v, rank, bw, bd, bucket, cmd && (cmdOnly || role === "cmd") ? { def: cmd.def, weapon: cmd.weapon, ranged: cmd.ranged, props: cmd.props || [], mount: cmdOnly && /Cavalry/.test(cmd.def.type) } : null, ppi);
     if (sp === "failed") return null;
     var jr = (hash(seed, 13) - 0.5) * 0.14;
     if (u.fleeing) jr += (hash(seed, 17) - 0.5) * 0.8;
-    return { sp: sp, jx: (hash(seed, 7) - 0.5) * bw * 0.08, jy: (hash(seed, 11) - 0.5) * bd * 0.06, jr: jr, exact: sp.bucket === bucket };
+    var jx = (hash(seed, 7) - 0.5) * bw * 0.08, jy = (hash(seed, 11) - 0.5) * bd * 0.06;
+    if (SOVL.FX && SOVL.FX.animating(u)) { var po = SOVL.FX.pose(u, rank, file, bw, bd); jx += po.x; jy += po.y; jr += po.r; }
+    return { sp: sp, jx: jx, jy: jy, jr: jr, exact: sp.bucket === bucket };
   }
   function stamp(ctx, m) {
     ctx.save(); ctx.translate(m.jx, m.jy); ctx.rotate(m.jr);
@@ -476,7 +479,11 @@
     ctx.restore();
   }
   P.drawModelSprite = function (ctx, u, bw, bd, rank, file, files) {
-    if (SOVL.isSingle(u.type) && !SOVL.commanderOnly(u)) return previous ? previous.call(this, ctx, u, bw, bd) : false;
+    if (SOVL.isSingle(u.type) && !SOVL.commanderOnly(u)) {
+      if (!previous) return false;
+      if (SOVL.FX && SOVL.FX.animating(u)) { var po = SOVL.FX.pose(u, 0, 0, bw, bd); ctx.save(); ctx.translate(po.x, po.y * 0.6); ctx.rotate(po.r * 0.5); try { return previous.call(this, ctx, u, bw, bd); } finally { ctx.restore(); } }
+      return previous.call(this, ctx, u, bw, bd);
+    }
     var m = modelSprite(this, u, bw, bd, rank || 0, file || 0, files || 1);
     if (!m) return previous ? previous.call(this, ctx, u, bw, bd) : false;
     stamp(ctx, m);
@@ -486,6 +493,7 @@
   // re-baked only when its models, formation, light direction or zoom level change.
   P.drawRegiment = function (ctx, u, rect, bw, bd, files, rk, count) {
     if (SOVL.isSingle(u.type) && !SOVL.commanderOnly(u)) return false;
+    if (SOVL.FX && SOVL.FX.animating(u)) return false; // moving or fighting: draw each model with its pose
     var th = rect.a + Math.PI / 2, bucket = ((Math.round(th / (Math.PI / 4)) % 8) + 8) % 8, ppi = levelFor(this);
     var cmdStar = u.commander && u.commander.alive && !SOVL.commanderOnly(u);
     var key = [count, files, rk, bucket, ppi, cmdStar ? 1 : 0, u.fleeing ? 1 : 0, u.banner ? 1 : 0, bw.toFixed(2), bd.toFixed(2)].join("|");

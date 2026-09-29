@@ -100,6 +100,7 @@
     // units: animate render positions
     battle.units.forEach(function (u) {
       if (u._rx == null) { u._rx = u.x; u._ry = u.y; u._ra = u.a; }
+      if (u._tw) return; // a timed tween (js/fx.js) is driving this unit
       var k = this.reduceMotion ? 1 : 1 - Math.pow(0.001, dt);
       u._rx += (u.x - u._rx) * k; u._ry += (u.y - u._ry) * k; u._ra += G.angleDiff(u._ra, u.a) * k;
     }, this);

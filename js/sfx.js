@@ -215,7 +215,7 @@
       }
       case "shoot":
         // the bow, gun or engine sounded when the hit dice were rolled; now the missiles land
-        impacts(unitOf(b, ev.to), ev, 0.2);
+        if (!SOVL.FX) impacts(unitOf(b, ev.to), ev, 0.2); // with js/fx.js the missiles sound as they land
         break;
       case "move":
         u = unitOf(b, ev.uid);

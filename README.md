@@ -69,6 +69,27 @@ slightly and are shaded by the same sun as the terrain. Sprites are cached in at
 at three resolutions, and each regiment is baked into one image that is redrawn only when
 it loses models, changes formation or turns through the light.
 
+Regiments move across the table instead of jumping. A move pivots first, then marches at
+a pace set by the unit type: infantry step with a slight stride, cavalry trot faster, and
+war machines trundle slowly. Moving units raise dust. Charges accelerate into contact and
+hit with a burst of dust and sparks. The front ranks lunge forward and the target is
+knocked back. Missiles fly from the shooters to their target, each drawn to suit its
+weapon, with a shadow on the ground:
+
+- arrows arc through the air;
+- bolts fly flat;
+- handgun shots leave tracers and muzzle smoke;
+- cannonballs, mortar shells and thrown stones shake the field where they land;
+- spears are thrown;
+- fire and steam are sprayed;
+- bombs are lobbed;
+- magic flies as glowing orbs.
+
+Hits and misses land where the dice say. In melee, sparks mark each blow along the contact
+line. Saved wounds glance off shields, and failed saves spill blood (or bone dust from the
+undead). Fallen models tip over, darken and fade, leaving a stain. Combat numbers pop and
+rise over the field. The **Motion** setting turns animation and effects off.
+
 Two orchestral themes play in the background: a brooding march on the menus and the
 campaign trail, and a battle theme on the field. They crossfade between screens and fade
 at each loop. Browsers only allow audio after the first click or key press.
@@ -145,6 +166,7 @@ js/army.js        army costs, validation, random armies, terrain generation
 js/ai.js          the AI opponent
 js/campaign.js    Trail of Death campaign model
 js/render.js      canvas renderer
+js/fx.js          battle animation and effects (tweens, strides, lunges, casualties, missiles, particles)
 js/ui.js          screens, input, campaign flow
 js/experience.js  title, onboarding, orders, interactive combat and accessibility
 js/visuals.js     artwork, formation labels, previews and impact effects

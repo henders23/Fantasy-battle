@@ -483,7 +483,7 @@
     evs.forEach(function (ev) {
       var u = b.unit(ev.uid || ev.from) || findDead(ev.uid || ev.from);
       switch (ev.type) {
-        case 'shoot': { var f = b.unit(ev.from), t = b.unit(ev.to) || findDead(ev.to); if (f && t) { for (var i = 0; i < Math.min(6, Math.max(1, ev.hits)); i++) r.addProjectile({ x: f.x + (Math.random() - 0.5) * f.w, y: f.y + (Math.random() - 0.5) * f.d }, { x: t.x + (Math.random() - 0.5) * t.w, y: t.y + (Math.random() - 0.5) * t.d }, f.side === UI.playerSide ? '#cfe6ff' : '#ffd0d0', 380 + i * 60); if (!ev.hits) r.addFloater(t.x, t.y - 1, 'miss', '#ccc'); } break; }
+        case 'shoot': { var t = b.unit(ev.to) || findDead(ev.to); if (t && !ev.hits) r.addFloater(t.x, t.y - 1, 'miss', '#ccc'); break; } // missiles are drawn by js/fx.js
         case 'wounds': { var wu = b.unit(ev.uid) || findDead(ev.uid); if (wu) r.addFloater(wu.x, wu.y - 1, ev.wounds ? '-' + ev.wounds + (ev.killed ? ' (' + ev.killed + ' slain)' : '') : 'no wounds', ev.wounds ? '#ff8080' : '#ccc'); break; }
         case 'seq': UI.diceSeq(ev); break;
         case 'seqEnd': UI.diceIdle(); break;

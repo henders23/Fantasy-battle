@@ -798,7 +798,6 @@
           b.dead.find(function (u) {
             return u.uid === ev.to;
           });
-        if (t && ev.wounds) UI.renderer.addImpact(t.x, t.y, "#e8c397");
       }
       if (ev.type === "engagementResolved" && b.phase === "combat")
         UI.finishEngagement(ev.report);
