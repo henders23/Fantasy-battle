@@ -99,7 +99,7 @@
     ctx.strokeRect(t.x, t.y, t.w, t.h);
     ctx.setLineDash([]);
     var name = SOVL.TERRAIN_TYPES[t.kind].name.toUpperCase();
-    ctx.font = "600 " + 11 / this.scale + 'px "Alegreya Sans", "Segoe UI", sans-serif';
+    ctx.font = "600 " + 11 / this.scale + 'px "Barlow", "Segoe UI", sans-serif';
     ctx.textAlign = "center";
     var textWidth = ctx.measureText(name).width;
     ctx.fillStyle = "rgba(12,22,24,.82)";
@@ -224,7 +224,7 @@
     if (st.preview && u && st.preview.ok) {
       var pv = st.preview;
       ctx.save();
-      ctx.font = 12 / this.scale + 'px "Alegreya Sans", "Segoe UI", sans-serif';
+      ctx.font = 12 / this.scale + 'px "Barlow", "Segoe UI", sans-serif';
       ctx.textAlign = "center";
       var label =
         pv.cost.toFixed(1) +
@@ -346,7 +346,7 @@
       ctx.textAlign = "left";
       ctx.fillText(text, x + 9, y + 17);
       if (selected && state) {
-        ctx.font = '10px "Alegreya Sans", "Segoe UI", sans-serif';
+        ctx.font = '10px "Barlow", "Segoe UI", sans-serif';
         ctx.fillStyle = u.fleeing ? "#ffb4a4" : "#e1cda6";
         ctx.fillText(state, x + 9, y + 32);
       }
@@ -359,7 +359,7 @@
     });
     if (this.moveLabel) {
       var l = this.moveLabel;
-      ctx.font = '600 13px "Alegreya Sans", "Segoe UI", sans-serif';
+      ctx.font = '600 13px "Barlow", "Segoe UI", sans-serif';
       var w = ctx.measureText(l.text).width + 18;
       ctx.fillStyle = "#0a1724f2";
       ctx.fillRect(l.x - w / 2, l.y - 17, w, 24);

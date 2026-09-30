@@ -377,7 +377,7 @@
       var rise = (1 - Math.pow(1 - Math.min(1, p * 1.4), 3)) * 34, a = p > 0.65 ? 1 - (p - 0.65) / 0.35 : 1;
       var size = f.big ? 18 : 15;
       ctx.save(); ctx.globalAlpha = a; ctx.translate(s.x, s.y - rise - f.stack * 18); ctx.scale(pop, pop);
-      ctx.font = "700 " + size + 'px "Cinzel", Georgia, serif'; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.font = "700 " + size + 'px "Marcellus SC", "Barlow Semi Condensed", Georgia, serif'; ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.lineJoin = "round"; ctx.lineWidth = 4; ctx.strokeStyle = "rgba(8,6,4,0.85)"; ctx.strokeText(f.text, 0, 0);
       ctx.fillStyle = f.color; ctx.fillText(f.text, 0, 0);
       ctx.restore();

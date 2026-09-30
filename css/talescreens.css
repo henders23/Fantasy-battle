@@ -20,7 +20,7 @@
 #modal-body.m-tale h2 { margin: 6px 0 0; font-size: 30px; color: #6e1f16; letter-spacing: 0.04em; }
 #modal-body.m-tale h2:after { content: "❦"; display: block; margin: 6px auto 0; font-size: 16px; color: #8a6a33; }
 #modal-body.m-tale .text { margin: 10px auto 0; max-width: 560px; font-size: 18px; line-height: 1.6; font-style: italic; color: #3a2a16; }
-#modal-body.m-tale .tl-story:first-letter { float: left; margin: 4px 8px 0 0; font-family: "Cinzel Decorative", var(--head); font-style: normal; font-size: 46px; line-height: 0.8; color: #6e1f16; }
+#modal-body.m-tale .tl-story:first-letter { float: left; margin: 4px 8px 0 0; font-family: var(--head); font-style: normal; font-size: 46px; line-height: 0.8; color: #6e1f16; }
 .tl-story { text-align: left; }
 .tl-choices { display: flex; flex-direction: column; gap: 10px; margin-top: 22px !important; }
 #modal-body.m-tale .tl-choice { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; padding: 12px 16px; text-align: left; border-radius: 4px;
@@ -73,7 +73,7 @@ body.reduce-motion .tr-sparks { display: none; }
 @media (prefers-reduced-motion: reduce) { .tr-lid { animation: none; transform: rotate(-24deg) translate(-4px, -10px); } .tr-rays { animation: none; opacity: 1; } .tr-sparks { display: none; } }
 .tr-find { padding: 20px 32px 24px; background: linear-gradient(180deg, #1a150f, #0f1822); }
 .tr-find .tl-eyebrow { color: var(--gild); }
-#modal-body.m-hoard h2 { margin: 4px 0 12px; font-size: 26px; color: #f4e9cf; }
+#modal-body.m-hoard h2 { margin: 4px 0 12px; font-size: 26px; color: #dee9f2; }
 .tr-gold { display: inline-flex; align-items: center; gap: 12px; margin: 2px 0 8px; animation: tr-pop 0.5s cubic-bezier(0.3, 1.5, 0.5, 1) 0.8s both; }
 .tr-gold .coin { width: 42px; height: 42px; }
 .tr-gold b { font-family: var(--head); font-size: 48px; line-height: 1; color: var(--gild-hi); text-shadow: 0 0 24px rgba(240, 200, 110, 0.45); }
@@ -87,7 +87,7 @@ body.reduce-motion .tr-gold, body.reduce-motion .tr-relic { animation: none; }
 .tr-relic em { font-style: normal; font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: #b9a57a; }
 .tr-relic p { margin: 6px 0 4px; font-size: 15px; color: #e6dcc8; }
 .tr-relic small { font-size: 13px; color: #a9b6c2; font-style: italic; }
-#modal-body.m-hoard .text { margin: 0 0 6px; font-size: 15px; font-style: italic; color: #c9b58a; }
+#modal-body.m-hoard .text { margin: 0 0 6px; font-size: 15px; font-style: italic; color: #abbdce; }
 .tr-purse { font-size: 13px; color: #93a2b1; margin-top: 6px; }
 .tr-purse b { color: #f3dca3; font-family: var(--head); }
 #modal-body.m-hoard .choices { margin-top: 16px; }

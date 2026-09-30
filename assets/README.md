@@ -16,7 +16,7 @@ equipment variant. Machines and monsters retain the existing native symbols.
 | `terrain-sprites.webp` | Fallback terrain art, used only if the procedural painter fails |
 | `music/trail-theme.mp3` | Menu and campaign theme (2:30) |
 | `music/battle-theme.mp3` | Battle theme (2:30) |
-| `fonts/` | Cinzel, Cinzel Decorative and Alegreya Sans (Latin subsets, SIL Open Font License; licences alongside), from the @fontsource npm packages |
+| `fonts/` | Marcellus SC, Barlow and Barlow Semi Condensed (Latin subsets, SIL Open Font License; licences alongside), from the @fontsource npm packages |
 | `sfx/` | Sound effects from 0 A.D. (CC BY-SA 3.0) and uisfx (CC0); see `sfx/CREDITS.md` |
 
 ## Prompt briefs

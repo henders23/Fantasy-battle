@@ -139,7 +139,8 @@ and close silently. Dice are modelled as small
 wooden cubes bouncing on a table. Clips are built from their sources by
 `tools/build_sfx.py`; credits and licences are in `assets/sfx/CREDITS.md`.
 
-The interface is set in Cinzel and Alegreya Sans, bundled with the game (SIL Open Font
+The interface uses the Moonsteel theme: blue-black steel with silver and ice-blue highlights,
+set in Marcellus SC, Barlow and Barlow Semi Condensed, bundled with the game (SIL Open Font
 License), so it looks the same offline. The title screen has drifting embers over the
 painting and shows the saved campaign on its Continue card. In battle, the top bar tracks
 the turn and the score, the unit profile highlights stats raised or lowered by effects,

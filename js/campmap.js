@@ -184,19 +184,19 @@
       g.fillStyle = k === 0 ? "rgba(140,40,30,0.85)" : INK + "0.7)"; g.beginPath(); g.moveTo(0, -s); g.lineTo(s * 0.16, 0); g.lineTo(-s * 0.16, 0); g.closePath(); g.fill();
       g.restore();
     }
-    g.font = "700 " + Math.round(s * 0.36) + "px Cinzel, serif"; g.textAlign = "center"; g.fillStyle = INK + "0.85)"; g.fillText("N", 0, -s - 4);
+    g.font = "700 " + Math.round(s * 0.36) + "px 'Marcellus SC', 'Barlow Semi Condensed', serif"; g.textAlign = "center"; g.fillStyle = INK + "0.85)"; g.fillText("N", 0, -s - 4);
     g.restore();
   }
   function cartouche(g, x, y, title, act, phone) {
     var fs = phone ? 15 : 19;
-    g.font = "700 " + fs + "px Cinzel, serif";
+    g.font = "700 " + fs + "px 'Marcellus SC', 'Barlow Semi Condensed', serif";
     var w = Math.max(g.measureText(title).width + 70, 200), h = phone ? 44 : 52;
     g.save(); g.translate(x, y);
     g.fillStyle = "rgba(236,222,186,0.95)"; g.strokeStyle = INK + "0.8)"; g.lineWidth = 1.4;
     g.beginPath(); g.moveTo(-w / 2, -h / 2); g.lineTo(w / 2, -h / 2); g.quadraticCurveTo(w / 2 + 14, 0, w / 2, h / 2); g.lineTo(-w / 2, h / 2); g.quadraticCurveTo(-w / 2 - 14, 0, -w / 2, -h / 2); g.closePath(); g.fill(); g.stroke();
     g.beginPath(); g.moveTo(-w / 2 + 8, -h / 2 + 5); g.lineTo(w / 2 - 8, -h / 2 + 5); g.moveTo(-w / 2 + 8, h / 2 - 5); g.lineTo(w / 2 - 8, h / 2 - 5); g.lineWidth = 0.7; g.stroke();
-    g.textAlign = "center"; g.fillStyle = "rgba(140,40,30,0.9)"; g.font = "700 " + Math.round(fs * 0.6) + "px Cinzel, serif"; g.fillText(act, 0, -h / 2 + (phone ? 16 : 18));
-    g.fillStyle = INK + "0.95)"; g.font = "700 " + fs + "px Cinzel, serif"; g.fillText(title, 0, h / 2 - (phone ? 9 : 11));
+    g.textAlign = "center"; g.fillStyle = "rgba(140,40,30,0.9)"; g.font = "700 " + Math.round(fs * 0.6) + "px 'Marcellus SC', 'Barlow Semi Condensed', serif"; g.fillText(act, 0, -h / 2 + (phone ? 16 : 18));
+    g.fillStyle = INK + "0.95)"; g.font = "700 " + fs + "px 'Marcellus SC', 'Barlow Semi Condensed', serif"; g.fillText(title, 0, h / 2 - (phone ? 9 : 11));
     g.restore();
   }
 
@@ -224,7 +224,7 @@
     else if (type === "merchant") { g.beginPath(); g.moveTo(0, -s); g.lineTo(0, s * 0.8); g.moveTo(-s * 0.5, s * 0.8); g.lineTo(s * 0.5, s * 0.8); g.moveTo(-s, -s * 0.55); g.lineTo(s, -s * 0.55); g.stroke(); [-1, 1].forEach(function (d) { g.beginPath(); g.arc(d * s * 0.8, -s * 0.05, s * 0.35, 0, Math.PI); g.stroke(); }); }
     else if (type === "camp") { g.beginPath(); g.moveTo(-s, s * 0.75); g.lineTo(0, -s * 0.85); g.lineTo(s, s * 0.75); g.closePath(); g.stroke(); g.beginPath(); g.moveTo(0, -s * 0.85); g.lineTo(-s * 0.2, s * 0.75); g.lineTo(s * 0.25, s * 0.75); g.closePath(); g.fill(); }
     else if (type === "treasure") { g.strokeRect(-s * 0.9, -s * 0.2, s * 1.8, s); g.beginPath(); g.moveTo(-s * 0.9, -s * 0.2); g.quadraticCurveTo(0, -s * 1.1, s * 0.9, -s * 0.2); g.stroke(); g.fillRect(-s * 0.15, -s * 0.05, s * 0.3, s * 0.35); }
-    else { g.font = "700 " + Math.round(R * 1.1) + "px Cinzel, serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("?", 0, s * 0.1); }
+    else { g.font = "700 " + Math.round(R * 1.1) + "px 'Marcellus SC', 'Barlow Semi Condensed', serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("?", 0, s * 0.1); }
     g.restore();
   }
   function banner(g, x, y, color, t) {
@@ -237,7 +237,7 @@
     g.restore();
   }
   function label(g, text, x, y, size, bold) {
-    g.font = (bold ? "700 " : "600 ") + size + "px Cinzel, serif"; g.textAlign = "center"; g.textBaseline = "alphabetic";
+    g.font = (bold ? "700 " : "600 ") + size + "px 'Marcellus SC', 'Barlow Semi Condensed', serif"; g.textAlign = "center"; g.textBaseline = "alphabetic";
     g.lineWidth = 4; g.strokeStyle = "rgba(232,216,178,0.9)"; g.strokeText(text, x, y);
     g.fillStyle = INK + "0.95)"; g.fillText(text, x, y);
   }

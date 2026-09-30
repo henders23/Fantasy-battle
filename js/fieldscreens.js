@@ -137,7 +137,7 @@
       for (var x = 6; x < TW; x += 6) { ctx.beginPath(); ctx.moveTo(x, edge); ctx.lineTo(x, edge + (top ? -0.6 : 0.6)); ctx.stroke(); }
       // the zone's name, set into the ground
       var fs = Math.max(0.9, Math.min(1.6, 15 * px));
-      ctx.font = "600 " + fs.toFixed(2) + 'px "Cinzel", Georgia, serif'; ctx.textAlign = "right"; ctx.textBaseline = top ? "bottom" : "top";
+      ctx.font = "600 " + fs.toFixed(2) + 'px "Marcellus SC", "Barlow Semi Condensed", Georgia, serif'; ctx.textAlign = "right"; ctx.textBaseline = top ? "bottom" : "top";
       ctx.fillStyle = "rgba(" + col + "," + (mine ? 0.75 : 0.5) + ")";
       var label = mine ? "Your deployment zone" : b.names[s] + " — deployment";
       if (ctx.letterSpacing !== undefined) ctx.letterSpacing = (fs * 0.12).toFixed(2) + "px";
@@ -152,7 +152,7 @@
       ctx.setLineDash([4 * px, 4 * px]); ctx.beginPath(); ctx.moveTo(mx, y0 + 0.4); ctx.lineTo(mx, y1 - 0.4); ctx.stroke(); ctx.setLineDash([]);
       [[y0, 1], [y1, -1]].forEach(function (a) { ctx.beginPath(); ctx.moveTo(mx, a[0]); ctx.lineTo(mx - 0.35, a[0] + 0.6 * a[1]); ctx.lineTo(mx + 0.35, a[0] + 0.6 * a[1]); ctx.closePath(); ctx.fill(); });
       var fs2 = Math.max(0.8, Math.min(1.3, 13 * px));
-      ctx.font = "600 " + fs2.toFixed(2) + 'px "Cinzel", Georgia, serif'; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+      ctx.font = "600 " + fs2.toFixed(2) + 'px "Marcellus SC", "Barlow Semi Condensed", Georgia, serif'; ctx.textAlign = "left"; ctx.textBaseline = "middle";
       ctx.fillText(Math.round(y1 - y0) + '"', mx + 0.6, (y0 + y1) / 2);
     }
     ctx.restore();
