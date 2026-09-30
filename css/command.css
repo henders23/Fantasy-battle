@@ -1,0 +1,5 @@
+/* Unit names in side colours (js/command.js). */
+.nm { font-weight: 600; white-space: nowrap; }
+.nm-mine { color: #8fc8f5; }
+.nm-foe { color: #f39a8c; }
+.engagement-head .muted .nm, .dp-label .nm, #battle-log .nm { text-shadow: 0 1px 1px rgba(0, 0, 0, 0.4); }

@@ -342,7 +342,7 @@
       ctx.roundRect(x, y, w, h, 3);
       ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = mine ? "#e2effa" : "#f7dad5";
+      ctx.fillStyle = mine ? "#a9d4ff" : "#ffb2a4"; // names in side colours, so matching units read apart
       ctx.textAlign = "left";
       ctx.fillText(text, x + 9, y + 17);
       if (selected && state) {

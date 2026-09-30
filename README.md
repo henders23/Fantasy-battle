@@ -33,6 +33,16 @@ is an upper bound before pivots and obstacles. Hovering over a charge target sho
 attack side and approximate wounds dealt/received. Estimates are advisory and do not
 include every special effect.
 
+When the Combat Phase opens, or you choose an engagement, the camera glides in close to the
+fight and eases back out to the whole table when the fighting is done. Scrolling or dragging
+takes the camera back at any time.
+
+Unit names are coloured by side wherever they are written: blue for yours, red for the
+enemy's. This covers the chronicle, the dice panel, the engagement panel and its result, and
+the labels on the table. So when both armies field the same unit ("Imperial Sword I attacks
+Imperial Sword I"), you can still tell which is which. The engine records which units each
+chronicle line mentions, in order, so identical names are told apart correctly.
+
 Melee is interactive: select an engagement on the battlefield or in the orders panel,
 then choose **Fight this engagement**. Every roll in that fight is yours to make: the
 attack dice, the armour saves, the break tests and any flight moves appear in the dice
@@ -279,6 +289,8 @@ js/campscreens.js  merchant and camp
 css/campscreens.css merchant and camp styles
 js/talescreens.js  campaign events and treasure
 css/talescreens.css event and treasure styles
+js/command.js      combat camera, side-coloured unit names, Enter to move on to the next regiment
+css/command.css    side colours for unit names
 tools/build_sfx.py builds assets/sfx from the 0 A.D. and uisfx libraries
 css/experience.css illustrated edition theme and responsive layouts
 assets/          original paintings, portraits and functional sprite atlases
@@ -301,7 +313,7 @@ test/features.js  Playwright test of scenarios, the rotation handle, undo, charg
 | Q / E | pivot 45° left / right |
 | Drag the gold handle | turn the selected unit freely |
 | Z | undo the moves and pivots of the current activation |
-| Space / Enter | roll the dice when a roll is waiting; otherwise end activation / pass |
+| Space / Enter | roll the dice when a roll is waiting; otherwise end activation / pass. After Enter, your next ready regiment is brought up when your turn returns: move it, press Enter again to skip on, or click another regiment instead |
 | X, Shift + X | show charge arcs / weapon ranges |
 | Mouse wheel, right-drag | zoom and pan |
 | Esc | cancel targeting |

@@ -3,6 +3,8 @@
 'use strict';
 var pw; try { pw = require('playwright'); } catch (e) { pw = require('/opt/node22/lib/node_modules/playwright'); }
 var base = process.argv[2] || 'http://127.0.0.1:8123/index.html', errors = [], checks = 0;
+// the camera glides (js/command.js): measure screen positions only once it has settled
+async function settled(page) { await page.waitForFunction(function () { var r = SOVL.UI && SOVL.UI.renderer; return !r || !r.flight; }, null, { timeout: 5000 }).catch(function () {}); }
 function expect(c, msg) { checks++; if (!c) { errors.push('CHECK FAILED: ' + msg); console.log('CHECK FAILED: ' + msg); } }
 (async function () {
   var browser = await pw.chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
@@ -44,7 +46,7 @@ function expect(c, msg) { checks++; if (!c) { errors.push('CHECK FAILED: ' + msg
   // play a few turns with mouse
   var t0 = Date.now(), didMove = false, didCharge = false, didShoot = false, didEnd = false, rollsSeen = 0;
   while (Date.now() - t0 < 400000) {
-    var st = await page.evaluate(function () { var UI = SOVL.UI, b = UI.battle; return { phase: b.phase, active: b.active, turn: b.turn, modal: UI.modalOpen, activeUnit: b.activeUnit, pending: !!b.pendingRoll, panelOn: document.getElementById('dice-panel').classList.contains('on'), animating: UI.combatAnimating }; });
+    var st = await page.evaluate(function () { var UI = SOVL.UI, b = UI.battle; return { phase: b.phase, active: b.active, turn: b.turn, modal: UI.modalOpen, activeUnit: b.activeUnit, auto: !!UI.autoSel && UI.autoSel === b.activeUnit, pending: !!b.pendingRoll, panelOn: document.getElementById('dice-panel').classList.contains('on'), animating: UI.combatAnimating }; });
     if (st.phase === 'end') break;
     if (st.pending) {
       rollsSeen++;
@@ -61,7 +63,7 @@ function expect(c, msg) { checks++; if (!c) { errors.push('CHECK FAILED: ' + msg
     box = await page.$eval('#battle-canvas', function (c) { var r = c.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
     if (st.phase === 'charge') {
       // find a unit with valid targets; click it then the target
-      var pair = await page.evaluate(function () { var UI = SOVL.UI, b = UI.battle, r = UI.renderer; var us = b.unitsOf(0); for (var i = 0; i < us.length; i++) { if (!b.canDeclareCharge(us[i])) continue; var ts = b.validChargeTargets(us[i]); if (ts.length) { var p = r.toScreen(us[i].x, us[i].y), q = r.toScreen(ts[0].unit.x, ts[0].unit.y); return { ux: p.x, uy: p.y, tx: q.x, ty: q.y, uid: us[i].uid, tid: ts[0].unit.uid }; } } return null; });
+      await settled(page); var pair = await page.evaluate(function () { var UI = SOVL.UI, b = UI.battle, r = UI.renderer; var us = b.unitsOf(0); for (var i = 0; i < us.length; i++) { if (!b.canDeclareCharge(us[i])) continue; var ts = b.validChargeTargets(us[i]); if (ts.length) { var p = r.toScreen(us[i].x, us[i].y), q = r.toScreen(ts[0].unit.x, ts[0].unit.y); return { ux: p.x, uy: p.y, tx: q.x, ty: q.y, uid: us[i].uid, tid: ts[0].unit.uid }; } } return null; });
       if (pair) {
         await page.mouse.click(box.x + pair.ux, box.y + pair.uy); await page.waitForTimeout(80);
         var sel = await page.evaluate(function () { return { sel: SOVL.UI.sel, targets: SOVL.UI.targets.length }; });
@@ -73,14 +75,15 @@ function expect(c, msg) { checks++; if (!c) { errors.push('CHECK FAILED: ' + msg
       continue;
     }
     if (st.phase === 'strategic') {
-      if (!st.activeUnit) {
-        var pick = await page.evaluate(function () { var UI = SOVL.UI, b = UI.battle, r = UI.renderer; var us = b.activatable(0).filter(function (u) { return !b.isEngaged(u) && !u.fleeing; }); if (!us.length) return null; var u = us[0], p = r.toScreen(u.x, u.y); return { sx: p.x, sy: p.y, uid: u.uid, x: u.x, y: u.y, a: u.a, ranged: !!u.ranged }; });
+      // a regiment brought up after Enter (js/command.js) is driven just like one clicked by hand
+      if (!st.activeUnit || st.auto) {
+        await settled(page); var pick = await page.evaluate(function () { var UI = SOVL.UI, b = UI.battle, r = UI.renderer; var au = b.activeUnit ? b.unit(b.activeUnit) : null; var us = au ? [au] : b.activatable(0).filter(function (u) { return !b.isEngaged(u) && !u.fleeing; }); if (!us.length) return null; var u = us[0], p = r.toScreen(u.x, u.y); return { sx: p.x, sy: p.y, uid: u.uid, x: u.x, y: u.y, a: u.a, ranged: !!u.ranged }; });
         if (!pick) { await page.keyboard.press('Enter'); await page.waitForTimeout(60); continue; }
         await page.mouse.click(box.x + pick.sx, box.y + pick.sy); await page.waitForTimeout(80);
         var act = await page.evaluate(function () { return SOVL.UI.battle.activeUnit; });
         expect(act === pick.uid, 'clicking own unit activates it');
         // move preview + click ground 5" ahead-left
-        var ground = await page.evaluate(function (uid) { var UI = SOVL.UI, b = UI.battle, u = b.unit(uid), r = UI.renderer; var f = SOVL.G.fwd(u.a); var w = { x: u.x + f.x * 4 + 1, y: u.y + f.y * 4 }; var p = r.toScreen(w.x, w.y); var cr = document.getElementById('battle-canvas').getBoundingClientRect(), hit = document.elementFromPoint(cr.x + p.x, cr.y + p.y); return { sx: p.x, sy: p.y, onUnit: !!r.unitAt(b, w) || !hit || hit.id !== 'battle-canvas', canMove: u.moveLeft > 0 && w.x > 1 && w.y > 1 && w.x < SOVL.TABLE.w - 1 && w.y < SOVL.TABLE.h - 1 }; }, pick.uid);
+        await settled(page); var ground = await page.evaluate(function (uid) { var UI = SOVL.UI, b = UI.battle, u = b.unit(uid), r = UI.renderer; var f = SOVL.G.fwd(u.a); var w = { x: u.x + f.x * 4 + 1, y: u.y + f.y * 4 }; var p = r.toScreen(w.x, w.y); var cr = document.getElementById('battle-canvas').getBoundingClientRect(), hit = document.elementFromPoint(cr.x + p.x, cr.y + p.y); return { sx: p.x, sy: p.y, onUnit: !!r.unitAt(b, w) || !hit || hit.id !== 'battle-canvas', canMove: u.moveLeft > 0 && w.x > 1 && w.y > 1 && w.x < SOVL.TABLE.w - 1 && w.y < SOVL.TABLE.h - 1 }; }, pick.uid);
         await page.mouse.move(box.x + ground.sx, box.y + ground.sy); await page.waitForTimeout(60);
         var pv = await page.evaluate(function () { return SOVL.UI.preview ? SOVL.UI.preview.ok : null; });
         if (!ground.onUnit && ground.canMove) expect(pv !== null, 'move preview shown on hover');
@@ -91,7 +94,7 @@ function expect(c, msg) { checks++; if (!c) { errors.push('CHECK FAILED: ' + msg
         var shootBtn = await page.$('#battle-actions button:has-text("Shoot")');
         if (shootBtn) {
           await shootBtn.click(); await page.waitForTimeout(60);
-          var tgt = await page.evaluate(function () { var UI = SOVL.UI, b = UI.battle, r = UI.renderer; if (UI.mode !== 'shoot' || !UI.targets.length) return null; var t = b.unit(UI.targets[0]), p = r.toScreen(t.x, t.y); return { sx: p.x, sy: p.y }; });
+          await settled(page); var tgt = await page.evaluate(function () { var UI = SOVL.UI, b = UI.battle, r = UI.renderer; if (UI.mode !== 'shoot' || !UI.targets.length) return null; var t = b.unit(UI.targets[0]), p = r.toScreen(t.x, t.y); return { sx: p.x, sy: p.y }; });
           if (tgt) { await page.mouse.click(box.x + tgt.sx, box.y + tgt.sy); await page.waitForTimeout(80); var used = await page.evaluate(function (uid) { var u = SOVL.UI.battle.unit(uid); return u && u.usedRanged; }, pick.uid); expect(used, 'shooting via click marks usedRanged'); didShoot = true; }
           else await page.keyboard.press('Escape');
         }

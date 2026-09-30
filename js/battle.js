@@ -417,7 +417,7 @@
     this.units.filter(function (u) { return hasProp(u, 'Frenzy'); }).forEach(function (u) {
       var best = null, bd = Infinity;
       self.enemiesOf(u.side).forEach(function (e) { var ci = self.chargeInfo(u, e); if (ci.ok && ci.dist < bd) { bd = ci.dist; best = e; } });
-      if (best) { self.declareCharge(u.uid, best.uid, true); self.addLog(u.name + ' is Frenzied and must charge ' + best.name + '!', 'charge'); }
+      if (best) { self.declareCharge(u.uid, best.uid, true); self.addLog(u.name + ' is Frenzied and must charge ' + best.name + '!', 'charge', { units: [u.uid, best.uid] }); }
     });
     this.checkChargePhaseEnd();
   };
@@ -526,11 +526,11 @@
       this.charges = this.charges.filter(function (c) { return c !== old; });
       t.declaredCharge = false;
       var oldTarget = this.unit(old.target); if (oldTarget) oldTarget.chargeTargetOf = null;
-      this.addLog(u.name + ' intercepts ' + t.name + ', cancelling its charge!', 'charge');
+      this.addLog(u.name + ' intercepts ' + t.name + ', cancelling its charge!', 'charge', { units: [u.uid, t.uid] });
     }
     this.charges.push({ charger: u.uid, target: t.uid, side: ci.side, dist: ci.dist, priority: ci.priority, counter: false, flee: false, runDown: !!ci.runDown });
     u.declaredCharge = true; t.chargeTargetOf = u.uid;
-    this.addLog(u.name + ' declares a charge against the ' + ci.side + ' of ' + t.name + ' (' + ci.dist.toFixed(1) + '").', 'charge');
+    this.addLog(u.name + ' declares a charge against the ' + ci.side + ' of ' + t.name + ' (' + ci.dist.toFixed(1) + '").', 'charge', { units: [u.uid, t.uid] });
     this.emit({ type: 'declare', from: u.uid, to: t.uid, side: ci.side });
     if (!auto) this.afterChargeAction();
     return { ok: true };
@@ -548,7 +548,7 @@
     var cc = this.canCounterCharge(u); if (!cc) return { ok: false, reason: 'No valid counter charge' };
     this.charges.push({ charger: u.uid, target: cc.charger.uid, side: 'front', dist: cc.info.dist, priority: cc.info.priority, counter: true, flee: false });
     u.declaredCharge = true;
-    this.addLog(u.name + ' counter-charges ' + cc.charger.name + '!', 'charge');
+    this.addLog(u.name + ' counter-charges ' + cc.charger.name + '!', 'charge', { units: [u.uid, cc.charger.uid] });
     this.emit({ type: 'declare', from: u.uid, to: cc.charger.uid, side: 'front', counter: true });
     this.afterChargeAction();
     return { ok: true };
@@ -567,7 +567,7 @@
     var cf = this.canFlee(u); if (!cf) return { ok: false, reason: 'Cannot flee from this charge' };
     this.charges.push({ charger: u.uid, target: cf.charger.uid, flee: true, counter: false });
     u.declaredCharge = true;
-    this.addLog(u.name + ' will flee from ' + cf.charger.name + '\'s charge!', 'charge');
+    this.addLog(u.name + ' will flee from ' + cf.charger.name + '\'s charge!', 'charge', { units: [u.uid, cf.charger.uid] });
     this.afterChargeAction();
     return { ok: true };
   };
@@ -646,7 +646,7 @@
         var alt = G.SIDES.filter(function (s2) { return !self.sideEngaged(t, s2) && !self.sideTargeted(t, s2); })[0];
         if (!alt) { u.activated = true; return; }
         var fc2 = G.frontCenter(u), sd2 = G.side(t, alt), d2 = G.dist(fc2, sd2.c);
-        if (d2 > self.chargeRange(u) || !self.inArc(u, sd2.c)) { self.addLog(u.name + ' cannot reach ' + t.name + ' and stumbles to a halt.', 'charge'); u.activated = true; self.moveToward(u, sd2.c, Math.max(0, self.chargeRange(u) - 1), 1.0); return; }
+        if (d2 > self.chargeRange(u) || !self.inArc(u, sd2.c)) { self.addLog(u.name + ' cannot reach ' + t.name + ' and stumbles to a halt.', 'charge', { units: [u.uid, t.uid] }); u.activated = true; self.moveToward(u, sd2.c, Math.max(0, self.chargeRange(u) - 1), 1.0); return; }
         side = alt;
       }
       self.resolveSingleCharge(u, t, side);
@@ -659,7 +659,7 @@
     var pos = this.chargePosition(u, t, side, []);
     if (!pos) {
       // failed charge: move toward target, stop short
-      this.addLog(u.name + ' cannot reach ' + t.name + ' and stumbles to a halt.', 'charge');
+      this.addLog(u.name + ' cannot reach ' + t.name + ' and stumbles to a halt.', 'charge', { units: [u.uid, t.uid] });
       u.activated = true;
       this.moveToward(u, G.side(t, side).c, Math.max(0, this.chargeRange(u) - 1), 1.0);
       return false;
@@ -667,7 +667,7 @@
     var from = { x: u.x, y: u.y, a: u.a };
     u.x = pos.x; u.y = pos.y; u.a = pos.a; u.chargedThisTurn = true; u.activated = true;
     this.contacts.push({ a: u.uid, aSide: 'front', b: t.uid, bSide: side, age: 0 });
-    this.addLog(u.name + ' charges into the ' + side + ' of ' + t.name + '!', 'charge');
+    this.addLog(u.name + ' charges into the ' + side + ' of ' + t.name + '!', 'charge', { units: [u.uid, t.uid] });
     this.emit({ type: 'charge', uid: u.uid, from: from, to: { x: u.x, y: u.y, a: u.a }, target: t.uid });
     return true;
   };
@@ -684,7 +684,7 @@
     u.x = ru.x; u.y = ru.y; u.a = ru.a; t.x = rt.x; t.y = rt.y; t.a = rt.a;
     u.chargedThisTurn = true; t.chargedThisTurn = true; u.activated = true; t.activated = true;
     this.contacts.push({ a: u.uid, aSide: 'front', b: t.uid, bSide: 'front', age: 0 });
-    this.addLog(u.name + ' and ' + t.name + ' crash into each other head on!', 'charge');
+    this.addLog(u.name + ' and ' + t.name + ' crash into each other head on!', 'charge', { units: [u.uid, t.uid] });
     this.emit({ type: 'charge', uid: u.uid, from: fromU, to: { x: u.x, y: u.y, a: u.a }, target: t.uid });
     this.emit({ type: 'charge', uid: t.uid, from: fromT, to: { x: t.x, y: t.y, a: t.a }, target: u.uid });
     return true;
@@ -711,14 +711,14 @@
     if (dist <= range && !this.losBlocked(fc, { x: u.x, y: u.y })) {
       // caught: move to the target's position and destroy it
       var pos = { x: u.x, y: u.y };
-      this.addLog(ch.name + ' runs down the fleeing ' + u.name + '!', 'kill');
+      this.addLog(ch.name + ' runs down the fleeing ' + u.name + '!', 'kill', { units: [ch.uid, u.uid] });
       ch.kills = (ch.kills || 0) + u.models + (u.commander && u.commander.alive ? 1 : 0);
       this.destroyUnit(u, 'run down');
       this.moveToward(ch, pos, range, 0);
       this.emit({ type: 'rundown', uid: ch.uid, target: u.uid });
     } else {
       this.moveToward(ch, { x: u.x, y: u.y }, Math.max(0, range), 0.5);
-      this.addLog(ch.name + ' pursues but cannot catch ' + u.name + '.', 'charge');
+      this.addLog(ch.name + ' pursues but cannot catch ' + u.name + '.', 'charge', { units: [ch.uid, u.uid] });
     }
   };
 
@@ -755,6 +755,15 @@
     u.moveLeft = this.isEngaged(u) || u.fleeing ? 0 : Math.max(0, moveAllowance(u, this) - (u.inDifficultAtStart ? 2 : 0));
     if (hasEffect(u, 'rooted')) u.moveLeft = 0;
     this.emit({ type: 'activate', uid: u.uid });
+    return { ok: true };
+  };
+  // Give back an activation the unit has not used yet (no move kept, no shot, spell or ability),
+  // so the interface can offer the next regiment without committing the player to it.
+  BP.releaseActivation = function (uid) {
+    var u = this.unit(uid);
+    if (!u || this.activeUnit !== uid) return { ok: false, reason: 'Not the active unit' };
+    if (this.pendingRoll || (u.undoStack && u.undoStack.length) || u.usedRanged || u.usedSpell || u.usedAbility) return { ok: false, reason: 'The unit has already acted' };
+    this.activeUnit = null; u.moveStarted = false; u.moveLeft = 0; u.undoStack = [];
     return { ok: true };
   };
   BP.endActivation = function () {
@@ -902,7 +911,7 @@
     var afterHits = function (hits, hitDice) {
       self.applyHits(t, hits, w.pow, { lethal: lethal, source: u, ranged: true }, function (dmg) {
         var txt = shooterName + ' fires ' + w.name + ' at ' + t.name + ': ' + hits + ' hit' + (hits === 1 ? '' : 's') + ' (' + info.target + '+' + (info.notes.length ? ', ' + info.notes.join(', ') : '') + '), ' + dmg.wounds + ' wound' + (dmg.wounds === 1 ? '' : 's') + (dmg.killed ? ', ' + dmg.killed + ' slain' : '') + '.';
-        var entry = self.addLog(txt, 'shoot', { hitDice: hitDice, hitTarget: info.target, saveDice: dmg.saveDice, saveTarget: dmg.saveTarget });
+        var entry = self.addLog(txt, 'shoot', { units: [u.uid, t.uid], hitDice: hitDice, hitTarget: info.target, saveDice: dmg.saveDice, saveTarget: dmg.saveTarget });
         self.emit({ type: 'shoot', from: u.uid, to: t.uid, hits: hits, wounds: dmg.wounds, killed: dmg.killed, log: entry });
         result.hits = hits; result.wounds = dmg.wounds; result.killed = dmg.killed; result.dmg = dmg;
         self.afterCasualties(t, dmg, u, function () { result.pending = false; self.emit({ type: 'seqEnd' }); });
@@ -954,13 +963,13 @@
       while (wounds > 0 && c.alive) {
         var d2 = (opts.lethal && c.maxWounds > 1) ? Math.min(2, c.maxWounds - c.wounds) : 1;
         c.wounds += d2; res.wounds += d2; res.commanderWounds += d2; wounds--;
-        if (c.wounds >= c.maxWounds) { c.alive = false; res.commanderKilled = true; this.addLog(c.name + ' has been slain!', 'kill'); this.emit({ type: 'commanderDeath', uid: t.uid }); }
+        if (c.wounds >= c.maxWounds) { c.alive = false; res.commanderKilled = true; this.addLog(c.name + ' has been slain!', 'kill', { units: [t.uid] }); this.emit({ type: 'commanderDeath', uid: t.uid }); }
       }
     }
     if (opts.source && !opts.source.removed) { opts.source.kills = (opts.source.kills || 0) + (startModels - t.models) + (res.commanderKilled ? 1 : 0); if (res.commanderKilled) opts.source.commanderKills = (opts.source.commanderKills || 0) + 1; }
     if (t.models <= 0 && t.commander && t.commander.alive && !t.wasRetinueLost) {
       t.wasRetinueLost = true; t.files = 1; refreshFootprint(t, true);
-      this.addLog(t.commander.name + ' fights on alone.', 'info');
+      this.addLog(t.commander.name + ' fights on alone.', 'info', { units: [t.uid] });
     } else if (t.models > 0) refreshFootprint(t, true);
     if (!unitAlive(t)) this.destroyUnit(t, 'destroyed');
     return res;
@@ -973,7 +982,7 @@
     this.contacts = this.contacts.filter(function (c) { return c.a !== u.uid && c.b !== u.uid; });
     this.charges = this.charges.filter(function (c) { return c.charger !== u.uid && c.target !== u.uid; });
     this.dead.push(u);
-    this.addLog(u.name + ' is ' + how + '.', 'kill');
+    this.addLog(u.name + ' is ' + how + '.', 'kill', { units: [u.uid] });
     this.emit({ type: 'destroy', uid: u.uid, how: how });
     if (this.activeUnit === u.uid) this.activeUnit = null;
   };
@@ -999,14 +1008,14 @@
     var breakdown = 'Disc ' + s.ds + (rb ? ' + ' + rb + ' ranks' : '') + (penalty && !fearless ? ' − ' + penalty : '') + (fearless && penalty ? ' (Fearless)' : '');
     if (isReanimated(u)) {
       var test0 = { dice: [], total: 0, ok: true, reanimated: true, value: value, rankBonus: rb, fearless: fearless };
-      test0.log = this.addLog(u.name + ' (' + why + '): Reanimated never fail Discipline tests.', 'test');
+      test0.log = this.addLog(u.name + ' (' + why + '): Reanimated never fail Discipline tests.', 'test', { units: [u.uid] });
       this.emit({ type: 'roll', spec: { kind: 'discipline', n: 0, target: value, label: u.name + ' — ' + why, sub: 'Reanimated: never fails', uid: u.uid, side: u.side, why: why }, res: test0 });
       cb(test0); return;
     }
     this.requestRoll({ kind: 'discipline', n: 2, target: value, label: u.name + ' — ' + why, sub: value + ' or lower to ' + (why === 'rally' ? 'rally' : 'hold') + ' (' + breakdown + ')', uid: u.uid, side: u.side, why: why, reroll: reroll }, function () { return R.disciplineTest(value, { reroll: reroll }); }, function (test) {
       test.value = value; test.rankBonus = rb; test.fearless = fearless;
       var txt = u.name + ' tests Discipline (' + why + '): needs ' + value + ' (' + breakdown + '), rolls ' + test.total + (test.rerolled ? ' after re-roll' : '') + ' — ' + (test.ok ? 'holds' : 'FAILS') + '.';
-      test.log = self.addLog(txt, test.ok ? 'test' : 'fail', { discDice: test.dice, target: value });
+      test.log = self.addLog(txt, test.ok ? 'test' : 'fail', { units: [u.uid], discDice: test.dice, target: value });
       cb(test);
     });
   };
@@ -1038,7 +1047,7 @@
       }
       if (!final) final = { x: from.x, y: from.y, a: ang, escaped: false };
       u.x = final.x; u.y = final.y; u.a = final.a;
-      self.addLog(u.name + ' ' + why + ' ' + dist + '" (' + dice.join('+') + ').', 'flee', { dice: dice });
+      self.addLog(u.name + ' ' + why + ' ' + dist + '" (' + dice.join('+') + ').', 'flee', { units: [u.uid], dice: dice });
       self.emit({ type: 'flee', uid: u.uid, from: from, to: { x: u.x, y: u.y, a: u.a }, dice: dice });
       if (final.escaped) { self.destroyUnit(u, 'fled'); cb({ escaped: true, dist: dist }); return; }
       cb({ escaped: false, dist: dist });
@@ -1081,13 +1090,13 @@
     var finish = function (cast) { result.pending = false; result.cast = cast; self.emit({ type: 'spell', from: u.uid, to: t.uid, spell: spellName, ok: cast }); self.emit({ type: 'seqEnd' }); };
     this.requestRoll({ kind: 'casting', spell: spellName, n: 2, target: sp.cv, bonus: lvl, label: u.commander.name + ' casts ' + spellName, sub: 'needs ' + sp.cv + ' on 2D6 + ' + lvl, uid: u.uid, targetUid: t.uid, side: u.side }, function () { var d = R.dice(2); return { dice: d, total: R.sum(d) + lvl, ok: R.sum(d) + lvl >= sp.cv, miscast: d[0] === 1 && d[1] === 1 }; }, function (cr) {
       var txt = u.commander.name + ' casts ' + spellName + ' (needs ' + sp.cv + '): rolls ' + cr.dice.join('+') + ' + ' + lvl + ' = ' + cr.total + ' — ';
-      if (cr.miscast) { txt += 'MISCAST! The caster is wracked by the winds of magic.'; self.addLog(txt, 'fail', { dice: cr.dice }); self.woundCommander(u, 1); result.miscast = true; finish(false); return; }
-      if (!cr.ok) { txt += 'the spell fizzles.'; self.addLog(txt, 'fail', { dice: cr.dice }); finish(false); return; }
-      txt += 'success!'; self.addLog(txt, 'spell', { dice: cr.dice });
+      if (cr.miscast) { txt += 'MISCAST! The caster is wracked by the winds of magic.'; self.addLog(txt, 'fail', { units: [u.uid], dice: cr.dice }); self.woundCommander(u, 1); result.miscast = true; finish(false); return; }
+      if (!cr.ok) { txt += 'the spell fizzles.'; self.addLog(txt, 'fail', { units: [u.uid], dice: cr.dice }); finish(false); return; }
+      txt += 'success!'; self.addLog(txt, 'spell', { units: [u.uid], dice: cr.dice });
       var damageWith = function (expr, pow, lethal, then) {
         self.requestRoll({ kind: 'expr', n: 1, expr: expr, label: spellName + ' hits', sub: expr.toUpperCase() + ' hits, Power ' + pow, uid: u.uid, targetUid: t.uid, side: u.side }, function () { return R.rollExpr(expr); }, function (ex) {
           self.applyHits(t, ex.total, pow, { lethal: lethal, source: u }, function (dmg) {
-            self.addLog(spellName + ' strikes ' + t.name + ' with ' + ex.total + ' hits (Power ' + pow + '): ' + dmg.wounds + ' wounds' + (dmg.killed ? ', ' + dmg.killed + ' slain' : '') + '.', 'spell', { saveDice: dmg.saveDice, saveTarget: dmg.saveTarget });
+            self.addLog(spellName + ' strikes ' + t.name + ' with ' + ex.total + ' hits (Power ' + pow + '): ' + dmg.wounds + ' wounds' + (dmg.killed ? ', ' + dmg.killed + ' slain' : '') + '.', 'spell', { units: [t.uid], saveDice: dmg.saveDice, saveTarget: dmg.saveTarget });
             result.dmg = dmg;
             self.afterCasualties(t, dmg, u, then);
           });
@@ -1106,7 +1115,7 @@
       }
       if (sp.kind === 'summon') {
         var placed = self.summonUnit(u, sp.summon, sp.count);
-        self.addLog(placed ? 'A unit of ' + sp.count + ' ' + placed.name + ' claws its way out of the ground!' : 'There is no room for the dead to rise.', 'spell');
+        self.addLog(placed ? 'A unit of ' + sp.count + ' ' + placed.name + ' claws its way out of the ground!' : 'There is no room for the dead to rise.', 'spell', { units: placed ? [placed.uid] : [] });
         finish(true); return;
       }
       finish(true);
@@ -1116,7 +1125,7 @@
   BP.woundCommander = function (u, n) {
     var c = u.commander; if (!c || !c.alive) return;
     c.wounds += n;
-    if (c.wounds >= c.maxWounds) { c.alive = false; this.addLog(c.name + ' has been slain!', 'kill'); this.emit({ type: 'commanderDeath', uid: u.uid }); if (!unitAlive(u)) this.destroyUnit(u, 'destroyed'); }
+    if (c.wounds >= c.maxWounds) { c.alive = false; this.addLog(c.name + ' has been slain!', 'kill', { units: [u.uid] }); this.emit({ type: 'commanderDeath', uid: u.uid }); if (!unitAlive(u)) this.destroyUnit(u, 'destroyed'); }
   };
   BP.healUnit = function (t, wounds) {
     var W = t.base.wd;
@@ -1188,10 +1197,10 @@
       case 'furious_charge': u.effects.push({ name: 'Furious Charge', effect: { rerollMiss: true }, until: this.turn }); break;
       case 'warcry': ae.power = 1; ae.powerUntil = this.turn; break;
       case 'power_of_many': ae.goblinsFearless = true; ae.goblinsUntil = this.turn; break;
-      case 'rallying_cry': t.fleeing = false; this.addLog(t.name + ' rallies to the cry!', 'test'); break;
+      case 'rallying_cry': t.fleeing = false; this.addLog(t.name + ' rallies to the cry!', 'test', { units: [t.uid] }); break;
       case 'mech_expertise': t.effects.push({ name: 'Mechanical Expertise', effect: { defense: 2, reroll1s: true }, until: 99 }); break;
     }
-    this.addLog(u.name + ' uses ' + ab.name + (t !== u ? ' on ' + t.name : '') + '.', 'spell');
+    this.addLog(u.name + ' uses ' + ab.name + (t !== u ? ' on ' + t.name : '') + '.', 'spell', { units: t !== u ? [u.uid, t.uid] : [u.uid] });
     this.emit({ type: 'ability', uid: u.uid, id: id, target: t.uid });
     return { ok: true };
   };
@@ -1201,7 +1210,7 @@
     this.seq(u.name + ' tries to rally', 'Discipline test', { uids: [u.uid], kind: 'rally' });
     var result = { ok: true, pending: true };
     this.disciplineTest(u, 0, 'rally', function (test) {
-      if (test.ok) { u.fleeing = false; self.addLog(u.name + ' rallies!', 'test'); }
+      if (test.ok) { u.fleeing = false; self.addLog(u.name + ' rallies!', 'test', { units: [u.uid] }); }
       result.rallied = test.ok; result.pending = false;
       self.emit({ type: 'seqEnd' });
       self.endActivation();
@@ -1338,7 +1347,7 @@
   BP.runEngagement = function (group, done) {
     var self = this;
     var report = { units: group.map(function (u) { return u.uid; }), rounds: [], score: [0, 0], breakTests: [], names: group.map(function (u) { return u.name; }), turn: this.turn };
-    this.addLog('Engagement: ' + group.map(function (u) { return u.name; }).join(' vs ') + '.', 'combat');
+    this.addLog('Engagement: ' + group.map(function (u) { return u.name; }).join(' vs ') + '.', 'combat', { units: group.map(function (u) { return u.uid; }) });
     var sideNames = [group.filter(function (u) { return u.side === 0; }).map(function (u) { return u.name; }).join(', '), group.filter(function (u) { return u.side === 1; }).map(function (u) { return u.name; }).join(', ')];
     this.seq(sideNames[0] + '  vs  ' + sideNames[1], 'Combat', { uids: report.units, kind: 'engagement' });
     var pending = [];
@@ -1352,13 +1361,13 @@
     var nextAttack = function () {
       if (pi >= pending.length) { scoreAndBreak(); return; }
       var p = pending[pi++];
-      if (p.target.removed) { self.addLog(p.atk.who + ' finds no enemy left to fight.', 'combat'); nextAttack(); return; }
+      if (p.target.removed) { self.addLog(p.atk.who + ' finds no enemy left to fight.', 'combat', { units: [p.attacker.uid] }); nextAttack(); return; }
       var notes = []; if (p.atk.rerollMiss) notes.push('re-roll misses'); if (hasProp(p.target, 'Putrid Stench')) notes.push('Putrid Stench: re-roll hits');
       self.requestRoll({ kind: 'hits', n: p.atk.dice, target: p.hitTarget, label: p.atk.who + ' attacks ' + p.target.name, sub: p.atk.dice + ' dice, ' + p.hitTarget + '+ to hit' + (notes.length ? ' (' + notes.join(', ') + ')' : ''), uid: p.attacker.uid, targetUid: p.target.uid, side: p.attacker.side, who: p.atk.who, targetName: p.target.name }, function () { return R.rollAgainst(p.atk.dice, p.hitTarget, { rerollMiss: p.atk.rerollMiss, rerollHit: hasProp(p.target, 'Putrid Stench') }); }, function (roll) {
         self.applyHits(p.target, roll.hits, p.atk.power, { melee: true, halberd: p.atk.halberd, poison: p.atk.poison, lethal: p.atk.lethal, source: p.attacker }, function (dmg) {
           woundsBy[p.attacker.side] = (woundsBy[p.attacker.side] || 0) + dmg.wounds;
           var txt = p.atk.who + ' attacks ' + p.target.name + ': ' + p.atk.dice + ' dice, ' + roll.hits + ' hits (' + p.hitTarget + '+), ' + dmg.wounds + ' wounds' + (dmg.killed ? ', ' + dmg.killed + ' slain' : '') + '.';
-          self.addLog(txt, 'combat', { hitDice: roll.dice, hitTarget: p.hitTarget, saveDice: dmg.saveDice, saveTarget: dmg.saveTarget });
+          self.addLog(txt, 'combat', { units: [p.attacker.uid, p.target.uid], hitDice: roll.dice, hitTarget: p.hitTarget, saveDice: dmg.saveDice, saveTarget: dmg.saveTarget });
           report.rounds.push({ who: p.atk.who, attacker: p.attacker.uid, target: p.target.uid, targetName: p.target.name, dice: p.atk.dice, hits: roll.hits, hitTarget: p.hitTarget, hitDice: roll.dice, wounds: dmg.wounds, killed: dmg.killed, saveDice: dmg.saveDice, saveTarget: dmg.saveTarget, commanderKilled: dmg.commanderKilled });
           nextAttack();
         });
@@ -1392,8 +1401,8 @@
             var reduce = (u.commander && u.commander.alive && cmdHasProp(u, 'Eternal Reign')) ? 1 : 0;
             self.requestRoll({ kind: 'crumble', n: 1, label: u.name + ' crumbles', sub: 'D3 wounds' + (reduce ? ' − 1 (Eternal Reign)' : ''), uid: u.uid, side: u.side }, function () { return { dice: [R.d6()] }; }, function (res) {
               var crumble = Math.max(0, Math.ceil(res.dice[0] / 2) - reduce);
-              if (crumble > 0) { var cd = self.applyWounds(u, crumble, {}); self.addLog(u.name + ' crumbles: ' + cd.wounds + ' wounds lost.', 'fail'); bt.crumble = cd.wounds; self.emit({ type: 'wounds', uid: u.uid, wounds: cd.wounds, killed: cd.killed }); }
-              else self.addLog(u.name + ' holds together.', 'test');
+              if (crumble > 0) { var cd = self.applyWounds(u, crumble, {}); self.addLog(u.name + ' crumbles: ' + cd.wounds + ' wounds lost.', 'fail', { units: [u.uid] }); bt.crumble = cd.wounds; self.emit({ type: 'wounds', uid: u.uid, wounds: cd.wounds, killed: cd.killed }); }
+              else self.addLog(u.name + ' holds together.', 'test', { units: [u.uid] });
               report.breakTests.push(bt); nextLoser();
             });
           } else if (!test.ok) {

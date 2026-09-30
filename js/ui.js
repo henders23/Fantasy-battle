@@ -532,7 +532,7 @@
   var BADGE = { hits: 'ATTACK', saves: 'SAVE', discipline: 'TEST', flight: 'FLEE', casting: 'CAST', expr: 'HITS', initiative: 'INITIATIVE', crumble: 'CRUMBLE' };
   function holdWord(pct) { return pct >= 0.8 ? 'Confident' : pct >= 0.55 ? 'Steady' : pct >= 0.3 ? 'Shaky' : pct > 0 ? 'Desperate' : 'Doomed'; }
   UI.diceSeq = function (ev) {
-    UI.dice = { title: ev.title, sub: ev.sub || '', rows: [], pending: null, banner: null, uids: ev.uids || [] };
+    UI.dice = { title: ev.title, sub: ev.sub || '', rows: [], pending: null, banner: null, uids: ev.uids || [], kind: ev.kind || null };
     UI.diceSeqId++;
     if (ev.uids) UI.targets = ev.uids.slice();
     UI.renderDice(); UI.diceShow();
