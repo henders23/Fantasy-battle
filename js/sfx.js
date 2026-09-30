@@ -7,7 +7,7 @@
 (function () {
   if (typeof window === "undefined") return;
   var UI = SOVL.UI;
-  var COUNT = {"alarm_horn":1,"amb_wind":1,"arrow":4,"arrow_hit":5,"arrow_miss":4,"ballista":2,"bow":4,"catapult":1,"clash":6,"coin":1,"death":6,"defeat":1,"fire":2,"flesh":6,"gallop":6,"gun":3,"hero_dead":1,"horn":3,"horse_death":2,"level_up":1,"march":3,"neigh":3,"reward":1,"run":1,"shield":6,"spell":3,"swing":4,"thrust":4,"travel":1,"turn":1,"ui_drop":1,"ui_error":1,"ui_select":1,"ui_tick":2,"ui_toggle":1,"victory":1};
+  var COUNT = {"alarm_horn":1,"amb_wind":1,"arrow":4,"arrow_hit":5,"arrow_miss":4,"ballista":2,"bow":4,"catapult":1,"clash":6,"coin":1,"death":6,"defeat":1,"fire":2,"flesh":6,"gallop":6,"gun":3,"hero_dead":1,"horn":3,"horse_death":2,"level_up":1,"march":3,"neigh":3,"reward":1,"run":1,"shield":6,"spell":3,"swing":4,"thrust":4,"travel":1,"turn":1,"ui_drop":1,"ui_select":1,"ui_tick":2,"ui_toggle":1,"victory":1};
   // measured mean loudness of each clip group (dB); gains bring them to a common level
   var MEAN = {alarm_horn:-14,arrow:-16.4,arrow_hit:-22.6,arrow_miss:-22.2,ballista:-24.3,bow:-28.5,catapult:-20.2,clash:-27.6,coin:-12,death:-19.8,defeat:-19.4,fire:-22.5,flesh:-12.9,gallop:-27.6,gun:-17.4,hero_dead:-18.6,horn:-12.2,horse_death:-17.9,level_up:-11.6,march:-22.8,neigh:-16.8,reward:-11.9,run:-22.4,shield:-23.8,spell:-13.3,swing:-20.8,thrust:-16,travel:-14.1,turn:-17.6,victory:-19,amb_wind:-22.6};
   // mix: how prominent each group sits against the rest (1 = reference)
@@ -297,8 +297,7 @@
     // every button, card and map stop answers with the same crisp click; dialogs open and close silently
     play("ui_select", { wet: 0, max: 1 });
   }, true);
-  var hint = UI.hint;
-  UI.hint = function (text) { if (/^(Cannot|No |Not |That position|Finish the current)/.test(text || "")) play("ui_error", { wet: 0, max: 1, vol: 0.8 }); return hint.apply(UI, arguments); };
+  // Invalid orders use the visible hint only. The error tone has been removed.
   var place = SOVL.Battle.prototype.placeUnit;
   SOVL.Battle.prototype.placeUnit = function () { var ok = place.apply(this, arguments); if (ok && this === UI.battle && this.phase === "deploy") play("ui_drop", { wet: 0, max: 1 }); return ok; };
 
@@ -306,11 +305,11 @@
   if (SOVL.Campaign) {
     var C = SOVL.Campaign;
     var moveTo = C.moveTo; C.moveTo = function () { var n = moveTo.apply(C, arguments); if (n) { play("travel", { max: 1 }); play("march", { delay: 0.1, vol: 0.5, max: 1 }); } return n; };
-    var buy = C.buy; C.buy = function () { var err = buy.apply(C, arguments); play(err ? "ui_error" : "coin", { wet: 0, max: 1 }); return err; };
-    var reinforce = C.reinforce; C.reinforce = function () { var err = reinforce.apply(C, arguments); play(err ? "ui_error" : "coin", { wet: 0, max: 1 }); return err; };
+    var buy = C.buy; C.buy = function () { var err = buy.apply(C, arguments); if (!err) play("coin", { wet: 0, max: 1 }); return err; };
+    var reinforce = C.reinforce; C.reinforce = function () { var err = reinforce.apply(C, arguments); if (!err) play("coin", { wet: 0, max: 1 }); return err; };
     var treasure = C.treasure; C.treasure = function () { play("reward", { max: 1 }); return treasure.apply(C, arguments); };
     var learn = C.learnTrait; C.learnTrait = function () { play("level_up", { max: 1 }); return learn.apply(C, arguments); };
-    var camp = C.camp; C.camp = function () { play("fire", { vol: 0.5, max: 1 }); return camp.apply(C, arguments); };
+    var camp = C.camp; C.camp = function () { var result = camp.apply(C, arguments); if (result) play("fire", { vol: 0.5, max: 1 }); return result; };
   }
 
   // Audio may only start after a gesture: warm up the graph and clips on the first one.

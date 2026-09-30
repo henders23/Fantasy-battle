@@ -447,11 +447,30 @@
     return { w: w, h: h, data: d };
   }
 
+  // Distinct traversable obstacles for the dry country, sharing the heightmap lighting.
+  GEN.dunes = function (F, t, nz, rnd) {
+    each(F, function(i,x,y) {
+      var edge=1-smooth(-0.35,0.25,sdShape(x,y,t,nz,0.45)); if(edge<=0)return;
+      var ridge=Math.sin(y*2.1+Math.sin(x*.65)*1.6+nz.n(x*.5,y*.5)), n=nz.fbm(x*7,y*7,2);
+      F.H[i]=(0.12+(ridge+1)*.16)*edge; F.A[i]=edge;F.R[i]=.72+n*.1;F.G[i]=.55+n*.08;F.B[i]=.32+n*.05;
+    });
+  };
+  GEN.scree = function(F,t,nz,rnd) {
+    each(F,function(i,x,y){var a=1-smooth(-.2,.25,sdShape(x,y,t,nz,.6));if(a<=0)return;var n=nz.fbm(x*8,y*8,2);F.H[i]=.04;F.A[i]=a;F.R[i]=.39+n*.12;F.G[i]=.37+n*.12;F.B[i]=.35+n*.12;});
+    for(var j=0;j<t.w*t.h*3;j++){var x=rnd()*t.w,y=rnd()*t.h;if(sdShape(x,y,t,nz,.6)>.1)continue;rock(F,nz,rnd,x,y,.08+rnd()*.18,.08+rnd()*.17,[.48,.46,.43],0);}
+  };
+  GEN.scrub = function(F,t,nz,rnd) {
+    each(F,function(i,x,y){var a=1-smooth(-.25,.3,sdShape(x,y,t,nz,.7));if(a<=0)return;var n=nz.fbm(x*4,y*4,2);F.H[i]=.035;F.A[i]=a;F.R[i]=.44+n*.14;F.G[i]=.42+n*.1;F.B[i]=.25+n*.08;});
+    for(var j=0;j<t.w*t.h*4;j++){var x=rnd()*t.w,y=rnd()*t.h;if(sdShape(x,y,t,nz,.7)>.15)continue;tussock(F,nz,rnd,x,y,.12+rnd()*.25,.1+rnd()*.18,[.42,.43,.23]);}
+  };
   var KIND_SALT = { forest: 1, swamp: 2, lake: 3, cliff: 4, building: 5 };
   function bake(t) {
     var seed = ((t.seed || 1) * 31 + (KIND_SALT[t.kind] || 0) * 7919) >>> 0;
     var F = new Field(t), nz = makeNoise(seed), rnd = makeRng(seed ^ 0x5bd1e995);
     GEN[t.kind](F, t, nz, rnd);
+    if (t.biome && t.biome !== 'borderlands' && /cliff|building|lake/.test(t.kind)) {
+      for (var i=0;i<F.R.length;i++) { if(F.W[i]>.2) continue; var v=F.R[i]*.4+F.G[i]*.4+F.B[i]*.2; if(t.biome==='ashlands'){F.R[i]=v*.87;F.G[i]=v*.88;F.B[i]=v*.94;}else{F.R[i]=v*1.19;F.G[i]=v*.94;F.B[i]=v*.63;} }
+    }
     return shade(F, nz);
   }
   return { bake: bake, kinds: GEN, PPI: PPI, M: M };
@@ -459,7 +478,7 @@
 
   var core = terrainCore(), PPI = core.PPI, M = core.M, GEN = core.kinds;
   var cache = {}, queue = [], working = false, inflight = {}, worker = null;
-  function keyOf(t) { return [t.kind, t.seed, t.w.toFixed(3), t.h.toFixed(3)].join("|"); }
+  function keyOf(t) { return [t.kind, t.biome || "borderlands", t.seed, t.w.toFixed(3), t.h.toFixed(3)].join("|"); }
   function toCanvas(r) {
     var cv = document.createElement("canvas"); cv.width = r.w; cv.height = r.h;
     var g = cv.getContext("2d"), img = g.createImageData(r.w, r.h);
@@ -503,7 +522,7 @@
     if (inflight[key] || queue.indexOf(t) >= 0) return;
     if (worker) {
       inflight[key] = t;
-      try { worker.postMessage({ key: key, t: { kind: t.kind, x: t.x, y: t.y, w: t.w, h: t.h, seed: t.seed } }); return; } catch (e) { useMainThread(); return; }
+      try { worker.postMessage({ key: key, t: { kind: t.kind, x: t.x, y: t.y, w: t.w, h: t.h, seed: t.seed, biome: t.biome } }); return; } catch (e) { useMainThread(); return; }
     }
     queue.push(t); pump();
   }

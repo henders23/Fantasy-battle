@@ -94,7 +94,7 @@ function ok(c, m) { if (!c) { errors.push('FAIL: ' + m); console.log('FAIL: ' + 
   await page.evaluate(function () { SOVL.UI.battle = null; SOVL.UI.show('menu'); });
   await page.click('#btn-campaign'); await page.waitForTimeout(200);
   var sfx = await page.evaluate(function () { return SOVL.UI.sfx && SOVL.UI.sfx.loaded(); });
-  ok(sfx && sfx.loaded === 94 && !sfx.missing.length, 'all sound clips decoded: ' + (sfx && sfx.loaded) + ' missing ' + (sfx && sfx.missing.join(',')));
+  ok(sfx && sfx.loaded === 93 && !sfx.missing.length, 'all sound clips decoded: ' + (sfx && sfx.loaded) + ' missing ' + (sfx && sfx.missing.join(',')));
   var diffs = await page.$$eval('#setup-difficulty option', function (o) { return o.map(function (x) { return x.value; }); });
   ok(diffs.join(',') === 'easy,normal,hard', 'difficulty select populated: ' + diffs);
   await page.selectOption('#setup-difficulty', 'hard');
@@ -157,14 +157,14 @@ function ok(c, m) { if (!c) { errors.push('FAIL: ' + m); console.log('FAIL: ' + 
   await page.screenshot({ path: path.join(shots, 'f6d-treasure.png') });
   await page.click('#modal.active #m-ok'); await page.waitForTimeout(100);
   // camp: the rest preview matches what resting does
-  await page.evaluate(function () { var c = SOVL.UI.campaign; c.army.entries.forEach(function (e) { var t = e.kind === 'commander' ? e.retinue : e; if (t.models > 4) t.models -= 3; }); SOVL.UI.campaignCamp({ type: 'camp' }); });
+  await page.evaluate(function () { var c = SOVL.UI.campaign; c.army.entries.forEach(function (e) { var t = e.kind === 'commander' ? e.retinue : e; if (t.models > 4) t.models -= 3; }); c.layer=0;c.nodeIndex=0;var node=SOVL.Campaign.nodeAt(c,c.layer,c.nodeIndex);node.type='camp';node.visited=true;delete node.campClaimed;SOVL.UI.campaignCamp(node); });
   await page.waitForTimeout(150); await page.screenshot({ path: path.join(shots, 'f6b-camp.png') });
-  var preview = await page.$$eval('#modal-body .cp-card:first-child .cp-delta', function (d) { return d.map(function (x) { return x.textContent.split('→').map(function (n) { return +n; }); }); });
-  await page.click('#modal-body .choices button'); await page.waitForTimeout(150);
+  var preview = await page.$$eval('#modal-body .cp-card:first-child .ms-mid small', function (d) { return d.map(function (x) { return x.textContent.split('→').map(function (n) { return parseInt(n,10); }); }); });
+  await page.click('#modal-body .cp-card:first-child > button.primary'); await page.waitForTimeout(150);
   var after = await page.evaluate(function () { return { dawn: !!document.querySelector('#modal-body.m-dawn'), deltas: Array.from(document.querySelectorAll('#modal-body .cp-change .cp-delta')).map(function (d) { return +d.textContent; }) }; });
   ok(after.dawn && preview.length === after.deltas.length && preview.every(function (p, i) { return p[1] - p[0] === after.deltas[i]; }), 'camp rest preview matches the result: ' + JSON.stringify({ preview: preview, after: after.deltas }));
   await page.click('#modal.active #m-ok'); await page.waitForTimeout(100);
-  await page.evaluate(function () { SOVL.UI.campaignCamp({ type: 'camp' }); }); await page.waitForTimeout(100);
+  await page.evaluate(function () { var c=SOVL.UI.campaign; c.layer=0;c.nodeIndex=0;var node=SOVL.Campaign.nodeAt(c,c.layer,c.nodeIndex);node.type='camp';node.visited=true;delete node.campClaimed;SOVL.UI.campaignCamp(node); }); await page.waitForTimeout(100);
   var drill0 = await page.evaluate(function () { var c = SOVL.UI.campaign, i = c.army.entries.findIndex(function (e) { return ((e.kind === 'commander' ? e.retinue : e).vet || 0) < 3; }); return { i: i, v: (function (e) { return (e.kind === 'commander' ? e.retinue : e).vet || 0; })(c.army.entries[i]), disabled: document.querySelector('#modal-body .cp-drill').disabled }; });
   await page.click('#modal-body .cp-opt:nth-child(' + (drill0.i + 1) + ')'); await page.click('#modal-body .cp-drill'); await page.waitForTimeout(100);
   var drill1 = await page.evaluate(function (i) { var e = SOVL.UI.campaign.army.entries[i]; return (e.kind === 'commander' ? e.retinue : e).vet || 0; }, drill0.i);

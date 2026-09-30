@@ -185,6 +185,9 @@ SOVL.FACTION_INFO = {
 
 // Terrain templates: kind, and size range in inches.
 SOVL.TERRAIN_TYPES = {
+  dunes:    { name: 'Deep sand', difficult: true, impassable: false, blocksLos: false, color: '#c39859' },
+  scrub:    { name: 'Dense scrub', difficult: true, impassable: false, blocksLos: false, color: '#8b8753' },
+  scree:    { name: 'Loose scree', difficult: true, impassable: false, blocksLos: false, color: '#777170' },
   forest:   { name: 'Forest',   difficult: true,  impassable: false, blocksLos: true,  color: '#2d5a27' },
   cliff:    { name: 'Cliff',    difficult: false, impassable: true,  blocksLos: true,  color: '#6e6a63' },
   building: { name: 'Ruin',     difficult: false, impassable: true,  blocksLos: true,  color: '#8b7d6b' },
@@ -205,8 +208,8 @@ SOVL.CAMPAIGN = {
   startGold: 150,
   acts: [
     { name: 'Act I — The Borderlands', layers: 6, pts: [150, 320], elitePts: 1.3, boss: { name: 'The Warlord of the Marches', pts: 500 } },
-    { name: 'Act II — The Blackwater', layers: 7, pts: [420, 700], elitePts: 1.3, boss: { name: 'The Drowned Court', pts: 900 } },
-    { name: 'Act III — The Trail\'s End', layers: 7, pts: [750, 1100], elitePts: 1.25, boss: { name: 'The Deathless Host', pts: 1400, final: true } }
+    { name: 'Act II — The Sunken Marches', layers: 7, pts: [420, 700], elitePts: 1.3, boss: { name: 'The Drowned Court', pts: 900 } },
+    { name: 'Act III — The Ashen Crown', layers: 7, pts: [750, 1100], elitePts: 1.25, boss: { name: 'The Deathless Host', pts: 1400, final: true } }
   ],
   // veterancy thresholds (battles survived)
   veteran: [

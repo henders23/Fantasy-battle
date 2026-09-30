@@ -26,8 +26,8 @@ starts a prepared 488-point Border Guard army against a Greenskin warband; **Cus
 battle** retains the full five-faction army builder. Armies are placed automatically
 at deployment and can still be dragged, rotated, narrowed or widened before battle.
 
-The battlefield includes painted miniatures on flocked movement trays, relief-painted terrain,
-illustrated tokens for monsters, chariots and war machines, readable regiment labels, an army selection strip and a collapsible battle chronicle.
+The battlefield includes realistic miniature sprites on flocked movement trays, relief-painted terrain,
+individual artwork for monsters, chariots and war machines, readable regiment labels, an army selection strip and a collapsible battle chronicle.
 The movement ghost shows the legal endpoint and its cost; the larger movement circle
 is an upper bound before pivots and obstacles. Hovering over a charge target shows the
 attack side and approximate wounds dealt/received. Estimates are advisory and do not
@@ -69,15 +69,20 @@ footprint. Painting runs in a background worker and falls back to the page when 
 unavailable. Hovering a piece shows its exact footprint and its rules. Regiments and tokens
 cast shadows from the same sun.
 
-Every regiment is painted model by model. Each faction and unit type has its own look:
-Empire state troops with kite shields, halberds and handguns, bearded dwarves in bronze
-helms, elves with crested silver helms and pennanted lances, green-skinned orcs and
-eared goblins, skeletons, zombies and armoured wights. Weapons, shields and mounts
-(horses, barded warhorses, boars, wolves, skeletal steeds) follow the unit's equipment,
-and each front rank carries a standard and the commander where they fight. Models vary
-slightly and are shaded by the same sun as the terrain. Sprites are cached in atlas sheets
-at three resolutions, and each regiment is baked into one image that is redrawn only when
-it loses models, changes formation or turns through the light.
+All 81 named unit definitions across the five factions now have dedicated realistic
+miniature artwork: natural proportions, worn steel, cloth, leather and detailed mounts.
+This includes commanders, dragons, giants, artillery and the dreadnought. Front ranks carry
+faction standards and their commander. The same sprites appear in the builder, roster and
+selected-unit panel. They are cached at three resolutions, and each stationary regiment is
+baked into one image; animated models retain their strides and combat poses. The procedural
+painter remains a fallback if an image cannot load. Asset mappings and provenance are in
+`js/realistic-art.js` and `assets/README.md`.
+
+The campaign now crosses six battlefield environments: wooded borderlands, golden plains,
+sand dunes, an oasis, red badlands and ashen ruins. Later acts introduce the desert and
+volcanic regions. Each has its own ground palette and terrain layout, stable across reloads;
+meeting engagements keep their deeper deployment zones clear. Dunes, scrub and scree slow
+movement without blocking sight. Map nodes and battle briefings identify the battlefield.
 
 Regiments move across the table instead of jumping. A move pivots first, then marches at
 a pace set by the unit type: infantry step with a slight stride, cavalry trot faster, and
@@ -135,7 +140,8 @@ from 0 A.D. (CC BY-SA 3.0), and interface sounds from uisfx (CC0). Each event pi
 sound that fits the unit's weapon and mount, with small variations in pitch and level.
 Wind blows over the campaign map; the battlefield has no ambient bed, so the fighting is heard
 clearly. Buttons, cards and map stops all answer with the same crisp mouse click, and dialogs open
-and close silently. Dice are modelled as small
+and close silently. A blocked unit selection keeps its visible hint but has no error sound;
+the old error clip and its playback hooks have been removed entirely. Dice are modelled as small
 wooden cubes bouncing on a table. Clips are built from their sources by
 `tools/build_sfx.py`; credits and licences are in `assets/sfx/CREDITS.md`.
 
@@ -180,11 +186,16 @@ Before you pay, a ware says why it can't be used (no commander magic, no unit ab
 banner, the army already at its limit for that section), how much more gold you need, or what
 it would replace. The purse, a note on the last purchase and the Leave button stay in view.
 
-The camp is a night scene by a fire:
+Every camp restores surviving regiments to their previous strength (at least their starting
+size, within unit limits) and gives 50 / 75 / 100 gold in Acts I / II / III. Choose one extra benefit:
 
-- **Rest** lists exactly which units will recover and by how many models.
-- **Drill** lets you choose a unit and shows the rank and bonus it will gain.
-- **Dawn** then reports what changed.
+- **Reinforce:** recruit up to half each regiment's starting size, within its unit limit.
+- **Drill:** promote a chosen unit by one veterancy rank, up to rank three.
+- **Supplies:** take extra gold, for a total of 125 / 175 / 225 gold by act.
+
+The firelit camp previews the exact changes and reports them at dawn. Rewards can only be
+claimed once; reloading an unclaimed camp resumes its choices. Existing campaigns keep their
+routes and saved armies.
 
 Deployment opens a muster dock beside the table. It shows the scenario, the turn limit, the
 depth of the zones and the gap between the armies, and compares the two armies' points. A
@@ -206,10 +217,11 @@ When a battle ends, the verdict sweeps across the field, then the result screen 
 
 The continue button stays in view however long the lists are.
 
-The Trail of Death map is drawn as an old campaign chart: a parchment sheet with inked
-woods, hills, marsh, mountains and a river that change with each act, a winding road
-between the stops, wax-seal markers for each kind of stop, the route already marched in
-red ink, and a banner where the army stands.
+The Trail of Death map spans three original landscape paintings: a forested borderland
+valley, the savannah and desert of the Sunken Marches, and a volcanic citadel beneath the
+Ashen Crown. Winding routes, glowing available stops, a blue travelled path and the army's
+banner sit over the landscape. Reachable stops remain keyboard accessible and the map
+adapts to phone screens. The Motion setting also controls its animated highlights.
 
 The **Guide** (the Guide button, or **?** in battle) walks through a first battle in five
 illustrated steps: deploying, declaring charges, moving and shooting, fighting, and answering
@@ -274,10 +286,14 @@ js/experience.js  title, onboarding, orders, interactive combat and accessibilit
 js/visuals.js     artwork, formation labels, previews and impact effects
 js/terrain.js     procedural relief terrain (heightmap, lighting, shadows), painted in a worker
 js/tokens.js      painted tokens for monsters, chariots, the dreadnought and war machines
-js/models.js      painted regiment models, movement trays and the regiment image cache
+js/models.js      regiment sprites, procedural fallback, movement trays and image cache
+js/realistic-art.js named unit-to-atlas mappings and sprite loading
+js/biomes.js      campaign battlefield selection and deterministic terrain layouts
+js/biome-art.js   ground textures for campaign biomes
 js/music.js       background music with crossfades
 js/sfx.js         sound effects: clip player, event mapping, ambience and synthesised dice
-js/campmap.js     the parchment campaign map
+js/campmap.js     illustrated campaign world map
+css/campaign-world.css landscape map, unit portraits and expanded camp styles
 js/theme.js       title screen and battle panel dressing
 css/theme.css     type, panels, title screen, dice and battle interface styles
 js/screens.js     army builder and campaign screen dressing
@@ -302,6 +318,8 @@ test/browser.js   Playwright smoke test through both modes (node test/browser.js
 test/interact.js  Playwright interaction test of orders, dice and engagements
 test/features.js  Playwright test of scenarios, the rotation handle, undo, charge reactions,
                   difficulty, traits, honours and re-arming
+test/expansion.js camp rewards, repeat claims, legacy saves and seeded terrain layouts
+test/expansion-browser.js unit art, sound removal, world maps, camp choices and mobile layout
 ```
 
 ## Controls
@@ -339,10 +357,12 @@ previous opponent it wins about 55% of seeded head-to-head games
 ```
 node test/sim.js 80          # rules unit tests + 80 simulated battles + campaign checks
 node test/tactical.js        # 20 automatic/manual battles with matching seeded outcomes
+node test/expansion.js       # campaign rewards, terrain and removed sound contracts
 python3 -m http.server 8123  # then, in another shell:
 node test/browser.js http://127.0.0.1:8123/index.html
 node test/interact.js
 node test/features.js
+node test/expansion-browser.js http://127.0.0.1:8123/index.html
 ```
 
 `test/interface.js` uses `linkedom` and `@napi-rs/canvas` as optional test-only
@@ -352,5 +372,9 @@ saves without starting a browser. Set `SOVL_SHOTS` to an output directory to exp
 native Canvas renders. These checks do not validate browser CSS layout. The existing
 Playwright suites remain available for live browser testing and have been updated for
 interactive melee.
+
+Browser tests require Playwright and Chromium. Set `CHROMIUM_PATH` to use an installed
+Chromium executable; `test/expansion-browser.js` accepts an optional screenshot directory
+after its URL.
 
 Artwork provenance and the source prompts are recorded in `assets/README.md`.

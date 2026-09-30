@@ -64,7 +64,7 @@
     return { acts: acts };
   };
 
-  C.currentAct = function (camp) { return camp.map.acts[camp.act]; };
+  C.currentAct = function (camp) { var act = camp.map.acts[camp.act]; if (act && SOVL.CAMPAIGN.acts[camp.act]) act.name = SOVL.CAMPAIGN.acts[camp.act].name; return act; };
   C.availableNodes = function (camp) {
     var act = C.currentAct(camp);
     if (camp.nodeIndex == null) return act.layers[0].map(function (n, i) { return i; });
@@ -251,13 +251,47 @@
     var t = entry.kind === 'commander' ? entry.retinue : entry; t.models++; camp.gold -= cost; return null;
   };
   // ---- Camp ----
+  C.campAllowance = function (camp) { return 50 + camp.act * 25; };
+  C.campRecovery = function (camp, e, reinforce) {
+    var t = e.kind === 'commander' ? e.retinue : e, def = SOVL.findUnitDef(camp.faction, t.id);
+    if (!def.per) return t.models;
+    var recovered = Math.min(def.size[1], Math.max(t.models, t.maxSeen || 0, def.size[0]));
+    return Math.min(def.size[1], recovered + (reinforce ? Math.ceil(def.size[0] / 2) : 0));
+  };
+  // Used by events as well as camp visits; it never awards camp gold.
   C.camp = function (camp, choice, entry) {
     if (choice === 'rest') {
-      camp.army.entries.forEach(function (e) { var t = e.kind === 'commander' ? e.retinue : e, def = SOVL.findUnitDef(camp.faction, t.id); if (def.per) { var full = Math.max(t.models, t.maxSeen || def.size[0]); t.models = Math.min(def.size[1], Math.max(t.models, Math.min(full, t.models + Math.ceil(def.size[0] / 2)))); } });
-      return 'The army rests. Wounded return to the ranks.';
+      camp.army.entries.forEach(function (e) { var t = e.kind === 'commander' ? e.retinue : e; t.models = C.campRecovery(camp, e, false); });
+      return 'All surviving regiments recover to their previous strength, or their starting strength if greater.';
     }
-    if (choice === 'train' && entry) { var t = entry.kind === 'commander' ? entry.retinue : entry; t.vet = Math.min(3, (t.vet || 0) + 1); return SOVL.findUnitDef(camp.faction, t.id).name + ' drills hard and gains a veterancy rank.'; }
+    if (choice === 'train' && entry && camp.army.entries.indexOf(entry) >= 0) {
+      var t = entry.kind === 'commander' ? entry.retinue : entry;
+      if ((t.vet || 0) >= 3) return null;
+      t.vet = (t.vet || 0) + 1;
+      // Training counts towards the next promotion, rather than being overwritten by it.
+      t.battles = Math.max(t.battles || 0, SOVL.CAMPAIGN.veteran[t.vet - 1].at);
+      return SOVL.findUnitDef(camp.faction, t.id).name + ' gains a veterancy rank.';
+    }
     return null;
+  };
+  C.campVisit = function (camp, node, choice, entry) {
+    var current = camp.nodeIndex == null ? null : C.nodeAt(camp, camp.layer, camp.nodeIndex);
+    if (!node || node !== current || node.type !== 'camp' || !node.visited || node.campClaimed) return null;
+    if (['reinforce', 'train', 'supplies'].indexOf(choice) < 0) return null;
+    var t = entry && (entry.kind === 'commander' ? entry.retinue : entry);
+    if (choice === 'train' && (!entry || camp.army.entries.indexOf(entry) < 0 || (t.vet || 0) >= 3)) return null;
+    C.camp(camp, 'rest');
+    var gold = C.campAllowance(camp), lines = ['The wounded return: every surviving regiment is restored.'];
+    if (choice === 'reinforce') {
+      camp.army.entries.forEach(function (e) { var u = e.kind === 'commander' ? e.retinue : e; u.models = C.campRecovery(camp, e, true); u.maxSeen = Math.max(u.maxSeen || 0, u.models); });
+      lines.push('Fresh recruits join every regiment: up to half its starting size, within its unit limit.');
+    } else if (choice === 'train') lines.push(C.camp(camp, 'train', entry));
+    else gold += 75 + camp.act * 25;
+    camp.gold += gold;
+    lines.push('The quartermaster provides ' + gold + ' gold.');
+    node.campClaimed = true;
+    camp.log = camp.log.concat(lines);
+    return { lines: lines, gold: gold };
   };
   // ---- Events ----
   C.randomEvent = function (camp) {

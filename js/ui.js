@@ -219,6 +219,7 @@
     R.setSeed(null);
     var b = new SOVL.Battle({ armies: opts.armies, terrain: opts.terrain, scenario: opts.scenario, names: opts.names, sides: ['bottom', 'top'], scoreMode: opts.campaign ? 'ratio' : 'points', interactive: true, interactiveCombat: true });
     UI.dice = { title: '', sub: '', rows: [], pending: null, banner: null }; UI.diceSeqId = 0; UI.deployDone = false; UI.renderDice(); $('dice-panel').classList.remove('on');
+    b.biome = opts.biome || 'borderlands'; b.fieldName = opts.fieldName || 'The Borderlands';
     UI.battle = b; UI.battleOpts = opts; UI.ai = new SOVL.AI(b, UI.aiSide, { aggression: opts.aggression || 0.5 });
     UI.sel = null; UI.inspect = null; UI.hover = null; UI.mode = 'move'; UI.targets = []; UI.preview = null; UI.busy = false; UI.deploySel = null;
     UI.ai.deploy(); // simultaneous deployment: hidden until the player is done
@@ -866,14 +867,15 @@
   UI.campaignBattle = function (node, kind, after) {
     var camp = UI.campaign, enemy = C.enemyArmyFor(camp, node, kind), act = SOVL.CAMPAIGN.acts[camp.act];
     var ef = SOVL.FACTION_DATA[enemy.faction], scenario = C.scenarioFor(camp, node, kind), scen = SOVL.SCENARIOS.filter(function (s) { return s.id === scenario; })[0];
+    var battlefield = SOVL.Biomes.forNode(camp, node);
     var intro = kind === 'small' ? 'A small warband bars the way.' : kind === 'undead' ? 'The dead stir in the barrow.' : node.type === 'boss' ? (camp.act === 2 ? 'At the end of the trail waits the Deathless Host. This is the final battle.' : act.boss.name + ' holds the pass with a full army. Win, and the road to the next act is open.') : node.type === 'elite' ? 'A veteran force blocks the trail. Expect a hard fight and better plunder.' : 'An enemy army stands in your way.';
-    var body = '<h2>' + esc(node.type === 'boss' ? act.boss.name : NODE_NAME[node.type] || 'Battle') + '</h2><div class="text">' + esc(intro) + '<br><br><b>' + esc(ef.name) + '</b> — ' + enemy.entries.length + ' units, about ' + enemy.pts + ' points:<br>' + enemy.entries.map(function (e) { return esc(A.entryLabel(enemy.faction, e)); }).join('<br>') + '<br><br>Your army: ' + A.armyCost(camp.army) + ' points, ' + camp.army.entries.length + ' units.' + (scen ? '<br><br><b>' + esc(scen.name) + '</b> — ' + esc(scen.desc) : '') + '</div><div class="choices"><button class="primary" id="m-fight">To battle</button></div>';
+    var body = '<h2>' + esc(node.type === 'boss' ? act.boss.name : NODE_NAME[node.type] || 'Battle') + '</h2><div class="text">' + esc(intro) + '<br><br><b>' + esc(battlefield.name) + '</b> — ' + esc(battlefield.desc) + '<br><br><b>' + esc(ef.name) + '</b> — ' + enemy.entries.length + ' units, about ' + enemy.pts + ' points:<br>' + enemy.entries.map(function (e) { return esc(A.entryLabel(enemy.faction, e)); }).join('<br>') + '<br><br>Your army: ' + A.armyCost(camp.army) + ' points, ' + camp.army.entries.length + ' units.' + (scen ? '<br><br><b>' + esc(scen.name) + '</b> — ' + esc(scen.desc) : '') + '</div><div class="choices"><button class="primary" id="m-fight">To battle</button></div>';
     UI.modalDismissable = false; UI.modal(body);
     $('m-fight').onclick = function () {
       UI.closeModal();
       camp.pendingBattle = { layer: camp.layer, idx: camp.nodeIndex, kind: kind || null }; C.save(camp);
-      var terrain = A.randomTerrain({}), army = C.battleArmy(camp);
-      UI.startBattle({ armies: [army, enemy], terrain: terrain, scenario: scenario, names: [camp.commanderName, node.type === 'boss' ? act.boss.name : ef.name], aggression: node.type === 'boss' ? 0.7 : 0.5, campaign: true, onEnd: function (b) {
+      var field = SOVL.Biomes.forNode(camp, node), terrain = SOVL.Biomes.terrain(field, scenario), army = C.battleArmy(camp);
+      UI.startBattle({ armies: [army, enemy], terrain: terrain, biome: field.id, fieldName: field.name, scenario: scenario, names: [camp.commanderName, node.type === 'boss' ? act.boss.name : ef.name], aggression: node.type === 'boss' ? 0.7 : 0.5, campaign: true, onEnd: function (b) {
         var r = C.applyBattleResult(camp, b, node, enemy);
         var extra = el('div', 'text', r.lines.map(esc).join('<br>'));
         camp.pendingBattle = null; C.save(camp);
@@ -981,17 +983,7 @@
     }
     render();
   };
-  UI.campaignCamp = function (node) {
-    var camp = UI.campaign, box = el('div');
-    box.appendChild(el('h2', null, 'Camp')); box.appendChild(el('div', 'text', 'A quiet night. Rest to bring wounded stragglers back to the ranks, or drill one unit to raise its veterancy.'));
-    var ch = el('div', 'choices');
-    var rest = el('button', 'primary', 'Rest — every unit recovers up to half its base size in lost models'); rest.onclick = function () { var t = C.camp(camp, 'rest'); camp.log.push(t); C.save(camp); UI.closeModal(); UI.renderCampaign(); UI.simpleModal('Camp', esc(t)); };
-    ch.appendChild(rest);
-    box.appendChild(ch);
-    box.appendChild(el('h3', null, 'Or train one unit'));
-    box.appendChild(UI.rosterList(camp, function (e) { var t = e.kind === 'commander' ? e.retinue : e; if ((t.vet || 0) >= 3) return null; var b = el('button', 'small', 'Train'); b.style.marginTop = '4px'; b.onclick = function () { var txt = C.camp(camp, 'train', e); camp.log.push(txt); C.save(camp); UI.closeModal(); UI.renderCampaign(); UI.simpleModal('Camp', esc(txt)); }; return b; }));
-    UI.modalDismissable = false; UI.modal(box);
-  };
+  // Camp choices are rendered by campscreens.js and claimed through C.campVisit.
 
   // ---------- rules ----------
   UI.showRules = function () {

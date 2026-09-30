@@ -1,17 +1,23 @@
 # Original game artwork
 
 Created for this project with the built-in image generation tool. These are original
-illustrations, not copied SOVL game artwork. Final game assets are WebP; the two sprite
-atlases retain their transparent backgrounds. Sprite source rectangles are specified
-in `js/visuals.js`; the renderer turns the downward-facing models to match unit facing.
-Infantry and cavalry sprites represent each faction generally, rather than every named
-equipment variant. Machines and monsters retain the existing native symbols.
+illustrations, not copied SOVL game artwork. Final game assets are WebP. The five realistic
+unit atlases retain transparent backgrounds and cover all 81 named definitions, including
+commanders, mounts, monsters and machines. Source rectangles and ID mappings are in
+`js/realistic-art.js`; companion JSON files record the prepared atlas bounds. They use one
+primary pose per named unit; equipment upgrades retain that unit's illustration. Generated
+figures were cropped, alpha-trimmed and packed into regular 1600 × 1280 atlases. Older generic
+sprites in `js/visuals.js` and the procedural model painter remain as loading fallbacks.
 
 | File | Use |
 | --- | --- |
 | `title-battle.webp` | Title screen, campaign atmosphere, battle briefs and results |
 | `battlefield-ground.webp` | Clear overhead ground; all actual obstacles come from the battle state |
 | `faction-portraits.webp` | Five faction illustrations in human/dwarf/elf/orc/undead order |
+| `units/empire.webp`, `units/dwarves.webp`, `units/elves.webp`, `units/orcs.webp`, `units/undead.webp` | Dedicated realistic unit sprites, commanders and faction standards |
+| `campaign/borderlands.webp` | Forested valley and northern fortress, Act I |
+| `campaign/sunlands.webp` | Savannah, desert, canyons and oasis, Act II |
+| `campaign/ashlands.webp` | Volcanic wastes and a distant citadel, Act III |
 | `unit-sprites.webp` | Fallback infantry and mounted models, used only if the model painter fails |
 | `terrain-sprites.webp` | Fallback terrain art, used only if the procedural painter fails |
 | `music/trail-theme.mp3` | Menu and campaign theme (2:30) |
@@ -20,6 +26,24 @@ equipment variant. Machines and monsters retain the existing native symbols.
 | `sfx/` | Sound effects from 0 A.D. (CC BY-SA 3.0) and uisfx (CC0); see `sfx/CREDITS.md` |
 
 ## Prompt briefs
+
+- **Realistic unit atlases:** One faction per transparent five-column, four-row sheet.
+  Full bodies and equipment, realistic proportions and anatomy, weathered steel, cloth,
+  leather and natural creature textures. Consistent elevated tabletop view and soft light,
+  with separated silhouettes and no bases, text, labels or background. Each slot specifies
+  its named unit, weapon, armour, mount or machine; spare slots provide standard bearers
+  and veterans. Human steel and blue cloth; dwarven iron, bronze and russet; elven silver
+  and teal; scarred orc iron and red; corroded undead armour and violet standards.
+- **Borderlands landscape:** A tall cinematic fantasy campaign landscape, viewed from
+  above, with a wooded valley, meandering river, rolling plains and a distant mountain
+  fortress. Atmospheric depth, natural terrain, restrained blue-green shadows and warm
+  sunlight. No routes, labels, units, icons or UI; these are drawn interactively in game.
+- **Sunlands landscape:** A tall elevated campaign vista transitioning from golden
+  savannah into pale dunes, sandstone canyons, a turquoise oasis and a distant desert
+  citadel. Detailed natural terrain and warm late-afternoon light; no text or markers.
+- **Ashlands landscape:** A tall dramatic campaign vista of barren red badlands and
+  black volcanic ridges, smoke and ember light, rising toward a distant dark fortress.
+  Realistic geological texture and atmospheric depth; no routes, text, markers or UI.
 
 - **Title:** A wide, cinematic dark fantasy painting. A human commander in dark plate
   and a torn blue banner occupies the right third, surveying armies beneath a burning

@@ -377,6 +377,7 @@
   var BUDGET_MS = 5, spent = 0;
   function spriteFor(u, role, v, rank, bw, bd, bucket, cmd, PPI) {
     var base = [u.faction, cmd ? "c:" + cmd.def.id + cmd.weapon : u.id + u.weapon + (u.ranged || ""), role, v, rank >= 2 ? 2 : rank].join("|"), tail = [bw.toFixed(2), bd.toFixed(2), u.banner ? 1 : 0, PPI].join("|");
+    tail += "|" + (SOVL.RealisticArt ? SOVL.RealisticArt.revision() : 0);
     var key = base + "|" + bucket + "|" + tail;
     var hit = cache[key];
     if (hit) return hit;
@@ -395,7 +396,7 @@
     g.translate(slot.x, slot.y); g.scale(PPI, PPI); g.translate(bw / 2 + padX, front);
     var a = SUN - bucket * (Math.PI / 4); L.x = Math.cos(a); L.y = Math.sin(a);
     c = g;
-    try { paintModel(u, role, v, rank, bw, bd, cmd); } catch (e) { g.restore(); cache[key] = "failed"; c = null; return "failed"; }
+    try { if (!SOVL.RealisticArt || !SOVL.RealisticArt.draw(g, u, bw, bd, role, cmd)) paintModel(u, role, v, rank, bw, bd, cmd); } catch (e) { g.restore(); cache[key] = "failed"; c = null; return "failed"; }
     g.restore(); c = null;
     hit = { cv: slot.page, sx: slot.x, sy: slot.y, sw: sw, sh: sh, ox: bw / 2 + padX, oy: front, w: sw / PPI, h: sh / PPI, bucket: bucket };
     cache[key] = hit; cacheCount++;
@@ -480,9 +481,12 @@
   }
   P.drawModelSprite = function (ctx, u, bw, bd, rank, file, files) {
     if (SOVL.isSingle(u.type) && !SOVL.commanderOnly(u)) {
-      if (!previous) return false;
-      if (SOVL.FX && SOVL.FX.animating(u)) { var po = SOVL.FX.pose(u, 0, 0, bw, bd); ctx.save(); ctx.translate(po.x, po.y * 0.6); ctx.rotate(po.r * 0.5); try { return previous.call(this, ctx, u, bw, bd); } finally { ctx.restore(); } }
-      return previous.call(this, ctx, u, bw, bd);
+      ctx.save();
+      try {
+        if (SOVL.FX && SOVL.FX.animating(u)) { var po = SOVL.FX.pose(u, 0, 0, bw, bd); ctx.translate(po.x, po.y * 0.6); ctx.rotate(po.r * 0.5); }
+        if (SOVL.RealisticArt && SOVL.RealisticArt.draw(ctx, u, bw, bd, "r", null)) return true;
+        return previous ? previous.call(this, ctx, u, bw, bd) : false;
+      } finally { ctx.restore(); }
     }
     var m = modelSprite(this, u, bw, bd, rank || 0, file || 0, files || 1);
     if (!m) return previous ? previous.call(this, ctx, u, bw, bd) : false;
@@ -496,7 +500,7 @@
     if (SOVL.FX && SOVL.FX.animating(u)) return false; // moving or fighting: draw each model with its pose
     var th = rect.a + Math.PI / 2, bucket = ((Math.round(th / (Math.PI / 4)) % 8) + 8) % 8, ppi = levelFor(this);
     var cmdStar = u.commander && u.commander.alive && !SOVL.commanderOnly(u);
-    var key = [count, files, rk, bucket, ppi, cmdStar ? 1 : 0, u.fleeing ? 1 : 0, u.banner ? 1 : 0, bw.toFixed(2), bd.toFixed(2)].join("|");
+    var key = [SOVL.RealisticArt ? SOVL.RealisticArt.revision() : 0, u.weapon, u.ranged, count, files, rk, bucket, ppi, cmdStar ? 1 : 0, u.fleeing ? 1 : 0, u.banner ? 1 : 0, bw.toFixed(2), bd.toFixed(2)].join("|");
     var comp = u._comp;
     if (!comp || comp.key !== key || comp.dirty) {
       var padX = bw * 0.9, front = Math.max(bw * 1.8, 0.5) + 0.2, back = bd * 0.4;

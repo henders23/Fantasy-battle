@@ -585,7 +585,7 @@
         (b.phase === "charge"
           ? "Protect your flanks. Turning an enemy before charging it can matter more than superior numbers."
           : "Use the army strip below to find a regiment. Blue fronts are yours; red fronts are the enemy.") +
-        '</div><div class="terrain-key"><span>Forest · slows, blocks sight</span><span>Swamp · slows movement</span><span>Cliff, ruin, lake · impassable</span></div></div>';
+        '</div><div class="terrain-key"><span>Forest · slows, blocks sight</span><span>Sand, scrub, scree, swamp · slow movement</span><span>Cliff, ruin, lake · impassable</span></div></div>';
     }
     if (
       b.phase === "strategic" &&

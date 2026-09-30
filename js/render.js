@@ -47,7 +47,7 @@
     if (!this.grass) this.makeGrass();
     ctx.save(); ctx.translate(this.ox, this.oy); ctx.scale(this.scale, this.scale);
     // table
-    if (this.groundImage && this.groundImage.complete && this.groundImage.naturalWidth) ctx.drawImage(this.groundImage, 0, 0, TABLE.w, TABLE.h);
+    if (this.groundImage && (this.groundImage.getContext || (this.groundImage.complete && this.groundImage.naturalWidth))) ctx.drawImage(this.groundImage, 0, 0, TABLE.w, TABLE.h);
     else { ctx.save(); ctx.scale(1 / 12, 1 / 12); ctx.fillStyle = this.grass; ctx.fillRect(0, 0, TABLE.w * 12, TABLE.h * 12); ctx.restore(); }
     ctx.fillStyle = 'rgba(11,29,36,0.15)'; ctx.fillRect(0, 0, TABLE.w, TABLE.h);
     // one sun for the whole table: warm light from the upper left, a soft vignette at the rims

@@ -193,6 +193,7 @@
         var own = A.armyCost(camp.army), foe = lastEnemy.pts || A.armyCost(lastEnemy), share = own / Math.max(1, own + foe);
         text.innerHTML = "";
         text.appendChild(el("p", "brief-intro", intro));
+        if (parts.length > 4) text.appendChild(el("p", "brief-scen", parts[1]));
         var odds = el("div", "odds", '<span class="mine">' + own + '</span><span class="odds-bar"><i style="width:' + (share * 100).toFixed(1) + '%"></i></span><span class="theirs">' + foe + "</span>");
         odds.title = "Army points: yours " + own + ", theirs " + foe;
         text.appendChild(odds);

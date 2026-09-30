@@ -127,6 +127,8 @@
     var box = info.apply(UI, arguments), b = UI.battle;
     try {
       box.style.setProperty("--faction", (SOVL.FACTION_INFO[u.faction] || {}).color || "#557fab");
+      var portrait=box.querySelector('.unit-portrait');
+      if(portrait && SOVL.Thumbs){portrait.style.backgroundImage='none';portrait.classList.add('unit-art-portrait');var model=SOVL.Thumbs.canvas(thumbFor(u,128,145));portrait.appendChild(model);}
       var lines = box.querySelectorAll(".statline"), keys = ["sk", "pw", "df", "at", "wd", "ds"];
       var pairs = [[lines[0], SOVL.effStats(u, b), u.base]];
       if (u.commander && u.commander.alive && lines[1]) pairs.push([lines[1], SOVL.effCmdStats(u, b), u.commander.base]);
@@ -148,7 +150,7 @@
   var thumbs = {};
   function thumbFor(u, W, H) {
     W = W || 50; H = H || 58;
-    var cmdOnly = SOVL.commanderOnly(u), key = [u.faction, u.id, u.weapon, u.ranged, cmdOnly ? u.commander.def.id : "", u.commander && u.commander.alive ? 1 : 0, W, H].join("|");
+    var cmdOnly = SOVL.commanderOnly(u), key = [SOVL.RealisticArt ? SOVL.RealisticArt.revision() : 0, u.faction, u.id, u.weapon, u.ranged, cmdOnly ? u.commander.def.id : "", u.commander && u.commander.alive ? 1 : 0, W, H].join("|");
     if (thumbs[key]) return thumbs[key];
     var d = Math.min(2, window.devicePixelRatio || 1), cv = document.createElement("canvas");
     cv.width = W * d; cv.height = H * d;
@@ -159,6 +161,7 @@
     var k = Math.min(W, H) * d / reach;
     g.translate(W * d / 2, H * d * (single || cav ? 0.5 : 0.58)); g.scale(k, k);
     try { P.drawModelSprite.call({ scale: k / d * 1.1, dpr: d }, g, u, bw, bd, 0, 1, files); } catch (e) { /* leave the plain plate */ }
+    cv._unitArt = { unit:u, width:W, height:H };
     thumbs[key] = cv;
     return cv;
   }
@@ -172,7 +175,7 @@
   }
   // Paint a copy of a cached thumbnail into a fresh canvas element.
   function thumbCanvas(src, cls) {
-    var cv = document.createElement("canvas"); cv.className = cls || "thumb"; cv.width = src.width; cv.height = src.height; cv.setAttribute("aria-hidden", "true");
+    var cv = document.createElement("canvas"); cv._unitArt = src._unitArt; cv.className = cls || "thumb"; cv.width = src.width; cv.height = src.height; cv.setAttribute("aria-hidden", "true");
     cv.getContext("2d").drawImage(src, 0, 0); return cv;
   }
   SOVL.Thumbs = { unit: thumbFor, fromDef: unitFromDef, canvas: thumbCanvas, forDef: function (fid, id, W, H, opts) { var u = unitFromDef(fid, id, opts); return u ? thumbCanvas(thumbFor(u, W, H)) : null; } };
@@ -192,7 +195,7 @@
         card.style.setProperty("--sb2", ratio > 0.6 ? "#a6d98a" : ratio > 0.3 ? "#ecd07a" : "#e9867a");
         var old = card.querySelector(".mini-portrait, .thumb");
         var src = thumbFor(u), cv = document.createElement("canvas");
-        cv.className = "thumb"; cv.width = src.width; cv.height = src.height; cv.setAttribute("aria-hidden", "true");
+        cv._unitArt = src._unitArt; cv.className = "thumb"; cv.width = src.width; cv.height = src.height; cv.setAttribute("aria-hidden", "true");
         cv.getContext("2d").drawImage(src, 0, 0);
         if (old) card.replaceChild(cv, old); else card.insertBefore(cv, card.firstChild);
       });
@@ -219,5 +222,8 @@
   window.addEventListener("load", function () {
     watchDice();
     if (UI.screen === "menu" || document.querySelector("#screen-menu.active")) { decorateTitle(); continueCard(); soundLabel(); startEmbers(); }
+  });
+  window.addEventListener('unitartready', function () {
+    document.querySelectorAll('canvas.thumb').forEach(function(cv){var a=cv._unitArt;if(!a)return;var src=thumbFor(a.unit,a.width,a.height);var g=cv.getContext('2d');g.clearRect(0,0,cv.width,cv.height);g.drawImage(src,0,0,cv.width,cv.height);});
   });
 })();

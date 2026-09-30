@@ -227,65 +227,39 @@
     UI.modalDismissable = false; UI.modal(box); $("modal-body").classList.add("m-bivouac", "m-dawn");
   }
   UI.campaignCamp = function (node) {
-    var camp = UI.campaign, box = el("div", "cp");
-    // what resting would restore, worked out on a copy of the campaign
-    var before = snapshot(camp), copy = JSON.parse(JSON.stringify(camp)); C.camp(copy, "rest");
-    var gains = [];
-    copy.army.entries.forEach(function (e, i) { var d = troop(e).models - before[i].models; if (d > 0) gains.push({ e: camp.army.entries[i], from: before[i].models, to: troop(e).models }); });
-    box.appendChild(el("div", "cp-sky", starfield() + FIRE + '<div class="cp-headtext"><div class="ms-eyebrow">A night on the trail</div><h2>Camp</h2><div class="text">A quiet night. Rest to bring wounded stragglers back to the ranks, or drill one unit to raise its veterancy.</div></div>'));
-    var cards = el("div", "cp-cards");
-    // rest
-    var rest = el("section", "cp-card");
-    rest.appendChild(el("h3", null, '<span class="cp-ic">' + ICON.tent + "</span>Rest by the fire"));
-    rest.appendChild(el("p", "ms-lead", "Every unit recovers up to half its base size in lost models."));
-    var rl = el("div", "cp-list");
-    if (!gains.length) rl.appendChild(el("p", "cp-none", "Every unit is already at strength."));
-    gains.forEach(function (g) {
-      var t = troop(g.e), max = SOVL.findUnitDef(camp.faction, t.id).size[1], row = el("div", "cp-item");
-      row.appendChild(unitThumb(camp, g.e, 32, 36));
-      row.appendChild(el("div", "ms-mid", "<b>" + esc(entryName(camp, g.e)) + '</b><div class="ms-bar gain"><i style="width:' + Math.round(100 * g.from / max) + '%"></i><u style="left:' + Math.round(100 * g.from / max) + "%;width:" + Math.round(100 * (g.to - g.from) / max) + '%"></u></div>'));
-      row.appendChild(el("span", "cp-delta", g.from + " → " + g.to));
-      rl.appendChild(row);
-    });
-    rest.appendChild(rl);
-    var rc = el("div", "choices"), rb = el("button", "primary", "Rest" + (gains.length ? " — " + gains.length + " unit" + (gains.length === 1 ? "" : "s") + " recover" + (gains.length === 1 ? "s" : "") : "")); rb.type = "button";
-    rb.onclick = function () {
-      var pre = snapshot(camp), t = C.camp(camp, "rest"); camp.log.push(t); C.save(camp);
-      var rows = [];
-      camp.army.entries.forEach(function (e, i) { var d = troop(e).models - pre[i].models; if (d > 0) rows.push({ e: e, text: "Stragglers rejoin: " + pre[i].models + " → " + troop(e).models + " models.", delta: "+" + d }); });
-      UI.renderCampaign(); dawn(camp, t, rows);
-    };
-    rc.appendChild(rb); rest.appendChild(rc); cards.appendChild(rest);
-    // drill
-    var drill = el("section", "cp-card");
-    drill.appendChild(el("h3", null, '<span class="cp-ic">' + ICON.drill + "</span>Drill one unit"));
-    drill.appendChild(el("p", "ms-lead", "Hard training by firelight: the chosen unit gains a veterancy rank."));
-    var dl = el("div", "cp-list cp-pick"), chosen = null, db = el("button", "primary cp-drill", "Choose a unit to drill"); db.type = "button"; db.disabled = true;
-    dl.setAttribute("role", "radiogroup"); dl.setAttribute("aria-label", "Unit to drill");
-    camp.army.entries.forEach(function (e) {
-      var t = troop(e), v = t.vet || 0, def = SOVL.findUnitDef(camp.faction, t.id), next = v < 3 ? rankOf(v + 1) : null;
-      var row = el("button", "cp-item cp-opt" + (next ? "" : " maxed")); row.type = "button"; row.disabled = !next;
-      row.setAttribute("role", "radio"); row.setAttribute("aria-checked", "false");
-      row.appendChild(unitThumb(camp, e, 32, 36));
-      row.appendChild(el("div", "ms-mid", "<b>" + esc(entryName(camp, e)) + "</b><small>" + (next ? (v ? esc(rankOf(v).name) + " → " : "") + '<span class="ms-rank">' + esc(next.name) + "</span> · " + esc(bonusOf(next)) : "Legendary: cannot rise further") + "</small>"));
-      row.appendChild(el("span", "cp-radio"));
-      row.onclick = function () {
-        chosen = e; dl.querySelectorAll(".cp-opt").forEach(function (x) { x.classList.remove("on"); x.setAttribute("aria-checked", "false"); });
-        row.classList.add("on"); row.setAttribute("aria-checked", "true");
-        db.disabled = false; db.textContent = "Drill " + def.name;
-      };
-      dl.appendChild(row);
-    });
-    drill.appendChild(dl);
-    db.onclick = function () {
-      if (!chosen) return;
-      var t = troop(chosen), v0 = t.vet || 0, txt = C.camp(camp, "train", chosen); camp.log.push(txt); C.save(camp);
-      var r = rankOf(t.vet);
-      UI.renderCampaign(); dawn(camp, txt, [{ e: chosen, text: (v0 ? esc(rankOf(v0).name) + " → " : "Raised to ") + '<span class="ms-rank">' + esc(r.name) + "</span>: " + esc(bonusOf(r)) + ".", delta: "★" }]);
-    };
-    var dc = el("div", "cp-drillfoot"); dc.appendChild(db); drill.appendChild(dc);
-    cards.appendChild(drill);
-    box.appendChild(cards);
-    UI.modalDismissable = false; UI.modal(box); $("modal-body").classList.add("m-bivouac");
+    var camp=UI.campaign, box=el("div","cp"), before=snapshot(camp), allowance=C.campAllowance(camp);
+    if(node.campClaimed){UI.simpleModal("Camp", "The army has already received its supplies here.");return;}
+    box.appendChild(el("div","cp-sky",starfield()+FIRE+'<div class="cp-headtext"><div class="ms-eyebrow">Shelter on the trail</div><h2>Rest. Resupply. Return stronger.</h2><div class="text">Every choice restores all surviving regiments to their previous strength and gives you <b>'+allowance+' gold</b>. Choose one extra benefit below.</div></div>'));
+    var benefits=el("div","cp-recovery"), recovery=[];
+    camp.army.entries.forEach(function(e){var n=C.campRecovery(camp,e,false)-troop(e).models;if(n>0)recovery.push(esc(entryName(camp,e))+" +"+n);});
+    benefits.innerHTML='<b>Included free</b><span>'+ (recovery.length ? recovery.join(' · ') : 'Your regiments are already rested.')+' · '+allowance+' gold</span>';
+    box.appendChild(benefits);
+    var cards=el("div","cp-cards"), done=false;
+    function finish(choice,entry){
+      if(done)return;var result=C.campVisit(camp,node,choice,entry);if(!result)return;done=true;C.save(camp);
+      var rows=[];camp.army.entries.forEach(function(e,i){var t=troop(e),gain=t.models-before[i].models,v=(t.vet||0)-before[i].vet,txt=[];
+        if(gain)txt.push(before[i].models+" → "+t.models+" models");if(v)txt.push(esc(rankOf(t.vet).name)+": "+esc(bonusOf(rankOf(t.vet))));
+        if(txt.length)rows.push({e:e,text:txt.join(" · "),delta:gain?"+"+gain:"★"});
+      });UI.renderCampaign();dawn(camp,result.lines.join(' '),rows);
+    }
+    var rest=el("section","cp-card");rest.appendChild(el("h3",null,'<span class="cp-ic">'+ICON.tent+'</span>Welcome reinforcements'));
+    rest.appendChild(el("p","ms-lead","After recovery, every regiment gains fresh recruits worth up to half its starting size, within its maximum strength."));
+    var list=el("div","cp-list"), total=0;
+    camp.army.entries.forEach(function(e){var t=troop(e),to=C.campRecovery(camp,e,true),extra=to-C.campRecovery(camp,e,false);if(!extra)return;total+=extra;
+      var row=el("div","cp-item");row.appendChild(unitThumb(camp,e,32,36));row.appendChild(el("div","ms-mid","<b>"+esc(entryName(camp,e))+"</b><small>"+t.models+" → "+to+" models after recovery and recruits</small>"));row.appendChild(el("span","cp-delta","+"+extra+" new"));list.appendChild(row);
+    });if(!total)list.appendChild(el('p','cp-none','All regiments are at their maximum size. Training or supplies will help more.'));rest.appendChild(list);
+    var rb=el("button","primary","Recover & reinforce");rb.type="button";rb.disabled=!total;rb.onclick=function(){finish('reinforce');};rest.appendChild(rb);cards.appendChild(rest);
+    var drill=el("section","cp-card");drill.appendChild(el("h3",null,'<span class="cp-ic">'+ICON.drill+'</span>Train a regiment'));
+    drill.appendChild(el("p","ms-lead","The whole army recovers while one regiment gains a permanent veterancy rank."));
+    var dl=el("div","cp-list cp-pick"),chosen=null,db=el("button","primary cp-drill","Choose a regiment");db.type="button";db.disabled=true;
+    dl.setAttribute("role","radiogroup");dl.setAttribute("aria-label","Regiment to train");
+    camp.army.entries.forEach(function(e){var t=troop(e),v=t.vet||0,next=v<3?rankOf(v+1):null,row=el("button","cp-item cp-opt"+(next?"":" maxed"));row.type="button";row.disabled=!next;row.setAttribute("role","radio");row.setAttribute("aria-checked","false");
+      row.appendChild(unitThumb(camp,e,32,36));row.appendChild(el("div","ms-mid","<b>"+esc(entryName(camp,e))+"</b><small>"+(next?esc(next.name)+" · "+esc(bonusOf(next)):"Legendary — maximum rank")+"</small>"));row.appendChild(el("span","cp-radio"));
+      row.onclick=function(){chosen=e;dl.querySelectorAll('.cp-opt').forEach(function(b){b.classList.remove('on');b.setAttribute('aria-checked','false');});row.classList.add('on');row.setAttribute('aria-checked','true');db.disabled=false;db.textContent='Recover & train';};dl.appendChild(row);
+    });drill.appendChild(dl);db.onclick=function(){finish('train',chosen);};drill.appendChild(db);cards.appendChild(drill);
+    var supply=el("section","cp-card cp-supplies"),extra=75+camp.act*25;
+    supply.appendChild(el("h3",null,"Fill the war chest"));supply.appendChild(el("p","ms-lead","Take an extra "+extra+" gold for recruits, equipment and relics at the next merchant."));supply.appendChild(el("div","cp-gold",(allowance+extra)+'<small>total gold · plus full recovery</small>'));
+    var sb=el("button","primary","Recover & take supplies");sb.type="button";sb.onclick=function(){finish('supplies');};supply.appendChild(sb);cards.appendChild(supply);box.appendChild(cards);
+    UI.modalDismissable=false;UI.modal(box);$("modal-body").classList.add("m-bivouac");
   };
 })();
