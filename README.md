@@ -335,7 +335,7 @@ js/talescreens.js  campaign events and treasure
 css/talescreens.css event and treasure styles
 js/command.js      combat camera, side-coloured unit names, Enter to move on to the next regiment
 css/command.css    side colours for unit names, hot-seat handover banner
-css/laptop.css     compact layouts for laptop windows: battlefield, title screen, builder, campaign
+css/laptop.css     compact layouts for laptop windows: battlefield, title, builder, campaign, dialogs
 js/battlesave.js   mid-battle save and resume (snapshots at rest, restore, title-screen card)
 js/sightline.js    line of sight, cover and target verdict preview
 js/hotseat.js      two players on one screen: setup, deployment handover, control follows the mover
