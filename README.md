@@ -16,7 +16,11 @@ Two modes:
   with a commander, a small retinue and two supporting units, pick a path across a
   branching map of battles, elite battles, events, merchants, camps and treasure, recruit,
   reinforce and re-arm, earn veterancy, learn commander traits, and defeat each act's
-  boss. Battles along the trail use all three scenarios. A lost battle or a dead commander
+  boss. The choices vary: the stops on offer at each step are all different kinds, a shop,
+  camp, treasure or event never follows another of its kind along a road, every middle step
+  offers a fight, and the step before each boss offers a camp or a merchant. The map closes
+  up to fit the window, so a whole act shows at once on a laptop.
+  Battles along the trail use all three scenarios. A lost battle or a dead commander
   ends the run, and the run-over screen lists every battle fought and each unit's honours
   (battles fought and enemy models slain). Progress is saved in the browser.
 
@@ -331,7 +335,7 @@ js/talescreens.js  campaign events and treasure
 css/talescreens.css event and treasure styles
 js/command.js      combat camera, side-coloured unit names, Enter to move on to the next regiment
 css/command.css    side colours for unit names, hot-seat handover banner
-css/laptop.css     compact layouts for laptop windows: battlefield bars, title screen, army builder
+css/laptop.css     compact layouts for laptop windows: battlefield, title screen, builder, campaign
 js/battlesave.js   mid-battle save and resume (snapshots at rest, restore, title-screen card)
 js/sightline.js    line of sight, cover and target verdict preview
 js/hotseat.js      two players on one screen: setup, deployment handover, control follows the mover
@@ -384,7 +388,7 @@ previous opponent it wins about 55% of seeded head-to-head games
 ## Tests
 
 ```
-node test/sim.js 80          # rules unit tests + 80 simulated battles + campaign checks
+node test/sim.js 80          # rules unit tests + 80 simulated battles + campaign and map checks
 node test/tactical.js        # 20 automatic/manual battles with matching seeded outcomes
 node test/expansion.js       # campaign rewards, terrain and removed sound contracts
 node test/save.js 12         # 12 battles saved and restored after every step, unchanged

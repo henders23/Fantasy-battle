@@ -28,6 +28,10 @@ function ok(c, m) { if (!c) { errors.push('FAIL: ' + m); console.log('FAIL: ' + 
   var dock = await page.evaluate(function () { var t = document.getElementById('deploy-tray'), b = SOVL.UI.battle; return { muster: t.classList.contains('muster-dock'), cards: t.querySelectorAll('.tray-unit').length, mine: b.unitsOf(0).length, scouts: t.querySelectorAll('.md-scout-row').length, theirs: b.unitsOf(1).length, facts: t.querySelector('.md-facts').textContent, go: !!t.querySelector('.md-actions button.primary') }; });
   ok(dock.muster && dock.cards === dock.mine && dock.scouts === dock.theirs && /14" deep/.test(dock.facts) && dock.go, 'muster dock lists regiments, scouts and zone depth: ' + JSON.stringify(dock));
   // rotation handle in deployment
+  // drag a regiment that has room to turn to face right (where the drag below ends); with no room
+  // the game rightly refuses the turn, which would fail this check by chance
+  await page.evaluate(function () { var UI = SOVL.UI, b = UI.battle; var u = b.unitsOf(0).filter(function (x) { return x.placed && Math.abs(x.a) > 0.3 && b.placementValid(x, { x: x.x, y: x.y, a: 0, w: x.w, d: x.d }, []); })[0]; if (u) { UI.deploySel = u.uid; UI.renderDeployTray(); } });
+  await page.waitForTimeout(100);
   var h = await page.evaluate(function () { var UI = SOVL.UI, r = UI.renderer, h = UI.handlePoint(); if (!h) return null; var s = r.toScreen(h.x, h.y); var u = UI.battle.unit(h.uid); var c = r.toScreen(u.x, u.y); return { sx: s.x, sy: s.y, uid: h.uid, a: u.a, cx: c.x, cy: c.y }; });
   ok(h, 'handle present in deployment: ' + JSON.stringify(h));
   await page.screenshot({ path: path.join(shots, 'f1-handle.png') });

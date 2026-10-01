@@ -2,7 +2,19 @@
 'use strict';
 (function () {
   var R = SOVL.R, A = SOVL.Army, C = {};
-  var NODE_TYPES = ['battle', 'battle', 'battle', 'elite', 'event', 'event', 'merchant', 'camp', 'treasure'];
+  // how often each kind of stop is drawn for the middle of an act, and for its first and last
+  // steps (the step before the boss is a place to rest and re-arm)
+  var STOPS = { battle: 4.4, elite: 1.6, event: 2.4, merchant: 1.3, camp: 1, treasure: 1.1 };
+  var FIRST = { event: 1.2, treasure: 1, merchant: 0.7 };
+  var REST = { camp: 2, merchant: 2, treasure: 0.8, event: 0.6 };
+  var FIGHT = { battle: true, elite: true, boss: true };
+  function weighted(w) {
+    var keys = Object.keys(w).filter(function (k) { return w[k] > 0; }), total = keys.reduce(function (a, k) { return a + w[k]; }, 0);
+    if (!keys.length) return null;
+    var x = R.rng() * total;
+    for (var i = 0; i < keys.length; i++) { x -= w[keys[i]]; if (x < 0) return keys[i]; }
+    return keys[keys.length - 1];
+  }
 
   C.create = function (opts) {
     var fid = opts.faction, cdef = SOVL.findUnitDef(fid, opts.commander);
@@ -35,16 +47,7 @@
       var layers = [];
       for (var l = 0; l < actDef.layers; l++) {
         var n = l === 0 ? 2 : (l === actDef.layers - 1 ? 1 : 2 + Math.floor(R.rng() * 2)), layer = [];
-        for (var i = 0; i < n; i++) {
-          var type;
-          if (l === actDef.layers - 1) type = 'boss';
-          else if (l === 0) type = 'battle';
-          else if (l === actDef.layers - 2) type = R.pick(['camp', 'merchant', 'camp']);
-          else type = R.pick(NODE_TYPES);
-          layer.push({ type: type, next: [], id: ai + '-' + l + '-' + i, visited: false });
-        }
-        // make sure a layer isn't all events/shops
-        if (l > 0 && l < actDef.layers - 2 && layer.every(function (nd) { return nd.type !== 'battle' && nd.type !== 'elite'; })) layer[0].type = 'battle';
+        for (var i = 0; i < n; i++) layer.push({ type: null, next: [], id: ai + '-' + l + '-' + i, visited: false });
         layers.push(layer);
       }
       // connections: each node connects to 1-2 nodes in the next layer; ensure every next node reachable
@@ -59,10 +62,68 @@
         nxt.forEach(function (n2, j) { if (!cur.some(function (nd) { return nd.next.indexOf(j) >= 0; })) cur[Math.min(cur.length - 1, j)].next.push(j); });
         cur.forEach(function (nd) { nd.next = nd.next.filter(function (v, k, arr) { return arr.indexOf(v) === k; }).sort(); });
       }
+      // rarely the roads leave a stop no kind that keeps every rule; then draw the act's stops again
+      for (var tries = 0; tries < 40; tries++) {
+        layers.forEach(function (layer) { layer.forEach(function (nd) { nd.type = null; }); });
+        assignStops(layers);
+        if (stopsVaried(layers)) break;
+      }
       return { name: actDef.name, layers: layers, boss: actDef.boss };
     });
     return { acts: acts };
   };
+
+  // Kinds of stop, chosen once the roads are known so that the choices vary: the stops on offer
+  // at any one step are all different, a shop, camp, treasure or event never sits next to another
+  // of its kind along a road, battles rarely follow battles, every middle step offers a fight, and
+  // the step before the boss offers a camp or a merchant. That step is settled first, so the step
+  // leading into it can avoid what lies on either side.
+  function assignStops(layers) {
+    var last = layers.length - 1, order = [];
+    for (var l0 = 0; l0 < last - 2; l0++) order.push(l0);
+    order.push(last - 1); if (last - 2 > 0) order.push(last - 2); order.push(last);
+    order.forEach(function (l) {
+      var layer = layers[l];
+      if (l === last) { layer.forEach(function (nd) { nd.type = 'boss'; }); return; }
+      var used = {};
+      R.shuffle(layer.map(function (nd, i) { return i; })).forEach(function (i, k) {
+        var nd = layer[i], w;
+        if (l === 0) w = k === 0 ? { battle: 1 } : Object.assign({}, FIRST);
+        else w = Object.assign({}, l === last - 1 ? REST : STOPS);
+        // the stops either side of this one along a road (those already settled)
+        var near = (l ? layers[l - 1].filter(function (p) { return p.next.indexOf(i) >= 0; }) : [])
+          .concat(nd.next.map(function (j) { return layers[l + 1][j]; })).filter(function (x) { return x.type; });
+        near.forEach(function (p) {
+          if (!FIGHT[p.type]) w[p.type] = 0; // no shop next to a shop, camp next to a camp...
+          else if (w[p.type]) w[p.type] *= 0.45; // ...and fewer battles next to battles
+        });
+        Object.keys(used).forEach(function (t) { w[t] = 0; });
+        if (l === last - 1 && k === 0) { var rest = { camp: w.camp ? 1 : 0, merchant: w.merchant ? 1 : 0 }; if (rest.camp || rest.merchant) w = rest; }
+        // if nothing fits, any kind not yet on offer here, keeping clear of its neighbours if possible
+        var spare = Object.assign({}, STOPS); Object.keys(used).forEach(function (t) { spare[t] = 0; });
+        var clear = Object.assign({}, spare); near.forEach(function (p) { if (!FIGHT[p.type]) clear[p.type] = 0; });
+        var type = weighted(w) || weighted(clear) || weighted(spare) || 'battle';
+        nd.type = type; used[type] = true;
+      });
+      // a middle step always offers a fight, put where it breaks up the fewest fights in a row
+      if (l > 0 && l < last - 1 && !layer.some(function (nd) { return FIGHT[nd.type]; })) {
+        var calm = layer.filter(function (nd, i) { return !layers[l - 1].some(function (p) { return p.next.indexOf(i) >= 0 && FIGHT[p.type]; }); });
+        (calm[0] || layer[0]).type = 'battle';
+      }
+    });
+  }
+
+  function stopsVaried(layers) {
+    var last = layers.length - 1;
+    return layers.every(function (layer, l) {
+      var ts = layer.map(function (nd) { return nd.type; });
+      if (ts.some(function (t, k) { return ts.indexOf(t) !== k; })) return false;
+      if (l > 0 && l < last - 1 && !ts.some(function (t) { return FIGHT[t]; })) return false;
+      if (l === last - 1 && ts.indexOf('camp') < 0 && ts.indexOf('merchant') < 0) return false;
+      return l === last || layer.every(function (nd) { return nd.next.every(function (j) { var t = layers[l + 1][j].type; return t !== nd.type || FIGHT[t]; }); });
+    });
+  }
+  C.stopsVaried = stopsVaried;
 
   C.currentAct = function (camp) { var act = camp.map.acts[camp.act]; if (act && SOVL.CAMPAIGN.acts[camp.act]) act.name = SOVL.CAMPAIGN.acts[camp.act].name; return act; };
   C.availableNodes = function (camp) {

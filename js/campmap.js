@@ -22,9 +22,13 @@
 
   function rng(seed) { var s = (seed >>> 0) || 1; return function () { s += 0x6d2b79f5; var t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
   // ---------- layout ----------
-  function layout(camp, W) {
-    var act = C.currentAct(camp), r = rng(camp.seed * 7 + camp.act * 131 + 3), phone = W < 520;
-    var layerH = phone ? 110 : 130, top = 180, H = act.layers.length * layerH + top + 60, pos = [];
+  // viewH: the height the map is shown in. The layers close up (down to 80px apart, which keeps
+  // every label clear) so that a whole act fits on a laptop screen instead of scrolling.
+  function layout(camp, W, viewH) {
+    var act = C.currentAct(camp), r = rng(camp.seed * 7 + camp.act * 131 + 3), phone = W < 520, n = act.layers.length;
+    var layerH = phone ? 110 : 130, bossY = phone ? 280 : 168, foot = 70;
+    if (!phone && viewH) layerH = Math.max(80, Math.min(130, (viewH - bossY - foot) / (n - 1)));
+    var H = Math.round(foot + (n - 1) * layerH + bossY), pos = [];
     act.layers.forEach(function (layer, li) {
       pos.push(layer.map(function (n, i) {
         var spread = Math.min(phone ? 110 : 230, (W - 60) / (layer.length + 0.2));
@@ -165,8 +169,9 @@
       var camp = UI.campaign, map = document.getElementById("camp-map");
       if (!camp || !map) return;
       var old = map.querySelector("svg"); if (old) old.remove();
-      var W = Math.max(300, Math.min(map.clientWidth - 24, 1100)), L = layout(camp, W), dpr = Math.min(2, window.devicePixelRatio || 1);
-      var key = [camp.seed, camp.act, W, dpr, landscapes[camp.act].complete && landscapes[camp.act].naturalWidth, JSON.stringify(camp.map.acts[camp.act].layers)].join("|");
+      var heading0 = map.querySelector(".campaign-heading"), viewH = map.clientHeight - (heading0 ? heading0.offsetHeight : 0) - 36;
+      var W = Math.max(300, Math.min(map.clientWidth - 24, 1100)), L = layout(camp, W, viewH), dpr = Math.min(2, window.devicePixelRatio || 1);
+      var key = [camp.seed, camp.act, W, L.H, dpr, landscapes[camp.act].complete && landscapes[camp.act].naturalWidth, JSON.stringify(camp.map.acts[camp.act].layers)].join("|");
       if (!sheet || sheet.key !== key) sheet = { key: key, cv: paintSheet(camp, L, dpr) };
       var wrap = document.createElement("div"); wrap.className = "trail-map"; wrap.style.width = W + "px"; wrap.style.height = L.H + "px";
       var cv = document.createElement("canvas"); cv.width = Math.round(W * dpr); cv.height = Math.round(L.H * dpr); cv.style.width = W + "px"; cv.style.height = L.H + "px";

@@ -105,3 +105,14 @@
   #builder-list .entry .head button.danger { min-height: 26px; padding: 2px 8px; }
 }
 
+/* ---------- campaign ---------- */
+/* the army panel takes only the room its regiments need; the chronicle gets the rest */
+@media (min-width: 1101px) {
+  #camp-roster { flex: 0 1 auto !important; min-height: 0; overflow: auto; }
+  #camp-log { flex: 1 1 170px; height: auto !important; min-height: 140px; overflow: auto; }
+}
+@media (min-width: 761px) and (max-height: 860px) {
+  #camp-map .campaign-heading { padding: 10px 18px 0; }
+  #camp-roster { padding: 10px 12px; }
+  .roster .entry { padding: 6px 9px; margin-bottom: 6px; }
+}

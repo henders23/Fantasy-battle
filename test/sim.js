@@ -104,6 +104,20 @@ if (SOVL.Campaign) {
     var camp = SOVL.Campaign.create({ faction: fids[c % 5], commander: SOVL.FACTION_DATA[fids[c % 5]].sections[0].units[c % 3].id });
     assert(camp.map.acts.length === 3, 'campaign acts');
     camp.map.acts.forEach(function (act) { assert(act.layers.length >= 3, 'layers'); act.layers.forEach(function (layer, li) { layer.forEach(function (n) { if (li < act.layers.length - 1) assert(n.next.length > 0, 'node without exits'); }); }); });
+    // varied stops: each step offers different kinds, a shop, camp, treasure or event never follows
+    // its own kind along a road, every middle step has a fight, and the first step has a battle
+    camp.map.acts.forEach(function (act) {
+      var L = act.layers.length;
+      act.layers.forEach(function (layer, li) {
+        var ts = layer.map(function (n) { return n.type; });
+        assert(ts.every(function (t) { return !!t; }), 'every stop has a kind');
+        assert(new Set(ts).size === ts.length, 'a step offers two of the same kind: ' + ts.join(', '));
+        if (li === 0) assert(ts.indexOf('battle') >= 0, 'the first step offers a battle');
+        if (li === L - 2) assert(ts.indexOf('camp') >= 0 || ts.indexOf('merchant') >= 0, 'the step before the boss offers a camp or merchant');
+        if (li > 0 && li < L - 2) assert(ts.some(function (t) { return t === 'battle' || t === 'elite'; }), 'a middle step without a fight');
+        if (li < L - 1) layer.forEach(function (n) { n.next.forEach(function (j) { var t = act.layers[li + 1][j].type; assert(t !== n.type || /battle|elite|boss/.test(t), n.type + ' followed by another ' + t); }); });
+      });
+    });
     var probs = A.validate(camp.army, 99999); assert(probs.filter(function (p) { return !/at least|unit size/.test(p); }).length === 0, 'campaign army invalid: ' + probs.join('; '));
     // simulate: fight the first battle node
     var node = camp.map.acts[0].layers[0][0];
