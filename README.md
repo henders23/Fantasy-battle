@@ -261,7 +261,8 @@ The **Field Manual** on the title screen is a chaptered rulebook with a contents
 follows your place. It covers the game and turn structure (as phase cards), combat step by
 step, shooting modifiers, magic with every spell and its casting value, terrain, dice colours,
 controls as keycaps, the Trail of Death's map stops, and the five factions.
-Layouts adapt to smaller screens; on phones, the orders panels appear below the field.
+Layouts adapt to smaller screens. On laptop-sized windows the bars around the battlefield
+slim down so the field stays as large as possible; on phones, the orders panels appear below the field.
 
 ## Rules
 
@@ -329,6 +330,7 @@ js/talescreens.js  campaign events and treasure
 css/talescreens.css event and treasure styles
 js/command.js      combat camera, side-coloured unit names, Enter to move on to the next regiment
 css/command.css    side colours for unit names, hot-seat handover banner
+css/laptop.css     compact layout for short (laptop) windows, so the battlefield keeps the height
 js/battlesave.js   mid-battle save and resume (snapshots at rest, restore, title-screen card)
 js/sightline.js    line of sight, cover and target verdict preview
 js/hotseat.js      two players on one screen: setup, deployment handover, control follows the mover
