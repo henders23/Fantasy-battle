@@ -156,7 +156,8 @@ strength bar, and dice show pips: gold for hits, green for saves, red for failed
 
 The army builder lays each section out as a grid of cards with the unit's painted model,
 stats and options, and a points gauge that turns green near the limit and red over it.
-Army entries show their model, and options are labelled fields. On the campaign screen the
+Each army entry folds to one line (its model, how it is equipped and its points), so the
+whole army stays in view; click an entry to open its options, one at a time. On the campaign screen the
 top bar tracks progress through the act, the roster shows each unit's model, strength and
 veterancy, and the log reads as a parchment chronicle. Battle briefings set the two armies
 side by side with a points comparison, and trait and run-over dialogs each have their own
@@ -330,7 +331,7 @@ js/talescreens.js  campaign events and treasure
 css/talescreens.css event and treasure styles
 js/command.js      combat camera, side-coloured unit names, Enter to move on to the next regiment
 css/command.css    side colours for unit names, hot-seat handover banner
-css/laptop.css     compact layout for short (laptop) windows, so the battlefield keeps the height
+css/laptop.css     compact layouts for laptop windows: battlefield bars, title screen, army builder
 js/battlesave.js   mid-battle save and resume (snapshots at rest, restore, title-screen card)
 js/sightline.js    line of sight, cover and target verdict preview
 js/hotseat.js      two players on one screen: setup, deployment handover, control follows the mover

@@ -157,9 +157,9 @@
         var btn = el('button', 'small', '+ Add'); btn.style.marginTop = '4px';
         btn.disabled = n >= lim.max;
         btn.onclick = function () {
-          if (sec.name === 'Commanders') army.entries.unshift(A.defaultCommander(fid, def.id, null, null));
-          else army.entries.push(A.defaultEntry(fid, def.id));
-          renderBuilder();
+          var added = sec.name === 'Commanders' ? A.defaultCommander(fid, def.id, null, null) : A.defaultEntry(fid, def.id);
+          if (sec.name === 'Commanders') army.entries.unshift(added); else army.entries.push(added);
+          b.openEntry = added; renderBuilder();
         };
         card.appendChild(btn); cat.appendChild(card);
       });
@@ -175,11 +175,45 @@
     var probs = A.validate(army, b.pts);
     if (probs.length) list.appendChild(el('div', 'problems', probs.map(esc).join('<br>')));
   }
+  // one line saying how an entry is equipped, shown while its options are folded away
+  function entrySummary(fid, e) {
+    var isCmd = e.kind === 'commander', t = isCmd ? e.retinue : e, def = SOVL.findUnitDef(fid, t.id), bits = [];
+    function kit(x, xdef) {
+      var out = [];
+      if (xdef.weapons.length > 1 && x.weapon) out.push(x.weapon);
+      if (x.ranged && xdef.ranged.length > 1) out.push(x.ranged);
+      (x.upgrades || []).forEach(function (u) { out.push(u); });
+      return out;
+    }
+    function models(n) { return n + (n === 1 ? ' model' : ' models'); }
+    if (isCmd) {
+      // the retinue first: it is most of the commander's points
+      var cdef = SOVL.findUnitDef(fid, e.id);
+      bits.push('Leads ' + def.name + (def.per ? ' (' + t.models + ')' : ''));
+      bits = bits.concat(kit(e, cdef));
+      (e.items || []).forEach(function (id) { var it = SOVL.itemById(id); if (it) bits.push(it.name); });
+      if (cdef.caster) bits.push((e.spells || []).length + '/' + cdef.caster + ' spells');
+    } else if (def.per) bits.push(models(t.models));
+    bits = bits.concat(kit(t, def));
+    if (t.banner) { var bn = SOVL.bannerById(t.banner); if (bn) bits.push(bn.name); }
+    return bits.join(' · ');
+  }
   function entryEditor(fid, e, idx, onChange, onRemove) {
     var isCmd = e.kind === 'commander', t = isCmd ? e.retinue : e, def = SOVL.findUnitDef(fid, t.id), cdef = isCmd ? SOVL.findUnitDef(fid, e.id) : null;
-    var box = el('div', 'entry');
-    var head = el('div', 'head', '<b>' + (isCmd ? esc(e.name) + ' <span class="muted">(' + esc(cdef.name) + ')</span>' : esc(def.name)) + '</b><span class="spacer"></span><span class="accent">' + A.entryCost(fid, e) + ' pts</span>');
-    var rm = el('button', 'small danger', '✕'); rm.onclick = onRemove; head.appendChild(rm); box.appendChild(head);
+    var open = UI.builder.openEntry === e, box = el('div', 'entry' + (open ? ' open' : ''));
+    var head = el('div', 'head', '<div class="entry-title"><b>' + (isCmd ? esc(e.name) + ' <span class="muted">(' + esc(cdef.name) + ')</span>' : esc(def.name)) + '</b><small class="entry-sum">' + esc(entrySummary(fid, e)) + '</small></div><span class="accent">' + A.entryCost(fid, e) + ' pts</span><span class="chev" aria-hidden="true"></span>');
+    var rm = el('button', 'small danger', '✕'); rm.title = 'Remove from the army'; rm.onclick = function (ev) { ev.stopPropagation(); onRemove(); }; head.appendChild(rm); box.appendChild(head);
+    // the entry's options fold away; one entry is open at a time, so the whole army stays in view
+    head.setAttribute('role', 'button'); head.tabIndex = 0; head.setAttribute('aria-expanded', open ? 'true' : 'false');
+    function toggle() {
+      var now = !box.classList.contains('open');
+      box.parentNode.querySelectorAll('.entry.open').forEach(function (o) { o.classList.remove('open'); o.querySelector('.head').setAttribute('aria-expanded', 'false'); });
+      box.classList.toggle('open', now); head.setAttribute('aria-expanded', now ? 'true' : 'false');
+      UI.builder.openEntry = now ? e : null;
+      if (now) box.scrollIntoView({ block: 'nearest' });
+    }
+    head.onclick = toggle;
+    head.onkeydown = function (ev) { if (ev.target === head && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); toggle(); } };
     var opts = el('div', 'opts');
     function sel(labelTxt, options, value, cb) { var l = el('label', null, labelTxt + ' '); var s = el('select'); options.forEach(function (o) { s.appendChild(new Option(o.label, o.value)); }); s.value = value; s.onchange = function () { cb(s.value); onChange(); }; l.appendChild(s); return l; }
     if (isCmd) {

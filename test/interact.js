@@ -32,6 +32,8 @@ function expect(c, msg) { checks++; if (!c) { errors.push('CHECK FAILED: ' + msg
   var n = await page.evaluate(function () { return SOVL.UI.builder.army.entries.length; });
   expect(n === 3, 'builder has 3 entries, got ' + n);
   // change retinue via select and models via slider
+  // entries fold to one line; open the commander's options first
+  await page.click('#builder-list .entry:nth-child(1) .head b'); await page.waitForTimeout(50);
   await page.selectOption('#builder-list .entry:nth-child(1) select', 'imperial_halberd');
   var ret = await page.evaluate(function () { return SOVL.UI.builder.army.entries[0].retinue.id; });
   expect(ret === 'imperial_halberd', 'retinue changed: ' + ret);

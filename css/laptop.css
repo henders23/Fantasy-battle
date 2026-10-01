@@ -73,3 +73,35 @@
   .muster-dock .md-scen { display: none; }
   .md-facts { display: none; }
 }
+
+/* ---------- army builder and other page screens ---------- */
+@media (min-width: 761px) and (max-height: 860px) {
+  .page { padding-top: 12px; padding-bottom: 12px; gap: 12px; }
+  .topbar { padding-bottom: 10px; }
+  .topbar h2 { font-size: 24px; }
+}
+@media (min-width: 1101px) and (max-width: 1600px), (min-width: 1101px) and (max-height: 860px) {
+  /* a narrower army list leaves the catalogue room for three columns */
+  #builder-list { width: 390px !important; padding: 10px; }
+  #builder-catalog { padding: 10px 12px; }
+  .cat-grid { grid-template-columns: repeat(auto-fill, minmax(245px, 1fr)); gap: 8px; }
+  #builder-catalog h3.sec-head { margin: 12px 0 8px; font-size: 15px; }
+  #builder-catalog .unit-card { padding: 9px 10px; }
+  #builder-catalog .unit-family { gap: 10px; margin-bottom: 6px; }
+  #builder-catalog .unit-family canvas.thumb { width: 48px !important; height: 56px !important; }
+  #builder-catalog .unit-card .head b { font-size: 15px; }
+  #builder-catalog .unit-card .head .muted, #builder-catalog .unit-card .head .accent { font-size: 12px; }
+  #builder-catalog .unit-card .stats { gap: 3px; margin: 0 0 6px; grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  #builder-catalog .unit-card .stats .stat { padding: 2px 0 3px; min-width: 0; }
+  #builder-catalog .unit-card .stats .stat span { font-size: 8.5px; letter-spacing: 0; overflow: hidden; }
+  #builder-catalog .unit-card .stats .stat b { font-size: 14px; }
+  #builder-catalog .unit-card .props { font-size: 12px; line-height: 1.4; }
+  .unit-card .add-btn { margin-top: 8px !important; padding: 5px 8px; min-height: 0; }
+  #builder-list .entry { padding: 6px 8px; margin-bottom: 5px; }
+  #builder-list .entry .head { gap: 8px; }
+  #builder-list .entry .head canvas.thumb { width: 36px !important; height: 41px !important; }
+  #builder-list .entry .head b { font-size: 14px; }
+  #builder-list .entry .entry-sum { font-size: 12px; }
+  #builder-list .entry .head button.danger { min-height: 26px; padding: 2px 8px; }
+}
+

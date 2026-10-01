@@ -135,8 +135,20 @@ input[type="checkbox"] { accent-color: #98b8d4; width: 16px; height: 16px; }
   background: linear-gradient(180deg, #141e29, #0d141b);
 }
 #builder-list .entry.is-cmd { border-left-color: var(--gild); background: linear-gradient(180deg, #1c2735, #121a24); }
-#builder-list .entry .head { gap: 10px; }
+#builder-list .entry .head { gap: 10px; cursor: pointer; border-radius: 3px; }
+#builder-list .entry .head:focus-visible { outline: 2px solid var(--gild); outline-offset: 3px; }
 #builder-list .entry .head b { font-size: 16px; }
+/* each entry folds to one line: name, how it is equipped, points */
+#builder-list .entry { padding: 8px 10px; margin-bottom: 6px; }
+#builder-list .entry .entry-title { flex: 1; min-width: 0; }
+#builder-list .entry .entry-title b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#builder-list .entry .entry-sum { display: block; font-size: 13px; color: #a9b6c2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+#builder-list .entry.open .entry-sum { display: none; }
+#builder-list .entry .chev { flex: none; width: 8px; height: 8px; margin: 0 2px; border-right: 2px solid #8fa6ba; border-bottom: 2px solid #8fa6ba; transform: rotate(45deg) translate(-2px, -2px); transition: transform 0.15s; }
+#builder-list .entry.open .chev { transform: rotate(-135deg) translate(-2px, -2px); }
+#builder-list .entry:not(.open) .opts { display: none; }
+#builder-list .entry:not(.open):hover { border-color: rgba(152, 184, 212, 0.5); }
+#builder-list .entry.open { border-color: rgba(152, 184, 212, 0.55); box-shadow: 0 0 0 1px rgba(152, 184, 212, 0.18); }
 #builder-list .entry .head .accent { font-family: var(--head); font-size: 14px; }
 #builder-list .entry .head button.danger { min-height: 30px; padding: 3px 10px; }
 #builder-list .entry .opts { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 12px; font-size: 14px; margin-top: 10px; }
@@ -147,6 +159,8 @@ input[type="checkbox"] { accent-color: #98b8d4; width: 16px; height: 16px; }
 #builder-list .entry .opts label.range { grid-column: 1 / -1; }
 #builder-list .entry .opts label.range b { font-family: var(--head); color: var(--gild-hi); }
 #builder-list .entry .pill { cursor: pointer; font-size: 13px; padding: 3px 10px; }
+/* spells sit side by side as pills, not as stacked option fields */
+#builder-list .entry .opts label.pill { display: inline-flex; flex-direction: row; margin: 4px 4px 0 0; text-transform: none; letter-spacing: 0.02em; font-size: 12.5px; color: #cbd3da; }
 #builder-list .entry .pill.on { background: rgba(152, 184, 212, 0.15); }
 .warn-box {
   margin-top: 6px;
