@@ -341,13 +341,14 @@
     $("engagement-panel").hidden = true;
     startBattle.call(UI, opts);
     var b = UI.battle;
-    b.autoDeploy(UI.playerSide);
+    if (!opts.restore) b.autoDeploy(UI.playerSide); // a resumed battle keeps its positions
     b.unitsOf(UI.playerSide).forEach(function (u) {
       u._rx = u.x;
       u._ry = u.y;
       u._ra = u.a;
     });
-    UI.deploySel = b.unitsOf(UI.playerSide)[0].uid;
+    var firstUnit = b.unitsOf(UI.playerSide)[0];
+    UI.deploySel = firstUnit ? firstUnit.uid : null;
     UI.applySettings();
     UI.renderDeployTray();
     UI.updateHud();
@@ -504,7 +505,7 @@
   };
   function phaseHint(b) {
     if (b.phase === "deploy")
-      return "Drag regiments within the blue zone, or begin with this formation.";
+      return "Drag regiments within the " + UI.ownColours()[0] + " zone, or begin with this formation.";
     if (b.pendingRoll)
       return b.pendingRoll.spec.label + " — click the dice or press Space to roll.";
     if (b.phase === "combat")
@@ -519,7 +520,7 @@
         ? UI.targets.length
           ? "Click a gold-highlighted enemy to charge. Hover to compare the likely exchange."
           : "No charge in reach. Choose another regiment or pass to movement."
-        : "Select a blue regiment to see its charge arc, or pass to movement.";
+        : "Select a " + UI.ownColours()[0] + " regiment to see its charge arc, or pass to movement.";
     if (UI.mode === "shoot" || UI.mode === "spell" || UI.mode === "ability")
       return "Click a highlighted target. Escape cancels the order.";
     if (b.activeUnit) {
@@ -584,7 +585,7 @@
         '</p><div class="guide-tip">' +
         (b.phase === "charge"
           ? "Protect your flanks. Turning an enemy before charging it can matter more than superior numbers."
-          : "Use the army strip below to find a regiment. Blue fronts are yours; red fronts are the enemy.") +
+          : "Use the army strip below to find a regiment. " + (UI.ownColours()[0] === "blue" ? "Blue fronts are yours; red fronts are the enemy." : "Red fronts are yours; blue fronts are the enemy.")) +
         '</div><div class="terrain-key"><span>Forest · slows, blocks sight</span><span>Sand, scrub, scree, swamp · slow movement</span><span>Cliff, ruin, lake · impassable</span></div></div>';
     }
     if (
@@ -1224,8 +1225,8 @@
     );
   };
   var campaignBattle = UI.campaignBattle;
-  UI.campaignBattle = function (node, kind) {
-    campaignBattle.call(UI, node, kind);
+  UI.campaignBattle = function (node, kind, after) {
+    campaignBattle.call(UI, node, kind, after); // keep "after": event battles pay their reward through it
     if (UI.modalOpen) {
       var art = elem("div", "result-art");
       $("modal-body").insertBefore(art, $("modal-body").firstChild);

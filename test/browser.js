@@ -80,7 +80,8 @@ var errors = [];
       await page.waitForTimeout(200); await page.screenshot({ path: path.join(shots, '12-merchant.png') });
       await page.click('#modal-body button.primary:has-text("Leave")');
     } else if (type === 'camp') {
-      await page.click('#modal-body .choices button'); await page.waitForTimeout(200);
+      // pick a reward card (the last one, supplies, is always available), then break camp
+      var cards = await page.$$('#modal-body .cp-card > button.primary:not([disabled])'); await cards[cards.length - 1].click(); await page.waitForTimeout(200);
       var m4 = await page.$('#modal.active #m-ok'); if (m4) await m4.click();
     } else if (type === 'treasure') {
       await page.click('#m-ok');

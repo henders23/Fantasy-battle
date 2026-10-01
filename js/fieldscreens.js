@@ -81,7 +81,7 @@
         rotL.setAttribute("aria-label", "Turn left (Q)"); rotR.setAttribute("aria-label", "Turn right (E)");
         rotL.onclick = function (e) { e.stopPropagation(); UI.rotateDeploy(u, -1); }; rotR.onclick = function (e) { e.stopPropagation(); UI.rotateDeploy(u, 1); };
         face.appendChild(rotL); face.appendChild(rotR); ctl.appendChild(face);
-        ctl.appendChild(el("p", "md-tip", u.placed ? "Drag it on the table to move it." : "Click inside the blue zone to place it."));
+        ctl.appendChild(el("p", "md-tip", u.placed ? "Drag it on the table to move it." : "Click inside the " + UI.ownColours()[0] + " zone to place it."));
         card.appendChild(ctl);
       }
       list.appendChild(card);
@@ -139,7 +139,7 @@
       var fs = Math.max(0.9, Math.min(1.6, 15 * px));
       ctx.font = "600 " + fs.toFixed(2) + 'px "Marcellus SC", "Barlow Semi Condensed", Georgia, serif'; ctx.textAlign = "right"; ctx.textBaseline = top ? "bottom" : "top";
       ctx.fillStyle = "rgba(" + col + "," + (mine ? 0.75 : 0.5) + ")";
-      var label = mine ? "Your deployment zone" : b.names[s] + " — deployment";
+      var label = mine && !UI.hotseat ? "Your deployment zone" : b.names[s] + " — deployment";
       if (ctx.letterSpacing !== undefined) ctx.letterSpacing = (fs * 0.12).toFixed(2) + "px";
       ctx.fillText(label.toUpperCase(), z.x + z.w - 1.2, top ? edge - 0.5 : edge + 0.5);
       if (ctx.letterSpacing !== undefined) ctx.letterSpacing = "0px";

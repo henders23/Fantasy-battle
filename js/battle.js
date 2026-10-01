@@ -90,6 +90,8 @@
     return u;
   }
   SOVL.makeUnit = makeUnit;
+  // a restored battle (js/battlesave.js) brings its own unit ids: new units must not reuse them
+  SOVL.reserveUnitIds = function (maxUid) { if (uidCounter <= maxUid) uidCounter = maxUid + 1; };
 
   function unitAlive(u) { return u.models > 0 || (u.commander && u.commander.alive); }
   function commanderOnly(u) { return u.models <= 0 && u.commander && u.commander.alive; }

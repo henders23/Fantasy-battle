@@ -8,10 +8,14 @@
   var STAT_NAMES = [['sk', 'Skill'], ['pw', 'Power'], ['df', 'Def'], ['at', 'Att'], ['wd', 'Wnd'], ['ds', 'Disc']];
 
   var UI = {
-    playerSide: 0, aiSide: 1, screen: 'menu', battle: null, ai: null, renderer: null, sel: null, inspect: null, hover: null,
+    playerSide: 0, aiSide: 1, hotseat: false, screen: 'menu', battle: null, ai: null, renderer: null, sel: null, inspect: null, hover: null,
     mode: 'move', spell: null, ability: null, targets: [], preview: null, aiTimer: null, busy: false, campaign: null, setup: {}, deploySel: null, dragging: null, aiDelay: 420
   };
   SOVL.UI = UI;
+  // the side drawn in blue: yours against the computer; in hot seat always the first player's
+  UI.colourSide = function () { return UI.hotseat ? 0 : UI.playerSide; };
+  // the colour of the army at the screen, for hints: [own, enemy]
+  UI.ownColours = function () { return UI.colourSide() === UI.playerSide ? ['blue', 'red'] : ['red', 'blue']; };
 
   // ---------- screens ----------
   UI.show = function (id) {
@@ -217,12 +221,13 @@
   UI.startBattle = function (opts) {
     if (UI.aiTimer) { clearTimeout(UI.aiTimer); UI.aiTimer = null; }
     R.setSeed(null);
-    var b = new SOVL.Battle({ armies: opts.armies, terrain: opts.terrain, scenario: opts.scenario, names: opts.names, sides: ['bottom', 'top'], scoreMode: opts.campaign ? 'ratio' : 'points', interactive: true, interactiveCombat: true });
-    UI.dice = { title: '', sub: '', rows: [], pending: null, banner: null }; UI.diceSeqId = 0; UI.deployDone = false; UI.renderDice(); $('dice-panel').classList.remove('on');
+    // opts.restore: a battle saved mid-fight (js/battlesave.js), resumed where it stood
+    var b = opts.restore || new SOVL.Battle({ armies: opts.armies, terrain: opts.terrain, scenario: opts.scenario, names: opts.names, sides: ['bottom', 'top'], scoreMode: opts.campaign ? 'ratio' : 'points', interactive: true, interactiveCombat: true });
+    UI.dice = { title: '', sub: '', rows: [], pending: null, banner: null }; UI.diceSeqId = 0; UI.deployDone = !!opts.restore && b.phase !== 'deploy'; UI.renderDice(); $('dice-panel').classList.remove('on');
     b.biome = opts.biome || 'borderlands'; b.fieldName = opts.fieldName || 'The Borderlands';
     UI.battle = b; UI.battleOpts = opts; UI.ai = new SOVL.AI(b, UI.aiSide, { aggression: opts.aggression || 0.5 });
     UI.sel = null; UI.inspect = null; UI.hover = null; UI.mode = 'move'; UI.targets = []; UI.preview = null; UI.busy = false; UI.deploySel = null;
-    UI.ai.deploy(); // simultaneous deployment: hidden until the player is done
+    if (!opts.restore && !opts.hotseat) UI.ai.deploy(); // simultaneous deployment: hidden until the player is done (in hot seat the second player deploys)
     if (!UI.renderer) { UI.renderer = new SOVL.Renderer($('battle-canvas')); UI.bindCanvas(); }
     UI.renderer.zoom = 1; UI.renderer.panX = 0; UI.renderer.panY = 0;
     b.units.forEach(function (u) { u._rx = u.x; u._ry = u.y; u._ra = u.a; });
@@ -235,7 +240,7 @@
   };
   UI.frame = function (now) {
     if (UI.screen === 'battle' && UI.battle) {
-      var st = { playerSide: UI.playerSide, selected: UI.sel || UI.inspect || UI.deploySel, hover: UI.hover, targets: UI.targets, preview: UI.preview, mode: UI.mode, spell: UI.spell, hideSide: UI.battle.phase === 'deploy' ? UI.aiSide : null, handle: UI.handlePoint(), rotating: !!UI.rotating };
+      var st = { playerSide: UI.playerSide, selected: UI.sel || UI.inspect || UI.deploySel, hover: UI.hover, targets: UI.targets, preview: UI.preview, mode: UI.mode, spell: UI.spell, hideSide: UI.battle.phase === 'deploy' && !UI.deployDone ? UI.aiSide : null, handle: UI.handlePoint(), rotating: !!UI.rotating };
       var b = UI.battle;
       if (st.hideSide != null) { var saved = b.units; b.units = b.units.filter(function (u) { return u.side !== st.hideSide; }); try { UI.renderer.draw(b, st, now); } finally { b.units = saved; } }
       else UI.renderer.draw(b, st, now);
@@ -375,7 +380,7 @@
     if (b.phase !== 'deploy' || UI.deployDone) { tray.style.display = 'none'; $('battle-log').style.display = ''; return; }
     tray.style.display = ''; $('battle-log').style.display = 'none'; tray.innerHTML = '';
     tray.appendChild(el('h3', null, 'Deploy your army'));
-    tray.appendChild(el('p', 'muted', 'Click a unit, then click inside your deployment zone (the blue band). Drag to reposition, <kbd>Q</kbd>/<kbd>E</kbd> to rotate. Ambushers may deploy anywhere on your half.'));
+    tray.appendChild(el('p', 'muted', 'Click a unit, then click inside your deployment zone (the ' + UI.ownColours()[0] + ' band). Drag to reposition, <kbd>Q</kbd>/<kbd>E</kbd> to rotate. Ambushers may deploy anywhere on your half.'));
     b.unitsOf(UI.playerSide).forEach(function (u) {
       var d = el('div', 'tray-unit' + (UI.deploySel === u.uid ? ' on' : '') + (u.placed ? ' placed' : ''), '<b>' + esc(u.name) + '</b> <span class="muted">' + (SOVL.isSingle(u.type) ? '' : u.models + ' models, ' + u.files + ' wide') + (u.placed ? ' ✓' : '') + '</span>');
       d.onclick = function () { UI.deploySel = u.uid; UI.renderDeployTray(); };
@@ -490,7 +495,7 @@
         case 'seqEnd': UI.diceIdle(); break;
         case 'rollRequest': UI.dicePending(ev.spec); break;
         case 'roll': UI.diceRolled(ev.spec, ev.res); break;
-        case 'score': { UI.diceBanner(ev); r.addFloater(ev.x, ev.y - 2, ev.winner == null ? 'Drawn combat' : (ev.winner === UI.playerSide ? 'You win by ' : b.names[ev.winner] + ' wins by ') + ev.diff, ev.winner == null ? '#ddd' : ev.winner === UI.playerSide ? '#9fd0ff' : '#ff9c9c'); break; }
+        case 'score': { UI.diceBanner(ev); r.addFloater(ev.x, ev.y - 2, ev.winner == null ? 'Drawn combat' : (ev.winner === UI.playerSide && !UI.hotseat ? 'You win by ' : b.names[ev.winner] + ' wins by ') + ev.diff, ev.winner == null ? '#ddd' : ev.winner === UI.colourSide() ? '#9fd0ff' : '#ff9c9c'); break; }
         case 'spell': { var c = b.unit(ev.from), tt = b.unit(ev.to) || findDead(ev.to); if (tt) { if (!SOVL.FX) r.addFlash(tt.x, tt.y, 2, ev.ok ? '#c090ff' : '#666'); r.addFloater(tt.x, tt.y - 1, ev.ok ? ev.spell : 'fizzle', ev.ok ? '#d8b0ff' : '#999'); } break; }
         case 'charge': { var cu = b.unit(ev.uid); if (cu) r.addFloater(cu.x, cu.y - 1, 'CHARGE!', '#ffd24a'); break; }
         case 'flee': { var fu = b.unit(ev.uid) || findDead(ev.uid); if (fu) r.addFloater(ev.from.x, ev.from.y - 1, 'flees ' + (ev.dice ? ev.dice.reduce(function (s, d) { return s + d; }, 0) + '"' : ''), '#f7f7a0'); break; }
@@ -557,7 +562,7 @@
   };
   UI.diceBanner = function (ev) {
     if (!UI.dice) return;
-    UI.dice.banner = ev.winner == null ? 'Drawn combat' : (ev.winner === UI.playerSide ? 'You win by ' : UI.battle.names[ev.winner] + ' wins by ') + ev.diff;
+    UI.dice.banner = ev.winner == null ? 'Drawn combat' : (ev.winner === UI.playerSide && !UI.hotseat ? 'You win by ' : UI.battle.names[ev.winner] + ' wins by ') + ev.diff;
     UI.dice.bannerSide = ev.winner;
     UI.renderDice(); UI.diceShow();
   };
@@ -602,7 +607,7 @@
     panel.appendChild(head);
     var rows = el('div', 'dp-rows');
     d.rows.forEach(function (row) {
-      var spec = row.spec, res = row.res, mine = spec.side === UI.playerSide;
+      var spec = row.spec, res = row.res, mine = spec.side === UI.colourSide();
       var r = el('div', 'dp-row' + (mine ? ' mine' : ' theirs')); r.id = 'dp-row-' + row.id;
       r.appendChild(el('div', 'dp-label', esc(spec.label) + (spec.sub ? ' <span class="muted">· ' + esc(spec.sub) + '</span>' : '')));
       r.appendChild(el('span', 'dp-badge k-' + spec.kind, BADGE[spec.kind] || spec.kind));
@@ -619,7 +624,7 @@
       rows.appendChild(r);
     });
     panel.appendChild(rows);
-    if (d.banner) panel.appendChild(el('div', 'dp-banner' + (d.bannerSide == null ? '' : d.bannerSide === UI.playerSide ? ' mine' : ' theirs'), esc(d.banner)));
+    if (d.banner) panel.appendChild(el('div', 'dp-banner' + (d.bannerSide == null ? '' : d.bannerSide === UI.colourSide() ? ' mine' : ' theirs'), esc(d.banner)));
     if (d.pending) {
       var spec = d.pending, pend = el('div', 'dp-pending');
       pend.appendChild(el('div', 'dp-label', '<b>' + esc(spec.label) + '</b> <span class="muted">· ' + esc(spec.sub) + '</span>'));
@@ -673,12 +678,12 @@
     var phaseName = { deploy: 'DEPLOYMENT', charge: 'CHARGE PHASE', strategic: 'STRATEGIC PHASE', 'strategic-end': 'STRATEGIC PHASE', combat: 'COMBAT PHASE', end: 'BATTLE OVER' }[b.phase] || b.phase.toUpperCase();
     $('battle-phase').textContent = phaseName;
     $('battle-turn').textContent = b.phase === 'deploy' ? UI.scenarioName(b.scenario) : 'Turn ' + b.turn + ' / ' + b.maxTurns + (b.scenario !== 'pitched' ? ' · ' + UI.scenarioName(b.scenario) : '');
-    var who = $('battle-who'); who.textContent = b.phase === 'deploy' || b.phase === 'end' ? '' : b.pendingRoll ? 'Roll the dice' : b.phase === 'combat' || b.phase === 'strategic-end' ? 'Resolving' : (b.active === UI.playerSide ? 'Your activation' : b.names[UI.aiSide] + ' is acting…'); who.className = 'who' + (b.active === UI.aiSide && !b.pendingRoll ? ' enemy' : '');
+    var who = $('battle-who'); who.textContent = b.phase === 'deploy' || b.phase === 'end' ? '' : b.pendingRoll ? 'Roll the dice' : b.phase === 'combat' || b.phase === 'strategic-end' ? 'Resolving' : (UI.hotseat ? b.names[b.active] + ' to move' : b.active === UI.playerSide ? 'Your activation' : b.names[UI.aiSide] + ' is acting…'); who.className = 'who' + (b.active !== UI.colourSide() && !b.pendingRoll ? ' enemy' : '');
     $('battle-score').textContent = b.phase === 'deploy' ? '' : 'Score ' + b.scoreFor(0) + ' — ' + b.scoreFor(1) + (b.scenario === 'objectives' ? ' · objectives' : '') + (b.scoreMode === 'ratio' ? ' (share of army value)' : '');
     var info = $('battle-unitinfo'), act = $('battle-actions'); info.innerHTML = ''; act.innerHTML = '';
     UI.updateReactionPrompt();
     var uid = UI.sel || UI.inspect || UI.deploySel, u = uid ? b.unit(uid) : null;
-    if (!u) { info.appendChild(el('p', 'muted', b.phase === 'deploy' ? 'Deploy your units, then Begin Battle.' : 'Click a unit to see its profile. Your units have a blue front edge; enemies red.')); }
+    if (!u) { info.appendChild(el('p', 'muted', b.phase === 'deploy' ? 'Deploy your units, then Begin Battle.' : 'Click a unit to see its profile. Your units have a ' + UI.ownColours()[0] + ' front edge; enemies ' + UI.ownColours()[1] + '.')); }
     else info.appendChild(UI.unitInfoPanel(u));
     // actions
     if (b.pendingRoll) {
@@ -873,9 +878,16 @@
     UI.modalDismissable = false; UI.modal(body);
     $('m-fight').onclick = function () {
       UI.closeModal();
-      camp.pendingBattle = { layer: camp.layer, idx: camp.nodeIndex, kind: kind || null }; C.save(camp);
+      camp.pendingBattle = { layer: camp.layer, idx: camp.nodeIndex, kind: kind || null, after: (after && after.spec) || null }; C.save(camp);
       var field = SOVL.Biomes.forNode(camp, node), terrain = SOVL.Biomes.terrain(field, scenario), army = C.battleArmy(camp);
-      UI.startBattle({ armies: [army, enemy], terrain: terrain, biome: field.id, fieldName: field.name, scenario: scenario, names: [camp.commanderName, node.type === 'boss' ? act.boss.name : ef.name], aggression: node.type === 'boss' ? 0.7 : 0.5, campaign: true, onEnd: function (b) {
+      UI.startBattle({ armies: [army, enemy], terrain: terrain, biome: field.id, fieldName: field.name, scenario: scenario, names: [camp.commanderName, node.type === 'boss' ? act.boss.name : ef.name], aggression: node.type === 'boss' ? 0.7 : 0.5, campaign: true, onEnd: UI.campaignOnEnd(node, after, enemy) });
+    };
+  };
+  // What happens when a campaign battle ends. Kept separate so a battle resumed after a reload
+  // (js/battlesave.js) ends exactly like one fought in a single sitting.
+  UI.campaignOnEnd = function (node, after, enemy) {
+    var camp = UI.campaign;
+      return function (b) {
         var r = C.applyBattleResult(camp, b, node, enemy);
         var extra = el('div', 'text', r.lines.map(esc).join('<br>'));
         camp.pendingBattle = null; C.save(camp);
@@ -893,8 +905,7 @@
           };
           if (camp.pendingTrait) UI.traitModal(cont); else cont();
         } });
-      } });
-    };
+      };
   };
   UI.traitModal = function (onDone) {
     var camp = UI.campaign, choices = C.traitChoices(camp), cmd = camp.army.entries[0], box = el('div');

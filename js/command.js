@@ -110,7 +110,7 @@
     });
     return spans.sort(function (a, c) { return a.s - c.s; });
   }
-  function cls(side) { return "nm " + (side === UI.playerSide ? "nm-mine" : "nm-foe"); }
+  function cls(side) { return "nm " + (side === UI.colourSide() ? "nm-mine" : "nm-foe"); }
   // colour the names inside an element, leaving its markup alone
   function colourElement(el, uids) {
     var b = UI.battle; if (!el || !b || el.__nm) return;

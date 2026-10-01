@@ -81,6 +81,18 @@
   };
 
   // ---------- events ----------
+  // The reward an event battle promises, paid once the battle is won. Built from a plain
+  // description (kept on the function as .spec) so a battle resumed after a reload pays it too.
+  UI.eventAftermath = function (spec) {
+    var fn = function () {
+      var camp = UI.campaign, more = [];
+      if (spec.goldAfter) { camp.gold += spec.goldAfter; more.push("+" + spec.goldAfter + " gold."); }
+      if (spec.itemAfter) { var it = R.pick(SOVL.MAGIC_ITEMS.filter(function (i) { return i.kind === spec.itemAfter; })); var err = C.buy(camp, { kind: "item", item: it, price: 0 }); more.push(err ? "The relic is useless to you." : "You claim " + it.name + "."); }
+      if (more.length) { camp.log.push(more.join(" ")); C.save(camp); UI.renderCampaign(); UI.chronicleOutcome("Aftermath", spec.title, more, null, spec.id); }
+    };
+    fn.spec = spec;
+    return fn;
+  };
   UI.campaignEvent = function (node) {
     var camp = UI.campaign, ev = C.randomEvent(camp), box = el("div", "tl");
     box.appendChild(el("div", "tl-seal", emblem(ev.id)));
@@ -100,12 +112,7 @@
         camp.log.push(ev.title + ": " + (lines.join(" ") || "nothing much happens.")); C.save(camp); UI.renderCampaign();
         var trait = function () { if (camp.pendingTrait) UI.traitModal(); };
         if (battleKind) {
-          UI.campaignBattle(node, battleKind, function () {
-            var more = [];
-            if (goldAfter) { camp.gold += goldAfter; more.push("+" + goldAfter + " gold."); }
-            if (itemAfter) { var it = R.pick(SOVL.MAGIC_ITEMS.filter(function (i) { return i.kind === itemAfter; })); var err = C.buy(camp, { kind: "item", item: it, price: 0 }); more.push(err ? "The relic is useless to you." : "You claim " + it.name + "."); }
-            if (more.length) { camp.log.push(more.join(" ")); C.save(camp); UI.renderCampaign(); UI.chronicleOutcome("Aftermath", ev.title, more, null, ev.id); }
-          });
+          UI.campaignBattle(node, battleKind, UI.eventAftermath({ goldAfter: goldAfter || 0, itemAfter: itemAfter || null, title: ev.title, id: ev.id }));
         } else if (lines.length) UI.chronicleOutcome(ev.title, headline(c.text), lines, trait, ev.id);
         else trait();
       };

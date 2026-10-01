@@ -10,7 +10,8 @@ Two modes:
 
 - **Skirmish** — build a 500 / 1000 / 1500 point army from one of five factions in the
   army builder, then fight the AI in a Pitched Battle, a Meeting Engagement (deep
-  deployment zones only 12" apart) or the Scoring Objectives scenario.
+  deployment zones only 12" apart) or the Scoring Objectives scenario. Choose **Second
+  player (hot seat)** as the opponent to play a friend on the same screen instead.
 - **Trail of Death** — a three-act roguelite campaign at one of three difficulties. Start
   with a commander, a small retinue and two supporting units, pick a path across a
   branching map of battles, elite battles, events, merchants, camps and treasure, recruit,
@@ -236,6 +237,26 @@ a charge. It opens on the step for the current phase, and the arrow keys page th
 Changes apply at once. Audio starts after the first click or key press. Settings and
 campaign saves stay on the device.
 
+**Battles are saved as you play.** Whenever no dice are waiting to be rolled, the battle is
+saved in the browser. Closing the tab or reloading loses nothing: a skirmish, quick or
+hot-seat battle comes back as **Resume battle** on the title screen, and a campaign battle
+picks up where it stood when the campaign is continued, instead of being fought again.
+A finished or abandoned battle clears its save.
+
+**Line of sight preview.** With one of your regiments selected, point at an enemy to see the
+line the rules use, from your front to the target (or to the side it would hit, in the
+Charge Phase). A clear line is drawn in green; a line cut by terrain turns red at the
+blocking piece, which is outlined. Cover the target stands in is outlined in amber. A tag on
+the line gives the verdict from the game's own checks: the roll needed to hit with its
+modifiers, the charge distance against the charge range, or why the target can't be chosen.
+
+**Hot seat.** In Custom battle, set *Play against* to *Second player (hot seat)* and name
+both players. Each builds an army in turn. Player 1 deploys first and hands over; player 2
+then deploys without seeing player 1's line. During the battle, control passes to whoever
+is to move, at every charge declaration, reaction and activation, with a banner naming the
+player. Player 1's army is always blue and player 2's red. Combat dice are rolled at the shared
+screen, and a hot-seat battle can be saved and resumed like any other.
+
 The **Field Manual** on the title screen is a chaptered rulebook with a contents rail that
 follows your place. It covers the game and turn structure (as phase cards), combat step by
 step, shooting modifiers, magic with every spell and its casting value, terrain, dice colours,
@@ -307,7 +328,10 @@ css/campscreens.css merchant and camp styles
 js/talescreens.js  campaign events and treasure
 css/talescreens.css event and treasure styles
 js/command.js      combat camera, side-coloured unit names, Enter to move on to the next regiment
-css/command.css    side colours for unit names
+css/command.css    side colours for unit names, hot-seat handover banner
+js/battlesave.js   mid-battle save and resume (snapshots at rest, restore, title-screen card)
+js/sightline.js    line of sight, cover and target verdict preview
+js/hotseat.js      two players on one screen: setup, deployment handover, control follows the mover
 tools/build_sfx.py builds assets/sfx from the 0 A.D. and uisfx libraries
 css/experience.css illustrated edition theme and responsive layouts
 assets/          original paintings, portraits and functional sprite atlases
@@ -320,6 +344,8 @@ test/features.js  Playwright test of scenarios, the rotation handle, undo, charg
                   difficulty, traits, honours and re-arming
 test/expansion.js camp rewards, repeat claims, legacy saves and seeded terrain layouts
 test/expansion-browser.js unit art, sound removal, world maps, camp choices and mobile layout
+test/save.js      saved and restored battles play out identically (node test/save.js [games] [seed])
+test/hotseat-browser.js a whole hot-seat battle with handovers, resume and result
 ```
 
 ## Controls
@@ -358,11 +384,13 @@ previous opponent it wins about 55% of seeded head-to-head games
 node test/sim.js 80          # rules unit tests + 80 simulated battles + campaign checks
 node test/tactical.js        # 20 automatic/manual battles with matching seeded outcomes
 node test/expansion.js       # campaign rewards, terrain and removed sound contracts
+node test/save.js 12         # 12 battles saved and restored after every step, unchanged
 python3 -m http.server 8123  # then, in another shell:
 node test/browser.js http://127.0.0.1:8123/index.html
 node test/interact.js
 node test/features.js
 node test/expansion-browser.js http://127.0.0.1:8123/index.html
+node test/hotseat-browser.js http://127.0.0.1:8123/index.html
 ```
 
 `test/interface.js` uses `linkedom` and `@napi-rs/canvas` as optional test-only

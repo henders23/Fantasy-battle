@@ -22,7 +22,7 @@
       var rule = document.createElement("div"); rule.className = "title-rule"; rule.setAttribute("aria-hidden", "true"); rule.innerHTML = "<i></i>";
       h1.parentNode.insertBefore(rule, h1.nextSibling);
     }
-    [["btn-quick", "quick"], ["btn-campaign", "campaign"], ["btn-skirmish", "custom"], ["btn-continue", "cont"]].forEach(function (p) {
+    [["btn-quick", "quick"], ["btn-campaign", "campaign"], ["btn-skirmish", "custom"], ["btn-continue", "cont"], ["btn-resume", "cont"]].forEach(function (p) {
       var b = $(p[0]); if (!b || b.querySelector(".mi")) return;
       var arrow = b.querySelector("b"), title = b.querySelector("span"), sub = b.querySelector("small");
       var mt = document.createElement("div"); mt.className = "mt";
@@ -106,7 +106,7 @@
     var bar = top.querySelector(".score-bar");
     if (!bar) { bar = document.createElement("div"); bar.className = "score-bar"; score.parentNode.insertBefore(bar, score); }
     if (b.phase === "deploy") { bar.innerHTML = ""; return; }
-    var me = UI.playerSide, a = b.scoreFor(me), e = b.scoreFor(1 - me), share = a + e > 0 ? a / (a + e) : 0.5;
+    var me = UI.colourSide(), a = b.scoreFor(me), e = b.scoreFor(1 - me), share = a + e > 0 ? a / (a + e) : 0.5;
     bar.title = "Score: " + b.names[me] + " " + a + ", " + b.names[1 - me] + " " + e + (b.scoreMode === "ratio" ? " (share of army value)" : "");
     bar.innerHTML = '<span class="mine">' + a + '</span><span class="sb-track"><i style="width:' + (share * 100).toFixed(1) + '%"></i></span><span class="theirs">' + e + "</span>";
   }
