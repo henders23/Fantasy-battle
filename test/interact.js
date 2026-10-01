@@ -3,8 +3,16 @@
 'use strict';
 var pw; try { pw = require('playwright'); } catch (e) { pw = require('/opt/node22/lib/node_modules/playwright'); }
 var base = process.argv[2] || 'http://127.0.0.1:8123/index.html', errors = [], checks = 0;
-// the camera glides (js/command.js): measure screen positions only once it has settled
-async function settled(page) { await page.waitForFunction(function () { var r = SOVL.UI && SOVL.UI.renderer; return !r || !r.flight; }, null, { timeout: 5000 }).catch(function () {}); }
+// The camera glides (js/command.js) and regiments, with their labels, glide to new positions
+// (js/fx.js). Measure screen positions only once everything has stopped, or a click can land on
+// a label still sliding past and pick the wrong regiment.
+async function settled(page) {
+  await page.waitForFunction(function () {
+    var UI = SOVL.UI, r = UI && UI.renderer, b = UI && UI.battle; if (!r || !b) return true;
+    if (r.flight) return false;
+    return b.units.every(function (u) { return !u._tw && (u._rx == null || (Math.abs(u._rx - u.x) < 0.02 && Math.abs(u._ry - u.y) < 0.02)); });
+  }, null, { timeout: 6000 }).catch(function () {});
+}
 function expect(c, msg) { checks++; if (!c) { errors.push('CHECK FAILED: ' + msg); console.log('CHECK FAILED: ' + msg); } }
 (async function () {
   var browser = await pw.chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
@@ -32,9 +40,21 @@ function expect(c, msg) { checks++; if (!c) { errors.push('CHECK FAILED: ' + msg
   // deployment with drag
   await page.click('#deploy-tray button:has-text("Auto-deploy")'); await page.waitForTimeout(100);
   var box = await page.$eval('#battle-canvas', function (c) { var r = c.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
-  var u0 = await page.evaluate(function () { var b = SOVL.UI.battle, u = b.unitsOf(0)[0], r = SOVL.UI.renderer, p = r.toScreen(u.x, u.y); return { uid: u.uid, sx: p.x, sy: p.y, x: u.x, y: u.y, a: u.a, scale: r.scale }; });
-  // drag 1.5 inches toward the table edge (the auto-deployed line leaves room behind it)
-  await page.mouse.move(box.x + u0.sx, box.y + u0.sy); await page.mouse.down(); await page.mouse.move(box.x + u0.sx, box.y + u0.sy + 1.5 * u0.scale, { steps: 5 }); await page.mouse.up(); await page.waitForTimeout(100);
+  // pick a regiment and a direction (back toward the table edge, or forward) where the game says
+  // a spot 1.5" away is free: auto-deploy can leave a unit against the back of its zone
+  var u0 = await page.evaluate(function () {
+    var b = SOVL.UI.battle, r = SOVL.UI.renderer, us = b.unitsOf(0);
+    for (var i = 0; i < us.length; i++) {
+      var u = us[i];
+      for (var k = 0; k < 2; k++) {
+        var dy = k ? -1.5 : 1.5, rect = { x: u.x, y: u.y + dy, a: u.a, w: u.w, d: u.d };
+        if (b.placementValid(u, rect, [])) { var p = r.toScreen(u.x, u.y); return { uid: u.uid, sx: p.x, sy: p.y, x: u.x, y: u.y, a: u.a, scale: r.scale, dy: dy }; }
+      }
+    }
+    return null;
+  });
+  expect(!!u0, 'some regiment has room to be dragged');
+  await page.mouse.move(box.x + u0.sx, box.y + u0.sy); await page.mouse.down(); await page.mouse.move(box.x + u0.sx, box.y + u0.sy + u0.dy * u0.scale, { steps: 5 }); await page.mouse.up(); await page.waitForTimeout(100);
   var after = await page.evaluate(function (uid) { var u = SOVL.UI.battle.unit(uid); return { x: u.x, y: u.y, a: u.a, placed: u.placed }; }, u0.uid);
   expect(Math.abs(after.y - u0.y) > 0.8, 'drag moved unit: ' + u0.y.toFixed(1) + ' -> ' + after.y.toFixed(1));
   await page.evaluate(function () { SOVL.UI.aiDelay = 40; });
@@ -87,7 +107,8 @@ function expect(c, msg) { checks++; if (!c) { errors.push('CHECK FAILED: ' + msg
         await page.mouse.move(box.x + ground.sx, box.y + ground.sy); await page.waitForTimeout(60);
         var pv = await page.evaluate(function () { return SOVL.UI.preview ? SOVL.UI.preview.ok : null; });
         if (!ground.onUnit && ground.canMove) expect(pv !== null, 'move preview shown on hover');
-        await page.mouse.click(box.x + ground.sx, box.y + ground.sy); await page.waitForTimeout(80);
+        // only click open ground: clicking another of your regiments here would (correctly) switch the activation to it
+        if (!ground.onUnit) { await page.mouse.click(box.x + ground.sx, box.y + ground.sy); await page.waitForTimeout(80); }
         var moved = await page.evaluate(function (uid) { var u = SOVL.UI.battle.unit(uid); return u ? { x: u.x, y: u.y, left: u.moveLeft } : null; }, pick.uid);
         if (moved && pv) { if (Math.abs(moved.x - pick.x) > 0.3 || Math.abs(moved.y - pick.y) > 0.3) didMove = true; }
         // shoot if a target exists
