@@ -214,3 +214,54 @@
   .tr-sparks { bottom: 56px; }
   .tr-find { padding: 14px 28px 18px; }
 }
+
+/* ---------- battle result ---------- */
+@media (min-width: 761px) and (max-height: 860px) {
+  #modal-body.m-result { width: min(1100px, 96vw); }
+  /* a lower banner, score and tally */
+  .res-hero { padding: 14px 24px 10px; }
+  .res-verdict { margin: 4px 0 2px; gap: 10px; }
+  .res-word { font-size: clamp(40px, 7.5vh, 60px); }
+  .res-why { font-size: 15px; }
+  .res-score { padding: 10px 24px 4px; }
+  .res-crest { width: 40px; height: 48px; }
+  .res-num { font-size: 30px; }
+  .res-bar.odds-bar { margin: 2px 24px 0; height: 6px; }
+  .res-stats { padding: 10px 24px 2px; gap: 8px; }
+  .res-stat { padding: 5px 10px; }
+  .res-stat b { font-size: 19px; }
+  .res-stat span { font-size: 12.5px; }
+  .res-stat small { font-size: 10px; }
+  /* the spoils (gold, veterancy) come before the regiment lists, so they are seen first */
+  .res-spoils { order: 1; margin: 10px 24px 0; padding: 9px 14px; }
+  .res-spoilhead { font-size: 15px; margin-bottom: 3px; }
+  #modal-body .res-spoils .res-spoiltext { font-size: 14px; line-height: 1.45; columns: 2; column-gap: 28px; padding: 0; }
+  .res-cols { order: 2; padding: 10px 24px 4px; gap: 12px; }
+  .res-foot { order: 3; padding: 10px 24px 12px; margin-top: 4px; }
+  .res-foot button.primary { padding: 10px 26px; font-size: 16px; }
+  /* one line per regiment: name over its strength bar, state and count side by side */
+  .res-colhead { padding: 4px 12px 6px; }
+  .res-unit { padding: 3px 12px; gap: 8px; grid-template-columns: 24px 1fr auto; }
+  .res-unit .thumb { width: 24px; height: 28px; }
+  .res-umid > span { font-size: 13.5px; }
+  .res-ubar { margin-top: 3px; }
+  .res-ustate { display: flex; align-items: baseline; gap: 6px; }
+  .res-ustate b { font-size: 11px; }
+  .res-ustate small { font-size: 11.5px; }
+}
+@media (min-width: 761px) and (max-height: 800px) {
+  .res-hero { padding: 10px 24px 8px; }
+  .res-eyebrow { font-size: 11px; }
+  .res-verdict { margin: 2px 0 0; }
+  .res-word { font-size: clamp(36px, 7vh, 48px); }
+  .laurel { width: 34px; }
+  .res-why { font-size: 14px; }
+  .res-score { padding: 8px 24px 2px; }
+  .res-crest { width: 32px; height: 38px; }
+  .res-num { font-size: 25px; }
+  .res-sidetext small { font-size: 11px; }
+  /* each tally on one line: the number, what it counts, and its unit */
+  .res-stats { padding-top: 8px; }
+  .res-stat { display: flex; align-items: baseline; justify-content: center; gap: 7px; padding: 6px 10px; }
+  .res-stat b { font-size: 18px; }
+}
