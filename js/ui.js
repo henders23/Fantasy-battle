@@ -111,8 +111,9 @@
         var camp = C.create({ faction: UI.setup.faction, commander: UI.setup.commander, name: $('setup-name').value.trim() || undefined, difficulty: $('setup-difficulty').value });
         UI.campaign = camp; C.save(camp);
         UI.showCampaign();
-        UI.modal('<h2>' + esc(SOVL.CAMPAIGN.acts[0].name) + '</h2><div class="text">' + esc(camp.commanderName) + ' rides out with a ragtag warband: ' + camp.army.entries.map(function (e) { return esc(A.entryLabel(camp.faction, e)); }).join(', ') + '.<br><br>Pick a node on the map to travel. Battles earn gold and veterancy; merchants and camps let you grow the army. Reach the end of Act III and defeat the Deathless Host.</div><div class="choices"><button class="primary" id="m-ok">Begin</button></div>');
-        $('m-ok').onclick = UI.closeModal;
+        if (UI.campaignStory) UI.campaignStory(camp); // the tale of the trail and what the run is for (js/storyscreens.js)
+        else { UI.modal('<h2>' + esc(SOVL.CAMPAIGN.acts[0].name) + '</h2><div class="text">' + esc(camp.commanderName) + ' rides out with a ragtag warband: ' + camp.army.entries.map(function (e) { return esc(A.entryLabel(camp.faction, e)); }).join(', ') + '.<br><br>Pick a node on the map to travel. Battles earn gold and veterancy; merchants and camps let you grow the army. Reach the end of Act III and defeat the Deathless Host.</div><div class="choices"><button class="primary" id="m-ok">Begin</button></div>');
+        $('m-ok').onclick = UI.closeModal; }
       }
     };
     UI.show('setup');
@@ -470,8 +471,8 @@
         UI.mode = 'move'; UI.targets = []; UI.updateHud(); return;
       }
       if (u && u.side === UI.playerSide) {
-        if (b.activeUnit && b.activeUnit !== u.uid) { UI.inspect = u.uid; UI.hint('Finish the current activation first (End Activation).'); UI.updateHud(); return; }
         if (!b.canActivate(u)) { UI.inspect = u.uid; UI.hint(u.name + ' has already been activated this turn.'); UI.updateHud(); return; }
+        if (b.activeUnit && b.activeUnit !== u.uid) { UI.inspect = u.uid; UI.hint('Finish the current order first, then click ' + u.name + '.'); UI.updateHud(); return; }
         var ra = b.beginActivation(u.uid); if (!ra.ok) { UI.hint(ra.reason); return; }
         UI.sel = u.uid; UI.inspect = null; UI.mode = 'move'; UI.targets = []; UI.diceHide(); UI.processEvents(); UI.updateHud(); return;
       }

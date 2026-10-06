@@ -49,7 +49,11 @@ include every special effect.
 
 When the Combat Phase opens, or you choose an engagement, the camera glides in close to the
 fight and eases back out to the whole table when the fighting is done. Scrolling or dragging
-takes the camera back at any time.
+takes the camera back at any time. The engagement panel ("Fight this engagement", the result,
+"Finish combat") and the dice sit at the bottom centre of the field, and the camera keeps the
+fight in the clear space above them. Before the first engagement is fought, a commander who has
+not acted this turn may use a once-per-battle ability that bears on the fighting (Inspire
+Valor, Mountain's Will, Warcry, Furious Charge, Power of Many) from the engagement panel.
 
 Unit names are coloured by side wherever they are written: blue for yours, red for the
 enemy's. This covers the chronicle, the dice panel, the engagement panel and its result, and
@@ -242,6 +246,14 @@ The **Guide** (the Guide button, or **?** in battle) walks through a first battl
 illustrated steps: deploying, declaring charges, moving and shooting, fighting, and answering
 a charge. It opens on the step for the current phase, and the arrow keys page through it.
 
+**Sound controls** sit at the top of every screen: a Music on/off button and a volume button
+that opens sliders for the music and the battle sounds. On the battlefield the music is "The
+Frame" by Drbeat; the menus and the trail keep the orchestral trail theme.
+
+**A story page opens each game.** A new campaign begins with the tale of the Trail of Death
+(a line for each faction, and the run's rules for its difficulty); the quick battle, custom
+battles and hot seat open with the stakes of the fight and how it is won.
+
 **Settings** are grouped into sound, battle and motion cards:
 - switches for battle sounds, music, and animation and effects;
 - volume sliders from 0 to 100%, with a test sound for effects;
@@ -345,6 +357,10 @@ css/talescreens.css event and treasure styles
 js/command.js      combat camera, side-coloured unit names, Enter to move on to the next regiment
 css/command.css    side colours for unit names, hot-seat handover banner
 css/laptop.css     compact layouts for laptop windows: battlefield, title, builder, campaign, dialogs
+js/audiobar.js     music on/off and volume controls at the top of every screen (css/audiobar.css)
+js/storyscreens.js the story page at the start of each game (css/storyscreens.css)
+js/combatdesk.js   combat panels at the bottom centre, camera kept on the fight, commander abilities
+                   before the first engagement (css/combatdesk.css)
 js/battlesave.js   mid-battle save and resume (snapshots at rest, restore, title-screen card)
 js/sightline.js    line of sight, cover and target verdict preview
 js/hotseat.js      two players on one screen: setup, deployment handover, control follows the mover
@@ -368,7 +384,7 @@ test/hotseat-browser.js a whole hot-seat battle with handovers, resume and resul
 
 | Input | Action |
 | --- | --- |
-| Click a unit | select / activate it (Strategic Phase) |
+| Click a unit | select / activate it (Strategic Phase). Clicking another ready regiment moves on to it: one that has not acted yet is swapped, one that has moved, shot or cast ends its activation and the clicked regiment is activated when your turn comes round |
 | Click the ground | pivot toward the point and advance |
 | Shift + click | pivot only |
 | Q / E | pivot 45° left / right |

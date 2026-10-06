@@ -5,7 +5,7 @@
 (function () {
   if (typeof document === "undefined" || typeof Audio === "undefined") return;
   var UI = SOVL.UI;
-  var TRACKS = { trail: "assets/music/trail-theme.mp3", battle: "assets/music/battle-theme.mp3" };
+  var TRACKS = { trail: "assets/music/trail-theme.mp3", battle: "assets/music/battle-the-frame.mp3" };
   var LEVEL = { low: 0.16, medium: 0.3, high: 0.48 };
   var players = {}, current = null, unlocked = false, timer = null;
 

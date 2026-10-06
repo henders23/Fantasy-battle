@@ -1,0 +1,39 @@
+/* combat phase: the engagement panel and the dice at the bottom centre of the field, clear of the
+   fight (js/combatdesk.js sets their exact heights and keeps the camera above them) */
+#battle-canvas-wrap.combat-desk #engagement-panel {
+  top: auto; bottom: 14px; left: 50%; transform: translateX(-50%);
+  width: min(680px, calc(100% - 28px)); max-height: 48%; padding: 12px 18px 14px;
+}
+#battle-canvas-wrap.combat-desk #engagement-panel .engagement-head { align-items: center; }
+#battle-canvas-wrap.combat-desk #engagement-panel .combat-instruction { margin: 6px 0 0; font-size: 13.5px; }
+/* the hint line moves to the top of the field, out of the panels' way */
+#battle-canvas-wrap.combat-desk #battle-hint { top: 12px; bottom: auto; left: 14px; max-width: calc(100% - 300px); }
+#battle-canvas-wrap.combat-desk:has(#engagement-panel:not([hidden])) #phase-banner { top: 22%; bottom: auto; }
+
+/* the dice, a size larger, in the same place */
+#battle-canvas-wrap.combat-desk #dice-panel { left: 50%; transform: translateX(-50%); width: min(860px, calc(100% - 28px)); z-index: 5; }
+#dice-panel .die { width: 30px; height: 30px; border-radius: 6px; }
+#dice-panel .die.big { width: 36px; height: 36px; border-radius: 7px; }
+#dice-panel .die.blank:after { font-size: 15px; }
+#dice-panel .dp-title { font-size: 16px; }
+#dice-panel .dp-row .dp-label { font-size: 14px; }
+#dice-panel .dp-target, #dice-panel .dp-count { font-size: 16px; }
+#dice-panel .dp-banner { font-size: 25px; }
+#dice-panel .dp-pending .dp-label { font-size: 15px; }
+#dice-panel .dp-row { grid-template-columns: 86px 44px 1fr 130px; }
+#dice-panel .dp-dice { gap: 6px; }
+
+/* commander abilities before the first fight */
+.cd-abilities { margin: 8px 0 10px; padding: 8px 10px 10px; border: 1px solid rgba(224, 184, 90, 0.4); border-radius: 4px; background: rgba(224, 184, 90, 0.07); }
+.cd-abhead { font-size: 12px; letter-spacing: 0.06em; color: #e9d29a; margin-bottom: 6px; }
+.cd-abrow { display: flex; flex-wrap: wrap; gap: 6px; }
+.cd-ability { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 6px 12px; text-align: left; border-color: rgba(224, 184, 90, 0.55); }
+.cd-ability b { font-family: var(--head); font-size: 14px; letter-spacing: 0.04em; color: #f3dca3; }
+.cd-ability span { font-size: 11.5px; color: #c9b58a; }
+@media (max-width: 760px) {
+  #battle-canvas-wrap.combat-desk #engagement-panel { width: calc(100% - 16px); max-height: 52%; padding: 10px 12px; }
+  #battle-canvas-wrap.combat-desk #battle-hint { max-width: calc(100% - 28px); }
+  #dice-panel .die { width: 24px; height: 24px; }
+  #dice-panel .die.big { width: 28px; height: 28px; }
+  #dice-panel .dp-row { grid-template-columns: 66px 30px 1fr 58px; }
+}

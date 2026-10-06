@@ -21,6 +21,7 @@ function ok(c, m) { if (!c) { errors.push('FAIL: ' + m); console.log('FAIL: ' + 
   await page.click('#setup-next'); await page.waitForTimeout(200);
   await page.click('#builder-auto'); await page.waitForTimeout(100);
   await page.click('#builder-go'); await page.waitForTimeout(500);
+  var sy = await page.$('#modal.active #modal-body.m-story #m-ok'); if (sy) { await sy.click(); await page.waitForTimeout(200); } // the story page
   var turnTxt = await page.$eval('#battle-turn', function (e) { return e.textContent; });
   ok(/Meeting/.test(turnTxt), 'deploy header shows scenario: ' + turnTxt);
   var dz = await page.evaluate(function () { var b = SOVL.UI.battle; return [b.deployDepth, b.deployZone(0), b.deployZone(1)]; });

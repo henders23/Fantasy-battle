@@ -10,8 +10,9 @@ const assert=require('assert'),fs=require('fs'),path=require('path'),pw=require(
  const art=await page.evaluate(()=>{let misses=[],count=0;for(const[fid,f]of Object.entries(SOVL.FACTION_DATA))for(const section of f.sections)for(const d of section.units){const u=SOVL.Thumbs.fromDef(fid,d.id);const a=SOVL.RealisticArt.resolve(u,'r',null);if(!a||!a.rect||!a.image.naturalWidth)misses.push(fid+'/'+d.id);count++;}return{misses,count};});
  assert.deepStrictEqual(art.misses,[]);console.log('All '+art.count+' named unit definitions have loaded artwork.');
  await page.click('#btn-quick');await page.waitForTimeout(600);
- const hint=await page.evaluate(()=>{const U=SOVL.UI,b=U.battle;U.settings.music=false;U.settings.sound=true;window.__sfxTrace=[];b.phase='strategic';b.active=0;let us=b.unitsOf(0);b.activeUnit=us[0].uid;U.sel=us[0].uid;U.canvasClick({x:us[1].x,y:us[1].y},{});return{text:document.getElementById('battle-hint').textContent,active:b.activeUnit,expected:us[0].uid,trace:window.__sfxTrace.slice()};});
- assert.match(hint.text,/Finish the current/);assert.strictEqual(hint.active,hint.expected);assert(!hint.trace.includes('ui_error'));
+ {const sy=await page.$('#modal.active #modal-body.m-story #m-ok');if(sy){await sy.click();await page.waitForTimeout(200);}} // the story page
+ const hint=await page.evaluate(()=>{const U=SOVL.UI,b=U.battle;U.settings.music=false;U.settings.sound=true;window.__sfxTrace=[];b.phase='strategic';b.active=0;let us=b.unitsOf(0);b.activeUnit=us[0].uid;U.sel=us[0].uid;U.canvasClick({x:us[1].x,y:us[1].y},{});return{text:document.getElementById('battle-hint').textContent,active:b.activeUnit,expected:us[0].uid,other:us[1].uid,trace:window.__sfxTrace.slice()};});
+ assert.strictEqual(hint.active,hint.other,'clicking another regiment moves the activation to it');assert(!hint.trace.includes('ui_error'));
  await page.evaluate(()=>{const U=SOVL.UI;U.closeModal();U.settings.sound=false;U.campaign=SOVL.Campaign.create({faction:'empires_of_men',commander:'captain',name:'Aldric'});U.showCampaign();U.closeModal();});
  for(let act=0;act<3;act++){
   await page.evaluate(act=>{let U=SOVL.UI,c=U.campaign;c.act=act;c.nodeIndex=null;c.layer=0;U.renderCampaign();document.getElementById('camp-map').scrollTop=0;},act);

@@ -1,0 +1,20 @@
+/* sound controls at the top of each screen (js/audiobar.js) */
+.audio-bar { position: relative; display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.ab-btn { display: inline-flex; align-items: center; gap: 7px; min-height: 32px; padding: 5px 11px; font-family: var(--head); font-size: 12px; letter-spacing: 0.08em; }
+.ab-btn svg { width: 17px; height: 17px; flex: none; }
+.ab-btn.off { color: #9aa7b3; }
+.ab-vol { padding: 5px 9px; }
+.ab-pop { position: absolute; top: calc(100% + 8px); right: 0; z-index: 60; width: 270px; padding: 12px 14px; border-radius: 6px;
+  background: linear-gradient(180deg, #131d29, #0b121a); border: 1px solid var(--panel-edge, rgba(152, 184, 212, 0.35)); box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6); }
+.ab-pop[hidden] { display: none; }
+.ab-row { display: grid; grid-template-columns: 96px 1fr 40px; align-items: center; gap: 8px; margin: 4px 0; font-size: 13px; color: #c9d3dc; text-transform: none; letter-spacing: 0; }
+.ab-row input { width: 100%; accent-color: var(--gild, #98b8d4); }
+.ab-pct { text-align: right; font-family: var(--head); font-weight: 400; color: #dbe6f0; font-variant-numeric: tabular-nums; }
+/* the title screen keeps them in its top corner */
+.audio-bar.in-menu { position: absolute; top: 18px; right: 22px; z-index: 5; }
+.audio-bar.in-menu .ab-btn { background: rgba(9, 15, 22, 0.75); }
+@media (max-width: 760px) {
+  .ab-btn span { display: none; }
+  .ab-btn { padding: 5px 8px; }
+  .audio-bar.in-menu { top: 10px; right: 10px; }
+}

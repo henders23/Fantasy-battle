@@ -39,6 +39,7 @@ function expect(c, msg) { checks++; if (!c) { errors.push('CHECK FAILED: ' + msg
   expect(ret === 'imperial_halberd', 'retinue changed: ' + ret);
   await page.click('#builder-auto'); await page.waitForTimeout(100);
   await page.click('#builder-go'); await page.waitForTimeout(300);
+  var sy = await page.$('#modal.active #modal-body.m-story #m-ok'); if (sy) { await sy.click(); await page.waitForTimeout(200); } // the story page
   // deployment with drag
   await page.click('#deploy-tray button:has-text("Auto-deploy")'); await page.waitForTimeout(100);
   var box = await page.$eval('#battle-canvas', function (c) { var r = c.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });

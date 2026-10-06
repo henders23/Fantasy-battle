@@ -1206,6 +1206,24 @@
     this.emit({ type: 'ability', uid: u.uid, id: id, target: t.uid });
     return { ok: true };
   };
+  // At the start of the combat phase, before the first engagement is fought, a commander who has
+  // not yet acted this turn may use a once-per-battle ability that bears on the fighting.
+  var COMBAT_ABILITIES = { inspire_valor: 1, mountains_will: 1, warcry: 1, furious_charge: 1, power_of_many: 1 };
+  BP.combatAbilities = function (side) {
+    var self = this, out = [];
+    if (this.phase !== 'combat' || this.combatBegun || this.pendingRoll) return out;
+    this.unitsOf(side).forEach(function (u) {
+      if (u.removed || u.fleeing || !u.commander || !u.commander.alive || u.usedSpell) return;
+      self.commanderAbilities(u).forEach(function (ab) { if (COMBAT_ABILITIES[ab.id]) out.push({ uid: u.uid, id: ab.id, name: ab.name, desc: ab.desc, commander: u.commander.name || u.name, unit: u.name }); });
+    });
+    return out;
+  };
+  BP.useCombatAbility = function (uid, id) {
+    var u = this.unit(uid);
+    if (!u || !this.combatAbilities(u.side).some(function (a) { return a.uid === uid && a.id === id; })) return { ok: false, reason: 'That ability cannot be used now.' };
+    var was = this.activeUnit; this.activeUnit = uid;
+    try { return this.useAbility(uid, id); } finally { this.activeUnit = was; }
+  };
   BP.rally = function (uid) {
     var u = this.unit(uid), self = this; if (!u || this.activeUnit !== uid || !u.fleeing) return { ok: false, reason: 'Not fleeing' };
     if (this.pendingRoll) return { ok: false, reason: 'Roll the dice first' };
@@ -1241,6 +1259,7 @@
     this.addLog('— Turn ' + this.turn + ': Combat Phase —', 'phase');
     this.emit({ type: 'phase', phase: 'combat', turn: this.turn });
     this.combatReports = [];
+    this.combatBegun = false; // until the first engagement is fought, commanders may still rouse their army
     if (this.interactiveCombat) {
       this.pendingCombats = this.engagements().map(function (g) { return g.map(function (u) { return u.uid; }); });
       var inCombat = {};
@@ -1263,7 +1282,7 @@
     var group = ids.map(function (id) { return self.unit(id); }).filter(Boolean);
     var result = { ok: true, report: null, pending: false };
     if (group.length < 2) { this.emit({ type: 'engagementResolved', report: null, remaining: this.pendingCombats.length }); return result; }
-    this.engagementBusy = true;
+    this.engagementBusy = true; this.combatBegun = true;
     this.runEngagement(group, function (report) {
       self.combatReports.push(report); self.engagementBusy = false; result.report = report; result.pending = false;
       self.emit({ type: 'engagementResolved', report: report, remaining: self.pendingCombats.length });

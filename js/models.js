@@ -375,6 +375,27 @@
   // Painting is capped per frame: past the budget a model borrows the sprite of the nearest
   // light direction already painted, and its own is painted on a later frame.
   var BUDGET_MS = 5, spent = 0;
+  var scratchCv = null, silCv = null;
+  function grow(cv, w, h) { if (cv.width < w) cv.width = w; if (cv.height < h) cv.height = h; return cv; }
+  function scratchFor(w, h) { if (!scratchCv) scratchCv = document.createElement("canvas"); return grow(scratchCv, w, h); }
+  // Stamp a figure so it stands out: lifted a little, inside a thin dark outline and a soft pale
+  // rim, both made from its silhouette drawn at small offsets (plain image draws: canvas blur
+  // filters are far too slow to run on every sprite).
+  var RING = [[1, 0], [0.71, 0.71], [0, 1], [-0.71, 0.71], [-1, 0], [-0.71, -0.71], [0, -1], [0.71, -0.71]];
+  function standOut(page, src, x, y, w, h, px) {
+    if (!silCv) silCv = document.createElement("canvas");
+    grow(silCv, w, h);
+    var sc = src.getContext("2d"), sil = silCv.getContext("2d");
+    sc.save(); sc.globalCompositeOperation = "source-atop"; sc.fillStyle = "rgba(255,246,228,0.12)"; sc.fillRect(0, 0, w, h); sc.restore();
+    function tint(col) { sil.save(); sil.setTransform(1, 0, 0, 1, 0, 0); sil.globalCompositeOperation = "copy"; sil.drawImage(src, 0, 0, w, h, 0, 0, w, h); sil.globalCompositeOperation = "source-in"; sil.fillStyle = col; sil.fillRect(0, 0, w, h); sil.restore(); }
+    page.save(); page.beginPath(); page.rect(x, y, w, h); page.clip(); page.clearRect(x, y, w, h);
+    tint("rgba(236,228,206,1)"); page.globalAlpha = 0.16;
+    RING.forEach(function (d) { page.drawImage(silCv, 0, 0, w, h, x + d[0] * px * 2.2, y + d[1] * px * 2.2, w, h); });
+    tint("rgba(8,10,14,1)"); page.globalAlpha = 0.8;
+    RING.forEach(function (d) { page.drawImage(silCv, 0, 0, w, h, x + d[0] * px, y + d[1] * px, w, h); });
+    page.globalAlpha = 1; page.drawImage(src, 0, 0, w, h, x, y, w, h);
+    page.restore();
+  }
   function spriteFor(u, role, v, rank, bw, bd, bucket, cmd, PPI) {
     var base = [u.faction, cmd ? "c:" + cmd.def.id + cmd.weapon : u.id + u.weapon + (u.ranged || ""), role, v, rank >= 2 ? 2 : rank].join("|"), tail = [bw.toFixed(2), bd.toFixed(2), u.banner ? 1 : 0, PPI].join("|");
     tail += "|" + (SOVL.RealisticArt ? SOVL.RealisticArt.revision() : 0);
@@ -391,13 +412,17 @@
     var padX = bw * 0.75, back = bd * 0.55, front = bd * 0.5 + Math.max(bw * 1.7, 0.4);
     var sw = Math.ceil((bw + 2 * padX) * PPI), sh = Math.ceil((back + front) * PPI), slot = allocate(sw, sh);
     if (!slot) { cache[key] = "failed"; return "failed"; }
-    var g = slot.page.getContext("2d");
-    g.save(); g.beginPath(); g.rect(slot.x, slot.y, sw, sh); g.clip();
-    g.translate(slot.x, slot.y); g.scale(PPI, PPI); g.translate(bw / 2 + padX, front);
+    // the figure is painted on a scratch canvas, then stamped into the atlas with its contrast
+    // lifted: a touch brighter and crisper, a thin dark outline and a soft pale rim, so each
+    // model reads clearly against its tray and the ground (done once per sprite, not per frame)
+    var page = slot.page.getContext("2d"), scratch = scratchFor(sw, sh), g = scratch.getContext("2d");
+    g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, sw, sh);
+    g.save(); g.scale(PPI, PPI); g.translate(bw / 2 + padX, front);
     var a = SUN - bucket * (Math.PI / 4); L.x = Math.cos(a); L.y = Math.sin(a);
     c = g;
     try { if (!SOVL.RealisticArt || !SOVL.RealisticArt.draw(g, u, bw, bd, role, cmd)) paintModel(u, role, v, rank, bw, bd, cmd); } catch (e) { g.restore(); cache[key] = "failed"; c = null; return "failed"; }
     g.restore(); c = null;
+    standOut(page, scratch, slot.x, slot.y, sw, sh, Math.max(1, PPI * 0.018));
     hit = { cv: slot.page, sx: slot.x, sy: slot.y, sw: sw, sh: sh, ox: bw / 2 + padX, oy: front, w: sw / PPI, h: sh / PPI, bucket: bucket };
     cache[key] = hit; cacheCount++;
     spent += performance.now() - t0;
@@ -430,8 +455,9 @@
     if (flock) return flock;
     var cv = document.createElement("canvas"); cv.width = cv.height = 96;
     var g = cv.getContext("2d"), rnd = SOVL.R.makeRng(99);
-    g.fillStyle = "#3d3a26"; g.fillRect(0, 0, 96, 96);
-    for (var i = 0; i < 1400; i++) { var t = rnd(); g.fillStyle = t < 0.4 ? "rgba(88,92,48,0.55)" : t < 0.7 ? "rgba(58,50,30,0.6)" : t < 0.9 ? "rgba(112,104,66,0.45)" : "rgba(30,28,18,0.6)"; g.fillRect(rnd() * 96, rnd() * 96, 1 + rnd() * 2, 1 + rnd() * 2); }
+    // a dark, fine-grained base: darker than any battlefield, so painted figures stand out on it
+    g.fillStyle = "#1b1e1a"; g.fillRect(0, 0, 96, 96);
+    for (var i = 0; i < 1100; i++) { var t = rnd(); g.fillStyle = t < 0.45 ? "rgba(52,58,44,0.5)" : t < 0.8 ? "rgba(34,36,30,0.6)" : "rgba(70,72,58,0.35)"; g.fillRect(rnd() * 96, rnd() * 96, 1 + rnd() * 1.5, 1 + rnd() * 1.5); }
     flock = ctx.createPattern(cv, "repeat");
     if (flock && flock.setTransform && typeof DOMMatrix !== "undefined") flock.setTransform(new DOMMatrix().scale(1 / 40));
     return flock;
@@ -441,8 +467,8 @@
     if (SOVL.isSingle(u.type) && !SOVL.commanderOnly(u)) { ctx.fillStyle = mine ? "rgba(20,40,80,0.55)" : "rgba(90,20,20,0.55)"; ctx.fill(); return; }
     ctx.save();
     ctx.fillStyle = flockPattern(ctx) || "#3d3a26"; ctx.fill();
-    ctx.fillStyle = mine ? "rgba(40,80,150,0.16)" : "rgba(150,40,40,0.16)"; ctx.fill();
-    ctx.lineWidth = 0.09; ctx.strokeStyle = mine ? "rgba(140,190,255,0.65)" : "rgba(255,140,140,0.6)"; ctx.stroke();
+    ctx.fillStyle = mine ? "rgba(46,92,170,0.24)" : "rgba(170,46,46,0.24)"; ctx.fill();
+    ctx.lineWidth = 0.11; ctx.strokeStyle = mine ? "rgba(150,200,255,0.85)" : "rgba(255,150,150,0.8)"; ctx.stroke();
     ctx.restore();
   };
 

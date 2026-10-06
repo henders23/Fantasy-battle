@@ -25,6 +25,7 @@ var errors = [];
   await page.click('#builder-auto'); await page.waitForTimeout(200);
   await page.screenshot({ path: path.join(shots, '03-builder.png') });
   await page.click('#builder-go'); await page.waitForTimeout(400);
+  var sy = await page.$('#modal.active #modal-body.m-story #m-ok'); if (sy) { await sy.click(); await page.waitForTimeout(200); } // the story page
   await page.screenshot({ path: path.join(shots, '04-deploy.png') });
   // place one unit by clicking, then auto-deploy the rest
   await page.click('.tray-unit');

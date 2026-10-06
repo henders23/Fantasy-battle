@@ -182,5 +182,27 @@ if (SOVL.Campaign) {
     });
   }
 }
+// commander abilities at the start of the combat phase: offered until the first engagement is
+// fought, never to a commander who has already acted this turn, and they take effect
+(function () {
+  R.setSeed(41);
+  var fid = 'empires_of_men', army = { faction: fid, name: 'A', entries: [A.defaultCommander(fid, 'captain', 'imperial_sword', 18, 'Aldric'), A.defaultEntry(fid, 'imperial_spear', 20)] };
+  var b = new SOVL.Battle({ armies: [army, A.randomArmy({ faction: 'greenskin_tribes', pts: 400 })], terrain: [], scenario: 'pitched', names: ['A', 'B'], interactive: true, interactiveCombat: true });
+  b.autoDeploy(0); b.autoDeploy(1); b.autoRoll = true; b.start();
+  var me = b.unitsOf(0).filter(function (u) { return u.commander; })[0], foe = b.unitsOf(1)[0];
+  me.x = 36; me.y = 26; me.a = -Math.PI / 2; foe.x = 36; foe.y = 26 - me.d / 2 - foe.d / 2 - 0.02; foe.a = Math.PI / 2;
+  b.contacts.push({ a: me.uid, aSide: 'front', b: foe.uid, bSide: 'front', age: 0 });
+  b.phase = 'strategic'; b.endStrategicPhase();
+  assert(b.phase === 'combat' && b.pendingCombats.length === 1, 'combat phase with one engagement: ' + b.phase);
+  var offer = b.combatAbilities(0);
+  assert(offer.length === 1 && offer[0].id === 'inspire_valor', 'Inspire Valor offered at the start of combat: ' + JSON.stringify(offer));
+  assert(!b.useCombatAbility(foe.uid, 'inspire_valor').ok, 'a unit without the ability cannot use it');
+  assert(b.useCombatAbility(me.uid, 'inspire_valor').ok && b.armyEffects[0].combatScore === 1, 'Inspire Valor takes effect in combat');
+  assert(b.combatAbilities(0).length === 0 && b.activeUnit == null, 'used once, and no unit left active');
+  var r1 = b.resolveEngagement(me.uid); b.rollAll(); // the dice are rolled by hand in combat
+  assert(r1.ok && b.combatReports.length === 1, 'the engagement is fought');
+  me.usedOnce = {}; me.usedSpell = false;
+  assert(b.combatAbilities(0).length === 0, 'no abilities once the fighting has begun');
+})();
 console.log(failures ? failures + ' FAILURES' : 'ALL TESTS PASSED');
 process.exit(failures ? 1 : 0);

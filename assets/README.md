@@ -21,7 +21,7 @@ sprites in `js/visuals.js` and the procedural model painter remain as loading fa
 | `unit-sprites.webp` | Fallback infantry and mounted models, used only if the model painter fails |
 | `terrain-sprites.webp` | Fallback terrain art, used only if the procedural painter fails |
 | `music/trail-theme.mp3` | Menu and campaign theme (2:30) |
-| `music/battle-theme.mp3` | Battle theme (2:30) |
+| `music/battle-the-frame.mp3` | Battle music: "The Frame" by Drbeat (3:40), supplied by the project owner |
 | `fonts/` | Marcellus SC, Barlow and Barlow Semi Condensed (Latin subsets, SIL Open Font License; licences alongside), from the @fontsource npm packages |
 | `sfx/` | Sound effects from 0 A.D. (CC BY-SA 3.0) and uisfx (CC0); see `sfx/CREDITS.md` |
 
@@ -67,12 +67,12 @@ sprites in `js/visuals.js` and the procedural model painter remain as loading fa
 
 ## Music
 
-Both themes are original instrumental tracks composed for this project with ElevenLabs
-Music (`eleven_music_v2_5`), 192 kbps MP3.
+The trail theme is an original instrumental track composed for this project with ElevenLabs
+Music (`eleven_music_v2_5`), 192 kbps MP3. The battle music is "The Frame" by Drbeat, a file
+supplied by the project owner.
 
 - **Trail theme:** Brooding dark-fantasy orchestral underscore. Low sustained strings and
   a soft cello melody over distant frame drums at a slow march, a lone horn call and sparse
   harp, rising slightly in the middle before settling back.
-- **Battle theme:** Tense medieval battle underscore. Steady war drums and low ostinato
-  strings in a minor key, brass swells, a martial snare and a bold horn theme, with a
-  modest build in the middle.
+- **Battle music:** "The Frame" by Drbeat, played on the battlefield; it loops with a short
+  fade at each end.

@@ -27,6 +27,7 @@ function check(c, m) { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) process
   check(/Player 1 · Aldric/.test(t1) && /Player 2 · Morwen/.test(t2), 'builders are titled per player (' + t1 + ' | ' + t2 + ')');
   await p.screenshot({ path: out + '/2-builder-p2.png' });
   await p.click('#builder-go'); await p.waitForTimeout(800);
+  var sy = await p.$('#modal.active #modal-body.m-story #m-ok'); if (sy) { await sy.click(); await p.waitForTimeout(200); } // the story page
   var d0 = await p.evaluate(function () { var UI = SOVL.UI, b = UI.battle; UI.__aiSteps = 0; var st = UI.ai.step; UI.ai.step = function () { UI.__aiSteps++; return st.apply(this, arguments); }; return { hs: UI.hotseat, side: UI.playerSide, names: b.names, placed1: b.unitsOf(1).filter(function (u) { return u.placed; }).length, title: document.querySelector('#deploy-tray .md-title').textContent, go: document.querySelector('#deploy-tray button.primary').textContent }; });
   check(d0.hs && d0.side === 0 && d0.placed1 === 0, 'player 1 deploys first; the AI placed nothing for player 2');
   check(/Aldric/.test(d0.title) && /hand over to Morwen/.test(d0.go), 'tray: "' + d0.title + '" / "' + d0.go + '"');

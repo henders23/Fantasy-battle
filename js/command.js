@@ -208,6 +208,9 @@
     if (UI.nextAfter == null || b.active !== UI.playerSide || b.activeUnit || b.pendingRoll || UI.modalOpen) return;
     var list = b.unitsOf(UI.playerSide), ready = b.activatable(UI.playerSide), at = list.findIndex(function (u) { return u.uid === UI.nextAfter; }), next = null;
     UI.nextAfter = null;
+    // a regiment the player clicked while another was active comes first
+    var picked = UI.nextPick != null ? b.unit(UI.nextPick) : null; UI.nextPick = null;
+    if (picked && ready.indexOf(picked) >= 0) next = picked;
     for (var i = 1; i <= list.length && !next; i++) { var u = list[(Math.max(0, at) + i) % list.length]; if (ready.indexOf(u) >= 0) next = u; }
     if (!next) return;
     UI.offering = true;
@@ -221,16 +224,27 @@
   }
   var updateHud = UI.updateHud;
   UI.updateHud = function () { var r = updateHud.apply(UI, arguments); try { offerNext(); } catch (e) { /* never block the interface */ } return r; };
-  // a regiment brought up for you can be swapped for another until it does something
+  // Clicking another ready regiment while one is active moves on to it, no Enter needed: a
+  // regiment that has not acted yet is simply swapped; one that has moved, shot or cast ends its
+  // activation, and the clicked regiment is activated as soon as the turn comes back round
+  // (straight away if the enemy has nothing left to activate).
   var canvasClick = UI.canvasClick;
   UI.canvasClick = function (p, e) {
     var b = UI.battle;
-    if (b && b.phase === "strategic" && b.active === UI.playerSide && UI.autoSel && b.activeUnit === UI.autoSel && !b.pendingRoll && UI.mode === "move") {
-      var u = UI.renderer.unitAt(b, p);
-      if (u && u.side === UI.playerSide && u.uid !== UI.autoSel && b.canActivate(u) && b.releaseActivation(UI.autoSel).ok) { UI.autoSel = null; UI.sel = null; }
+    if (b && b.phase === "strategic" && b.active === UI.playerSide && b.activeUnit && !b.pendingRoll && UI.mode === "move" && !UI.modalOpen) {
+      var u = UI.renderer.unitAt(b, p), cur = b.unit(b.activeUnit);
+      if (u && cur && u.side === UI.playerSide && u.uid !== cur.uid && b.canActivate(u)) {
+        if (b.releaseActivation(cur.uid).ok) { UI.autoSel = null; UI.sel = null; }
+        else {
+          UI.nextPick = u.uid;
+          UI.endActivation();
+          if (b.activeUnit !== u.uid && UI.battle === b && b.phase === "strategic") UI.hint(cur.name + "'s activation is over. " + u.name + " will be ready when your turn comes round.");
+          return;
+        }
+      }
     }
     return canvasClick.apply(UI, arguments);
   };
   var startBattle = UI.startBattle;
-  UI.startBattle = function () { UI.nextAfter = null; UI.autoSel = null; UI.focusedGroup = null; return startBattle.apply(UI, arguments); };
+  UI.startBattle = function () { UI.nextAfter = null; UI.nextPick = null; UI.autoSel = null; UI.focusedGroup = null; return startBattle.apply(UI, arguments); };
 })();
