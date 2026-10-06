@@ -989,7 +989,7 @@
     box.appendChild(ch); UI.modalDismissable = false; UI.modal(box);
   };
   UI.campaignMerchant = function (node) {
-    var camp = UI.campaign, stock = node.stock || (node.stock = C.merchantStock(camp));
+    var camp = UI.campaign, stock = node.stock || (node.stock = C.merchantStock(camp, node));
     function render(err) {
       var box = el('div');
       box.appendChild(el('h2', null, 'Merchant'));
@@ -1006,12 +1006,12 @@
       });
       box.appendChild(el('h3', null, 'Reinforce'));
       box.appendChild(UI.rosterList(camp, function (e) {
-        var cost = C.reinforceCost(camp, e); if (cost == null) return null;
+        var cost = C.reinforceCost(camp, e, node); if (cost == null) return null;
         var b = el('button', 'small', '+1 model — ' + cost + ' g'); b.disabled = camp.gold < cost; b.style.marginTop = '4px';
-        b.onclick = function () { var err = C.reinforce(camp, e); C.save(camp); UI.renderCampaign(); render(err); };
+        b.onclick = function () { var err = C.reinforce(camp, e, node); C.save(camp); UI.renderCampaign(); render(err); };
         return b;
       }));
-      var offers = C.equipmentOffers(camp);
+      var offers = C.equipmentOffers(camp, node);
       if (offers.length) {
         box.appendChild(el('h3', null, 'Re-arm'));
         box.appendChild(el('p', 'muted', 'Swap a unit\'s weapons or add an upgrade from its source list.'));

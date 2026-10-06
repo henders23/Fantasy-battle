@@ -89,7 +89,8 @@ var errors = [];
     await page.waitForTimeout(200);
   }
   await page.screenshot({ path: path.join(shots, '15-map-after.png') });
-  // rules page
+  // rules page (the walk can stop with a trait choice still open: runs now outlast it more often)
+  var lastTrait = await page.$('#modal.active #modal-body.m-trait .choices button'); if (lastTrait) { await lastTrait.click(); await page.waitForTimeout(300); }
   var onCamp = await page.evaluate(function () { return SOVL.UI.screen === 'campaign'; }); if (onCamp) await page.click('#camp-menu');
   await page.click('#btn-rules'); await page.waitForTimeout(200); await page.screenshot({ path: path.join(shots, '16-rules.png') });
   await browser.close();

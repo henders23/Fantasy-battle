@@ -264,20 +264,67 @@
   };
 
   // ---- Merchant ----
-  C.merchantStock = function (camp) {
-    var f = SOVL.FACTION_DATA[camp.faction], stock = [], sections = f.sections.filter(function (s) { return s.name !== 'Commanders' && s.name !== 'Mounts'; });
+  // Each merchant on the trail is one of several kinds of trader, never the same kind twice in a
+  // row, each with its own mix: how many recruits, relics and banners, and its own speciality.
+  C.MERCHANTS = {
+    general:     { name: 'Merchant', units: 4, items: 2, banners: 2, text: 'A trader\'s wagon, lamps lit against the dusk. Recruits, relics and reinforcements — for a price.' },
+    recruiter:   { name: 'Recruiting Sergeant', units: 6, items: 0, banners: 1, seasoned: 1, text: 'A sergeant with a drum and a ledger. Fighting men for hire, some of them already blooded.' },
+    relics:      { name: 'Relic Dealer', units: 1, items: 4, banners: 3, text: 'A cart of curios under oilcloth: blades that hum, banners that will not burn.' },
+    armourer:    { name: 'Travelling Armourer', units: 2, items: 2, banners: 1, rearm: 0.6, text: 'A forge on wheels. Re-arming costs far less here, and the smith has a few blades to sell.' },
+    sutler:      { name: 'Camp Sutler', units: 3, items: 1, banners: 1, reinforce: 0.7, text: 'Bread, ale and boots for the ranks. Recruits to fill the gaps come cheap here.' }
+  };
+  C.merchantKind = function (node) { return C.MERCHANTS[(node && node.merchant) || 'general'] || C.MERCHANTS.general; };
+  C.merchantStock = function (camp, node) {
+    var f = SOVL.FACTION_DATA[camp.faction], stock = [], kinds = Object.keys(C.MERCHANTS);
+    var kindId = R.pick(kinds.filter(function (k) { return k !== camp.lastMerchant; })), kind = C.MERCHANTS[kindId];
+    if (node) node.merchant = kindId;
+    camp.lastMerchant = kindId;
+    var seen = camp.lastWares || [], offered = [];
+    var sections = f.sections.filter(function (s) { return s.name !== 'Commanders' && s.name !== 'Mounts'; });
+    // what the army lacks: ranged troops, war machines, monsters or heavy units are offered first
+    var has = function (test) { return camp.army.entries.some(function (e) { var t = e.kind === 'commander' ? e.retinue : e; return test(SOVL.findUnitDef(camp.faction, t.id), t); }); };
+    var lacksRanged = !has(function (d, t) { return !!t.ranged; });
     var pool = []; sections.forEach(function (s) { s.units.forEach(function (u) { pool.push({ def: u, section: s }); }); });
-    R.shuffle(pool).slice(0, 4).forEach(function (p) {
-      var models = p.def.per ? p.def.size[0] : 1, e = A.defaultEntry(camp.faction, p.def.id, models);
-      stock.push({ kind: 'unit', entry: e, section: p.section.name, price: Math.round(A.unitCost(camp.faction, e) * 1.2) + 10 });
+    pool.forEach(function (p) {
+      var w = seen.indexOf(p.def.id) >= 0 ? 0.25 : 1; // fresh faces over last time's
+      if (lacksRanged && p.def.ranged && p.def.ranged.length) w *= 2.5;
+      if (!has(function (d) { return d.type === p.def.type; })) w *= 1.6; // a kind of troop the army has none of
+      p.w = w;
     });
-    R.shuffle(SOVL.MAGIC_ITEMS.slice()).slice(0, 2).forEach(function (it) { stock.push({ kind: 'item', item: it, price: it.cost * 2 + 20 }); });
-    R.shuffle(SOVL.BANNERS.slice()).slice(0, 2).forEach(function (bn) { stock.push({ kind: 'banner', banner: bn, price: bn.cost * 2 + 10 }); });
+    // draw recruits by weight, spread across sections
+    var units = [], secCount = {};
+    while (units.length < kind.units && pool.length) {
+      var total = pool.reduce(function (a, p) { return a + p.w / (1 + (secCount[p.section.name] || 0)); }, 0), x = R.rng() * total, pick = pool[pool.length - 1];
+      for (var i = 0; i < pool.length; i++) { x -= pool[i].w / (1 + (secCount[pool[i].section.name] || 0)); if (x < 0) { pick = pool[i]; break; } }
+      units.push(pick); secCount[pick.section.name] = (secCount[pick.section.name] || 0) + 1;
+      pool.splice(pool.indexOf(pick), 1);
+    }
+    units.forEach(function (p, k) {
+      // companies come at different strengths: a small band, a full company, or between
+      var def = p.def, size = !def.per ? 1 : R.pick([def.size[0], def.size[0], Math.round((def.size[0] + def.size[1]) / 2), def.size[1]]);
+      var e = A.defaultEntry(camp.faction, def.id, size), o = { kind: 'unit', entry: e, section: p.section.name };
+      if (kind.seasoned && k < kind.seasoned) { e.vet = 1; e.battles = SOVL.CAMPAIGN.veteran[0].at; o.tag = 'Seasoned'; }
+      else if (def.per && def.size[1] > def.size[0] && size === def.size[1]) o.tag = 'Full company';
+      o.price = Math.round(A.unitCost(camp.faction, e) * (o.tag === 'Seasoned' ? 1.45 : 1.2)) + 10;
+      stock.push(o); offered.push(def.id);
+    });
+    // relics the commander can use, banners some regiment can carry
+    var cdef = SOVL.findUnitDef(camp.faction, camp.army.entries[0].id), usable = SOVL.MAGIC_ITEMS.filter(function (it) { return cdef.magic && (it.kind !== 'weapon' || cdef.magic === 'weapon_item') && (it.id !== 'staff_of_power' || cdef.caster); });
+    if (!usable.length) usable = SOVL.MAGIC_ITEMS.slice();
+    var maxBanner = 0; camp.army.entries.forEach(function (e) { var t = e.kind === 'commander' ? e.retinue : e, d = SOVL.findUnitDef(camp.faction, t.id); if (d.banner) maxBanner = Math.max(maxBanner, d.banner); });
+    var carriable = SOVL.BANNERS.filter(function (bn) { return bn.cost <= maxBanner; }); if (!carriable.length) carriable = SOVL.BANNERS.slice();
+    var fresh = function (list) { return R.shuffle(list.slice()).sort(function (a, b) { return (seen.indexOf(a.id) >= 0) - (seen.indexOf(b.id) >= 0); }); };
+    fresh(usable).slice(0, kind.items).forEach(function (it) { stock.push({ kind: 'item', item: it, price: it.cost * 2 + 20 }); offered.push(it.id); });
+    fresh(carriable).slice(0, kind.banners).forEach(function (bn) { stock.push({ kind: 'banner', banner: bn, price: bn.cost * 2 + 10 }); offered.push(bn.id); });
+    // one ware is going cheap
+    var deal = stock[Math.floor(R.rng() * stock.length)];
+    if (deal && R.rng() < 0.7) { deal.was = deal.price; deal.price = Math.round(deal.price * 0.75); deal.bargain = true; }
+    camp.lastWares = offered;
     return stock;
   };
   // Equipment a unit could be re-armed with: alternative weapon sets and optional upgrades from its source entry.
-  C.equipmentOffers = function (camp) {
-    var offers = [];
+  C.equipmentOffers = function (camp, node) {
+    var offers = [], cut = C.merchantKind(node).rearm || 1;
     camp.army.entries.forEach(function (e) {
       var t = e.kind === 'commander' ? e.retinue : e, def = SOVL.findUnitDef(camp.faction, t.id), models = def.per ? t.models : 1;
       def.weapons.forEach(function (w) { if (w.name !== t.weapon) offers.push({ kind: 'equip', ref: t.ref, entry: e, unitName: def.name, name: w.name, what: 'weapon', price: Math.round((8 + w.cost * models) * 1.5) }); });
@@ -288,12 +335,13 @@
         (cdef.upgrades || []).forEach(function (up) { if ((e.upgrades || []).indexOf(up.name) < 0) offers.push({ kind: 'equip', ref: e.ref, entry: e, commander: true, unitName: e.name, name: up.name, what: 'upgrade', price: Math.round((10 + up.cost) * 1.5) }); });
       }
     });
+    if (cut !== 1) offers.forEach(function (o) { o.price = Math.max(5, Math.round(o.price * cut)); });
     return offers;
   };
-  C.reinforceCost = function (camp, entry) {
+  C.reinforceCost = function (camp, entry, node) {
     var t = entry.kind === 'commander' ? entry.retinue : entry, def = SOVL.findUnitDef(camp.faction, t.id);
     if (!def.per || t.models >= def.size[1]) return null;
-    return Math.round((def.cost + A.optionCost(def, t.weapon)) * 1.5) + 2;
+    return Math.max(1, Math.round((Math.round((def.cost + A.optionCost(def, t.weapon)) * 1.5) + 2) * (C.merchantKind(node).reinforce || 1)));
   };
   C.unitCapCount = function (camp, sectionName) {
     return camp.army.entries.filter(function (e) { var s = SOVL.findSection(camp.faction, e.kind === 'commander' ? e.id : e.id); return s && s.name === sectionName; }).length;
@@ -324,8 +372,8 @@
     camp.gold -= offer.price; offer.sold = true;
     return null;
   };
-  C.reinforce = function (camp, entry) {
-    var cost = C.reinforceCost(camp, entry); if (cost == null) return 'Unit is at full strength.';
+  C.reinforce = function (camp, entry, node) {
+    var cost = C.reinforceCost(camp, entry, node); if (cost == null) return 'Unit is at full strength.';
     if (camp.gold < cost) return 'Not enough gold.';
     var t = entry.kind === 'commander' ? entry.retinue : entry; t.models++; camp.gold -= cost; return null;
   };

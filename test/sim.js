@@ -145,6 +145,27 @@ if (SOVL.Campaign) {
   var o4 = outcome('hard', 'battle', 1, false); assert(o4.over, 'Legend: a lost battle ends the run');
   var o5 = outcome('normal', 'battle', 0, true); assert(!o5.over && !o5.retreat && o5.gold < 200 + 200, 'Veteran: a fallen commander is carried off wounded ' + JSON.stringify(o5));
   var o6 = outcome('hard', 'battle', 0, true); assert(o6.over, 'Legend: a fallen commander ends the run');
+  // merchants: never the same kind of trader twice running, every relic usable by the commander,
+  // the stock matches the trader, and few wares repeat the previous visit
+  for (var ms = 0; ms < 60; ms++) {
+    R.setSeed(300 + ms); var mf = fids[ms % 5], mc = CC.create({ faction: mf, commander: SOVL.FACTION_DATA[mf].sections[0].units[ms % 3].id });
+    var mcdef = SOVL.findUnitDef(mf, mc.army.entries[0].id), lastKind = null;
+    for (var mv = 0; mv < 3; mv++) {
+      var mnode = { type: 'merchant' }, mstock = CC.merchantStock(mc, mnode), mk = CC.merchantKind(mnode);
+      assert(mnode.merchant && mnode.merchant !== lastKind, 'a different trader each visit'); lastKind = mnode.merchant;
+      assert(mstock.filter(function (o) { return o.kind === 'unit'; }).length === mk.units, mnode.merchant + ' sells ' + mk.units + ' recruits');
+      mstock.forEach(function (o) {
+        if (o.kind === 'item') assert(mcdef.magic && (o.item.kind !== 'weapon' || mcdef.magic === 'weapon_item'), 'a relic the commander can use: ' + o.item.id);
+        assert(o.price > 0, 'a price');
+        if (o.kind === 'unit') assert(!A.validate({ faction: mf, entries: [o.entry] }, 99999).some(function (pb) { return /size|weapon|upgrade/i.test(pb) && !/at least/.test(pb); }), 'a valid recruit');
+      });
+    }
+  }
+  var arm = CC.create({ faction: 'empires_of_men', commander: 'captain' }), anode = { merchant: 'armourer' }, snode = { merchant: 'sutler' };
+  var o0 = CC.equipmentOffers(arm, null), o1 = CC.equipmentOffers(arm, anode);
+  assert(o0.length && o1[0].price < o0[0].price, 'the armourer re-arms for less');
+  var weak = arm.army.entries[1], t0 = CC.reinforceCost(arm, weak, null), t1 = CC.reinforceCost(arm, weak, snode);
+  assert(t0 == null || t1 < t0, 'the sutler reinforces for less');
   // the larger map: three ways to begin, 2-4 stops a step, 2-3 before the boss, every stop reachable
   for (var mseed = 0; mseed < 200; mseed++) {
     R.setSeed(mseed); var mp = CC.generateMap();

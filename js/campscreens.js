@@ -38,7 +38,7 @@
 
   // ---------- merchant ----------
   UI.campaignMerchant = function (node) {
-    var camp = UI.campaign, stock = node.stock || (node.stock = C.merchantStock(camp));
+    var camp = UI.campaign, stock = node.stock || (node.stock = C.merchantStock(camp, node)), kind = C.merchantKind(node);
     var view = { tab: "wares", msg: null, bad: false, spent: 0 };
     // why a ware cannot be bought, checked before the gold changes hands (C.buy checks again)
     function whyNot(o) {
@@ -63,7 +63,7 @@
         return same ? "Replaces " + same.name + "." : "For " + camp.army.entries[0].name + ".";
       }
       if (o.kind === "banner") { var b = bearer(o); return b ? "Carried by " + b + "." : ""; }
-      if (o.kind === "unit") return "Joins the army at once.";
+      if (o.kind === "unit") return o.entry.vet ? "Already Veteran (+1 Discipline). Joins at once." : "Joins the army at once.";
       return "";
     }
     function priceButton(price, blocked, onBuy, label) {
@@ -92,7 +92,9 @@
         body = '<p class="ms-desc">' + esc(thing.desc) + "</p>";
       }
       card.appendChild(pic);
-      var mid = el("div", "desc ms-mid", '<div class="ms-title"><b>' + esc(title) + '</b><em>' + esc(sub) + "</em></div>" + body +
+      var tags = (o.tag ? '<span class="ms-tag">' + esc(o.tag) + "</span>" : "") + (o.bargain && !sold ? '<span class="ms-tag deal">Bargain · was ' + o.was + "</span>" : "");
+      if (o.bargain) card.classList.add("deal");
+      var mid = el("div", "desc ms-mid", '<div class="ms-title"><b>' + esc(title) + '</b><em>' + esc(sub) + "</em>" + tags + "</div>" + body +
         (sold ? "" : why ? '<p class="ms-why">' + esc(why) + "</p>" : poor ? '<p class="ms-poor">You need ' + (o.price - camp.gold) + " more gold.</p>" : note(o) ? '<p class="ms-note">' + esc(note(o)) + "</p>" : ""));
       card.appendChild(mid);
       if (sold) card.appendChild(el("span", "ms-sold", "Sold"));
@@ -105,11 +107,11 @@
     }
     function render() {
       var list = $("modal-body") && $("modal-body").querySelector(".ms-panels"), scroll = list ? list.scrollTop : 0;
-      var offers = C.equipmentOffers(camp), reinforceable = camp.army.entries.filter(function (e) { return C.reinforceCost(camp, e) != null; });
+      var offers = C.equipmentOffers(camp, node), reinforceable = camp.army.entries.filter(function (e) { return C.reinforceCost(camp, e, node) != null; });
       var box = el("div", "ms");
       var head = el("div", "ms-head");
       head.appendChild(el("div", "ms-seal", ICON.scales));
-      head.appendChild(el("div", "ms-headtext", '<div class="ms-eyebrow">On the trail</div><h2>Merchant</h2><div class="text">A trader\'s wagon, lamps lit against the dusk. Recruits, relics and reinforcements — for a price.</div>'));
+      head.appendChild(el("div", "ms-headtext", '<div class="ms-eyebrow">On the trail</div><h2>' + esc(kind.name) + '</h2><div class="text">' + esc(kind.text) + '</div>'));
       head.appendChild(el("div", "ms-purse" + (view.spent ? " flash" : ""), purseHtml(camp)));
       box.appendChild(head);
       // tabs
@@ -132,9 +134,9 @@
       // reinforce
       var pr = el("section", "ms-panel" + (view.tab === "reinforce" ? " on" : ""));
       pr.appendChild(el("h3", null, "Reinforce"));
-      pr.appendChild(el("p", "ms-lead", "Fill gaps in the ranks. Each model costs the same, however many you buy."));
+      pr.appendChild(el("p", "ms-lead", "Fill gaps in the ranks. Each model costs the same, however many you buy." + (kind.reinforce ? " Recruits cost " + Math.round(100 * (1 - kind.reinforce)) + "% less here." : "")));
       camp.army.entries.forEach(function (e) {
-        var t = troop(e), def = SOVL.findUnitDef(camp.faction, t.id), cost = C.reinforceCost(camp, e);
+        var t = troop(e), def = SOVL.findUnitDef(camp.faction, t.id), cost = C.reinforceCost(camp, e, node);
         if (!def.per) return;
         var row = el("div", "ms-row" + (cost == null ? " full" : ""));
         row.appendChild(unitThumb(camp, e, 40, 46));
@@ -144,10 +146,10 @@
         if (cost == null) acts.appendChild(el("span", "ms-full", "Full strength"));
         else {
           var missing = max - t.models, can = Math.min(missing, Math.floor(camp.gold / cost));
-          acts.appendChild(priceButton(cost, camp.gold < cost, function () { var err = C.reinforce(camp, e); done(err, "One more model joins " + def.name + "."); }, "Add one model to " + def.name));
+          acts.appendChild(priceButton(cost, camp.gold < cost, function () { var err = C.reinforce(camp, e, node); done(err, "One more model joins " + def.name + "."); }, "Add one model to " + def.name));
           acts.lastChild.insertAdjacentHTML("afterbegin", "<em>+1</em>");
           if (can > 1) {
-            var fill = priceButton(cost * can, false, function () { var n = 0, err = null; while (n < can && !(err = C.reinforce(camp, e))) n++; done(n ? null : err, n + " models join " + def.name + "."); }, "Add " + can + " models to " + def.name);
+            var fill = priceButton(cost * can, false, function () { var n = 0, err = null; while (n < can && !(err = C.reinforce(camp, e, node))) n++; done(n ? null : err, n + " models join " + def.name + "."); }, "Add " + can + " models to " + def.name);
             fill.classList.add("ms-fill"); fill.insertAdjacentHTML("afterbegin", "<em>+" + can + (can === missing ? " (full)" : "") + "</em>");
             acts.appendChild(fill);
           }
@@ -159,6 +161,7 @@
       var pa = el("section", "ms-panel" + (view.tab === "rearm" ? " on" : ""));
       pa.appendChild(el("h3", null, "Re-arm"));
       if (!offers.length) pa.appendChild(el("p", "ms-lead", "Nothing here suits your army."));
+      else if (kind.rearm) pa.appendChild(el("p", "ms-lead", "The armourer re-arms for " + Math.round(100 * (1 - kind.rearm)) + "% less than other traders."));
       var groups = [], byKey = {};
       offers.forEach(function (o) { var k = (o.commander ? "c" : "u") + o.ref; if (!byKey[k]) { byKey[k] = { o: o, list: [] }; groups.push(byKey[k]); } byKey[k].list.push(o); });
       groups.forEach(function (g) {

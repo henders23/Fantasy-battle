@@ -22,6 +22,11 @@ Two modes:
   camp, treasure or event never follows another of its kind along a road, every middle step
   offers a fight, and the step before each boss offers a camp or a merchant. The map closes
   up to fit the window. Battles along the trail use all three scenarios.
+  Merchants come in five kinds, never the same twice running: a general merchant, a recruiting
+  sergeant (more recruits, one already a Veteran), a relic dealer (magic items and banners), a
+  travelling armourer (re-arming 40% cheaper) and a camp sutler (reinforcements 30% cheaper).
+  Recruits come at different strengths, wares favour what the army lacks and what the last
+  trader did not offer, relics are ones the commander can use, and one ware is often a bargain.
   On Recruit and Veteran a lost battle is a costly retreat (no plunder, a fifth of the gold
   lost) and a fallen commander is carried off wounded; losing to a boss ends the run. On
   Legend any lost battle or a fallen commander ends it. The run-over screen lists every
