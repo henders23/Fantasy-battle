@@ -16,13 +16,17 @@ Two modes:
   with a commander, a small retinue and two supporting units, pick a path across a
   branching map of battles, elite battles, events, merchants, camps and treasure, recruit,
   reinforce and re-arm, earn veterancy, learn commander traits, and defeat each act's
+  boss. Each act is a web of 20-30 stops over 8-10 steps (three ways to begin, up to four
+  stops a step, roads that split, cross and merge), so there are hundreds of routes to each
   boss. The choices vary: the stops on offer at each step are all different kinds, a shop,
   camp, treasure or event never follows another of its kind along a road, every middle step
   offers a fight, and the step before each boss offers a camp or a merchant. The map closes
-  up to fit the window, so a whole act shows at once on a laptop.
-  Battles along the trail use all three scenarios. A lost battle or a dead commander
-  ends the run, and the run-over screen lists every battle fought and each unit's honours
-  (battles fought and enemy models slain). Progress is saved in the browser.
+  up to fit the window. Battles along the trail use all three scenarios.
+  On Recruit and Veteran a lost battle is a costly retreat (no plunder, a fifth of the gold
+  lost) and a fallen commander is carried off wounded; losing to a boss ends the run. On
+  Legend any lost battle or a fallen commander ends it. The run-over screen lists every
+  battle fought and each unit's honours (battles fought and enemy models slain). Progress
+  is saved in the browser.
 
 ## Illustrated tactical edition
 

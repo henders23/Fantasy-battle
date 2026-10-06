@@ -914,7 +914,7 @@
       UI.closeModal();
       camp.pendingBattle = { layer: camp.layer, idx: camp.nodeIndex, kind: kind || null, after: (after && after.spec) || null }; C.save(camp);
       var field = SOVL.Biomes.forNode(camp, node), terrain = SOVL.Biomes.terrain(field, scenario), army = C.battleArmy(camp);
-      UI.startBattle({ armies: [army, enemy], terrain: terrain, biome: field.id, fieldName: field.name, scenario: scenario, names: [camp.commanderName, node.type === 'boss' ? act.boss.name : ef.name], aggression: node.type === 'boss' ? 0.7 : 0.5, campaign: true, onEnd: UI.campaignOnEnd(node, after, enemy) });
+      UI.startBattle({ armies: [army, enemy], terrain: terrain, biome: field.id, fieldName: field.name, scenario: scenario, names: [camp.commanderName, node.type === 'boss' ? act.boss.name : ef.name], aggression: node.type === 'boss' ? 0.6 : 0.5, campaign: true, onEnd: UI.campaignOnEnd(node, after, enemy) });
     };
   };
   // What happens when a campaign battle ends. Kept separate so a battle resumed after a reload
@@ -925,11 +925,11 @@
         var r = C.applyBattleResult(camp, b, node, enemy);
         var extra = el('div', 'text', r.lines.map(esc).join('<br>'));
         camp.pendingBattle = null; C.save(camp);
-        UI.showResult(b, { extra: extra, label: r.won ? (r.draw ? 'Withdraw' : 'Continue the trail') : 'The trail ends', onDone: function () {
+        UI.showResult(b, { extra: extra, label: camp.over ? 'The trail ends' : r.retreat ? 'Fall back' : r.draw ? 'Withdraw' : 'Continue the trail', onDone: function () {
           UI.show('campaign');
-          if (!r.won) { UI.showRunOver(); return; }
+          if (camp.over) { UI.showRunOver(); return; }
           var cont = function () {
-            if (after) after();
+            if (after && !r.retreat) after(); // a lost event battle earns no reward
             if (node.type === 'boss' && !r.draw) {
               C.advanceAct(camp); C.save(camp);
               if (camp.victory) { UI.showRunOver(); return; }

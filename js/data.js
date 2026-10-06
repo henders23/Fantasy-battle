@@ -164,9 +164,11 @@ SOVL.SCENARIOS = [
 ];
 
 SOVL.DIFFICULTIES = [
-  { id: 'easy', name: 'Recruit', pts: 0.8, gold: 220, desc: 'Smaller enemy armies, more gold.' },
-  { id: 'normal', name: 'Veteran', pts: 1.0, gold: 150, desc: 'The intended challenge.' },
-  { id: 'hard', name: 'Legend', pts: 1.2, gold: 110, desc: 'Larger enemy armies, less gold.' }
+  // lossEndsRun / commanderDeathEndsRun: on Recruit and Veteran a lost battle is a costly retreat and a
+  // fallen commander is carried off wounded; losing to a boss always ends the run
+  { id: 'easy', name: 'Recruit', pts: 0.7, gold: 220, lossEndsRun: false, commanderDeathEndsRun: false, desc: 'Smaller enemy armies, more gold. A lost battle is a retreat, not the end.' },
+  { id: 'normal', name: 'Veteran', pts: 0.85, gold: 150, lossEndsRun: false, commanderDeathEndsRun: false, desc: 'The intended challenge. A lost battle is a costly retreat; losing to a boss ends the run.' },
+  { id: 'hard', name: 'Legend', pts: 1.1, gold: 110, lossEndsRun: true, commanderDeathEndsRun: true, desc: 'Larger enemy armies, less gold. One lost battle or a fallen commander ends the run.' }
 ];
 
 SOVL.ARMY_SIZES = [
@@ -207,9 +209,9 @@ SOVL.COMMANDER_NAMES = {
 SOVL.CAMPAIGN = {
   startGold: 150,
   acts: [
-    { name: 'Act I — The Borderlands', layers: 6, pts: [150, 320], elitePts: 1.3, boss: { name: 'The Warlord of the Marches', pts: 500 } },
-    { name: 'Act II — The Sunken Marches', layers: 7, pts: [420, 700], elitePts: 1.3, boss: { name: 'The Drowned Court', pts: 900 } },
-    { name: 'Act III — The Ashen Crown', layers: 7, pts: [750, 1100], elitePts: 1.25, boss: { name: 'The Deathless Host', pts: 1400, final: true } }
+    { name: 'Act I — The Borderlands', layers: 8, pts: [150, 320], elitePts: 1.2, boss: { name: 'The Warlord of the Marches', pts: 500 } },
+    { name: 'Act II — The Sunken Marches', layers: 9, pts: [420, 700], elitePts: 1.2, boss: { name: 'The Drowned Court', pts: 900 } },
+    { name: 'Act III — The Ashen Crown', layers: 10, pts: [750, 1100], elitePts: 1.15, boss: { name: 'The Deathless Host', pts: 1400, final: true } }
   ],
   // veterancy thresholds (battles survived)
   veteran: [

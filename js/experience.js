@@ -269,7 +269,7 @@
       ],
     };
     R.setSeed(4826);
-    var enemy = A.randomArmy({ faction: "greenskin_tribes", pts: 500 });
+    var enemy = A.randomArmy({ faction: "greenskin_tribes", pts: 420 }); // a little smaller than yours: the first battle should be winnable
     R.setSeed(null);
     UI.startBattle({
       armies: [army, enemy],

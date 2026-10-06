@@ -29,7 +29,7 @@
     // two small supporting units from the battle line / cheap sections
     var f = SOVL.FACTION_DATA[fid], bl = f.sections.filter(function (s) { return s.name === 'Battle Line'; })[0];
     var picks = R.shuffle(bl.units.slice()).slice(0, 2);
-    picks.forEach(function (d, i) { var e = A.defaultEntry(fid, d.id, d.size[0]); e.ref = 'u' + (i + 2); army.entries.push(e); });
+    picks.forEach(function (d, i) { var e = A.defaultEntry(fid, d.id, Math.round((d.size[0] + d.size[1]) / 2)); e.ref = 'u' + (i + 2); army.entries.push(e); });
     var diff = SOVL.DIFFICULTIES.filter(function (d) { return d.id === opts.difficulty; })[0] || SOVL.DIFFICULTIES[1];
     var camp = {
       version: 2, faction: fid, commanderName: name, army: army, gold: diff.gold, difficulty: diff.id, act: 0, layer: 0, nodeIndex: null,
@@ -45,22 +45,34 @@
   C.generateMap = function () {
     var acts = SOVL.CAMPAIGN.acts.map(function (actDef, ai) {
       var layers = [];
+      // three ways to begin, 2-4 stops at each step after (2-3 before the boss), the boss alone at the end
       for (var l = 0; l < actDef.layers; l++) {
-        var n = l === 0 ? 2 : (l === actDef.layers - 1 ? 1 : 2 + Math.floor(R.rng() * 2)), layer = [];
+        var last = actDef.layers - 1, n = l === 0 ? 3 : l === last ? 1 : 2 + Math.floor(R.rng() * (l === last - 1 ? 2 : 3)), layer = [];
         for (var i = 0; i < n; i++) layer.push({ type: null, next: [], id: ai + '-' + l + '-' + i, visited: false });
         layers.push(layer);
       }
-      // connections: each node connects to 1-2 nodes in the next layer; ensure every next node reachable
+      // roads: each stop leads on to 1-3 stops in the next step, mostly ahead but sometimes across,
+      // so routes split, cross and merge; every stop can be reached
       for (var l2 = 0; l2 < layers.length - 1; l2++) {
         var cur = layers[l2], nxt = layers[l2 + 1];
         cur.forEach(function (nd, i) {
           var a = Math.floor(i * nxt.length / cur.length), b = Math.min(nxt.length - 1, Math.floor((i + 1) * nxt.length / cur.length));
-          nd.next.push(a); if (b !== a && R.rng() < 0.7) nd.next.push(b);
-          if (R.rng() < 0.35) { var c = Math.floor(R.rng() * nxt.length); if (nd.next.indexOf(c) < 0 && Math.abs(c - a) <= 1) nd.next.push(c); }
-          nd.next.sort();
+          nd.next.push(a); if (b !== a && R.rng() < 0.75) nd.next.push(b);
+          for (var x = 0; x < 2; x++) {
+            if (nd.next.length >= 3 || R.rng() >= (x ? 0.2 : 0.5)) continue;
+            var c = Math.floor(R.rng() * nxt.length);
+            if (nd.next.indexOf(c) < 0 && Math.abs(c - a) <= 2) nd.next.push(c);
+          }
+          nd.next.sort(function (p, q) { return p - q; });
         });
-        nxt.forEach(function (n2, j) { if (!cur.some(function (nd) { return nd.next.indexOf(j) >= 0; })) cur[Math.min(cur.length - 1, j)].next.push(j); });
-        cur.forEach(function (nd) { nd.next = nd.next.filter(function (v, k, arr) { return arr.indexOf(v) === k; }).sort(); });
+        // a stop nothing leads to gets a road from the nearest stop that has room for another
+        nxt.forEach(function (n2, j) {
+          if (cur.some(function (nd) { return nd.next.indexOf(j) >= 0; })) return;
+          var at = j * (cur.length - 1) / Math.max(1, nxt.length - 1), full = function (p) { return p.next.length >= 3 ? 1 : 0; };
+          var from = cur.slice().sort(function (p, q) { return full(p) - full(q) || Math.abs(cur.indexOf(p) - at) - Math.abs(cur.indexOf(q) - at); })[0];
+          from.next.push(j);
+        });
+        cur.forEach(function (nd) { nd.next = nd.next.filter(function (v, k, arr) { return arr.indexOf(v) === k; }).sort(function (p, q) { return p - q; }); });
       }
       // rarely the roads leave a stop no kind that keeps every rule; then draw the act's stops again
       for (var tries = 0; tries < 40; tries++) {
@@ -136,7 +148,7 @@
 
   // Enemy army for a node
   C.enemyArmyFor = function (camp, node, kind) {
-    var actDef = SOVL.CAMPAIGN.acts[camp.act], t = camp.layer / Math.max(1, actDef.layers - 1);
+    var actDef = SOVL.CAMPAIGN.acts[camp.act], steps = (C.currentAct(camp) || { layers: [] }).layers.length || actDef.layers, t = camp.layer / Math.max(1, steps - 1); // the act being played: a run saved before the maps grew keeps its own
     var pts = Math.round(actDef.pts[0] + (actDef.pts[1] - actDef.pts[0]) * t);
     // scale a little with the player's own strength so the run stays fair
     var own = A.armyCost(camp.army), diff = C.difficulty(camp);
@@ -145,7 +157,8 @@
     if (type === 'small') { pts = Math.round(pts * 0.6); }
     if (type === 'undead') { fid = 'dead_nations'; pts = Math.round(pts * 0.9); }
     if (type === 'elite') pts = Math.round(pts * actDef.elitePts);
-    if (type === 'boss') { pts = Math.round(Math.min(actDef.boss.pts, Math.max(actDef.boss.pts * 0.6, own * 1.25)) * diff.pts); fid = camp.act === 2 ? 'dead_nations' : null; }
+    // a boss matches the army that reaches it (within the act's limits) rather than outnumbering it
+    if (type === 'boss') { pts = Math.round(Math.min(actDef.boss.pts, Math.max(actDef.boss.pts * 0.5, own * 0.8)) * diff.pts); fid = camp.act === 2 ? 'dead_nations' : null; }
     else pts = Math.min(pts, Math.round((own * 1.4 + 50) * diff.pts)); // never wildly larger than the player's own army
     if (!fid) { var others = fids.filter(function (f) { return f !== camp.faction; }); fid = R.rng() < 0.85 ? R.pick(others) : camp.faction; }
     var army = A.randomArmy({ faction: fid, pts: Math.max(150, pts), boss: type === 'boss', name: type === 'boss' ? actDef.boss.name : undefined });
@@ -174,15 +187,20 @@
       if (u.commander && !u.commander.alive) cmdAlive = false;
     });
     camp.battles++;
-    var lines = [];
-    if ((!won && !draw) || !cmdAlive) {
+    var lines = [], diff = C.difficulty(camp), boss = node && node.type === 'boss', lost = !won && !draw;
+    // a lost battle ends the run against a boss, or on Legend; so does a fallen commander on Legend
+    if ((lost && (boss || diff.lossEndsRun)) || (!cmdAlive && diff.commanderDeathEndsRun)) {
       camp.over = true;
       camp.history.push({ act: camp.act, type: node ? node.type : 'battle', enemy: enemyArmy.faction, pts: enemyArmy.pts, won: false, draw: false, turn: battle.result.turn, why: battle.result.why, fatal: true });
       lines.push(cmdAlive ? 'The battle is lost. The trail ends here.' : camp.commanderName + ' has fallen. The trail ends here.');
       camp.log = camp.log.concat(lines);
       return { won: false, lines: lines };
     }
-    if (won) camp.wins++; else lines.push('A bloody stalemate. Both armies withdraw; there is no plunder, but the trail goes on.');
+    if (won) camp.wins++;
+    else if (lost) lines.push('The army falls back in disorder. There is no plunder, and the abandoned baggage costs ' + Math.round(camp.gold * 0.2) + ' gold, but the trail goes on.');
+    else lines.push('A bloody stalemate. Both armies withdraw; there is no plunder, but the trail goes on.');
+    if (lost) camp.gold -= Math.round(camp.gold * 0.2);
+    if (!cmdAlive) { var fee = Math.min(camp.gold, 30); camp.gold -= fee; lines.push(camp.commanderName + ' is carried from the field, badly wounded, and will lead again' + (fee ? ' (the surgeon\'s fee: ' + fee + ' gold)' : '') + '.'); }
     // casualties: half of lost models return (wounded); destroyed units are gone; routed units return at half
     var newEntries = [];
     camp.army.entries.forEach(function (e) {
@@ -214,7 +232,7 @@
     camp.history.push({ act: camp.act, type: node ? node.type : 'battle', enemy: enemyArmy.faction, pts: enemyArmy.pts, won: won, draw: draw, turn: battle.result.turn, why: battle.result.why });
     if (!won && node && node.type === 'boss') { camp.over = true; lines.push('A stalemate is not enough against ' + (SOVL.CAMPAIGN.acts[camp.act].boss.name) + '. The trail ends here.'); camp.log = camp.log.concat(lines); return { won: false, lines: lines }; }
     camp.log = camp.log.concat(lines);
-    return { won: true, draw: draw, lines: lines, gold: gold };
+    return { won: !lost, draw: draw, retreat: lost, lines: lines, gold: gold };
   };
 
   C.moveTo = function (camp, idx) {

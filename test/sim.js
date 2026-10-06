@@ -125,5 +125,41 @@ if (SOVL.Campaign) {
     assert(enemy.entries.length > 0, 'enemy army');
   }
 }
+// campaign rules by difficulty: on Recruit and Veteran a lost battle is a retreat and a fallen
+// commander is carried off wounded; losing to a boss always ends the run; on Legend any loss or a
+// fallen commander ends it
+if (SOVL.Campaign) {
+  var CC = SOVL.Campaign;
+  var endBattle = function (winner, cmdDead) {
+    var cmdUnit = { side: 0, commander: { alive: !cmdDead }, campaignRef: 'zz' };
+    return { result: { winner: winner, why: 'turns', turn: 8 }, units: [cmdUnit], dead: [] };
+  };
+  var outcome = function (difficulty, nodeType, winner, cmdDead) {
+    R.setSeed(77); var c = CC.create({ faction: 'empires_of_men', commander: 'captain', difficulty: difficulty });
+    c.gold = 200; var r = CC.applyBattleResult(c, endBattle(winner, cmdDead), { type: nodeType }, { faction: 'dwarf_holds', pts: 300 });
+    return { over: c.over, retreat: !!r.retreat, gold: c.gold };
+  };
+  var o1 = outcome('normal', 'battle', 1, false); assert(!o1.over && o1.retreat && o1.gold === 160, 'Veteran: a lost battle is a retreat costing a fifth of the gold ' + JSON.stringify(o1));
+  var o2 = outcome('easy', 'elite', 1, false); assert(!o2.over && o2.retreat, 'Recruit: a lost elite battle is a retreat');
+  var o3 = outcome('normal', 'boss', 1, false); assert(o3.over, 'Veteran: losing to a boss ends the run');
+  var o4 = outcome('hard', 'battle', 1, false); assert(o4.over, 'Legend: a lost battle ends the run');
+  var o5 = outcome('normal', 'battle', 0, true); assert(!o5.over && !o5.retreat && o5.gold < 200 + 200, 'Veteran: a fallen commander is carried off wounded ' + JSON.stringify(o5));
+  var o6 = outcome('hard', 'battle', 0, true); assert(o6.over, 'Legend: a fallen commander ends the run');
+  // the larger map: three ways to begin, 2-4 stops a step, 2-3 before the boss, every stop reachable
+  for (var mseed = 0; mseed < 200; mseed++) {
+    R.setSeed(mseed); var mp = CC.generateMap();
+    mp.acts.forEach(function (act, ai) {
+      var L = act.layers.length;
+      assert(L === SOVL.CAMPAIGN.acts[ai].layers, 'act length');
+      assert(act.layers[0].length === 3, 'three ways to begin');
+      act.layers.forEach(function (layer, li) {
+        if (li > 0 && li < L - 2) assert(layer.length >= 2 && layer.length <= 4, '2-4 stops a step');
+        if (li === L - 2) assert(layer.length >= 2 && layer.length <= 3, '2-3 stops before the boss');
+        if (li > 0) layer.forEach(function (n, i) { assert(act.layers[li - 1].some(function (p) { return p.next.indexOf(i) >= 0; }), 'unreachable stop'); });
+        if (li < L - 1) layer.forEach(function (n) { assert(n.next.length >= 1 && n.next.length <= 3, '1-3 roads from a stop'); });
+      });
+    });
+  }
+}
 console.log(failures ? failures + ' FAILURES' : 'ALL TESTS PASSED');
 process.exit(failures ? 1 : 0);

@@ -31,7 +31,7 @@
     var H = Math.round(foot + (n - 1) * layerH + bossY), pos = [];
     act.layers.forEach(function (layer, li) {
       pos.push(layer.map(function (n, i) {
-        var spread = Math.min(phone ? 110 : 230, (W - 60) / (layer.length + 0.2));
+        var spread = Math.min(phone ? 110 : 280, (W - 60) / (layer.length + 0.2));
         var jx = n.type === "boss" ? 0 : (r() - 0.5) * spread * 0.28, jy = n.type === "boss" ? 0 : (r() - 0.5) * layerH * 0.22;
         return { x: W / 2 + (i - (layer.length - 1) / 2) * spread + jx, y: H - 70 - li * layerH + jy };
       }));
@@ -146,7 +146,8 @@
         g.restore();
       });
     });
-    var bp = cur ? L.pos[cur.li][cur.i] : { x: L.W / 2, y: L.H - 22 };
+    // before the first step the flag stands between the first two ways to begin, clear of their labels
+    var p0 = L.pos[0], bp = cur ? L.pos[cur.li][cur.i] : { x: p0.length > 1 ? (p0[0].x + p0[1].x) / 2 : L.W / 2, y: L.H - 22 };
     banner(g, bp.x + (cur ? 12 : 0), bp.y - (cur ? 10 : 0), (SOVL.FACTION_INFO[camp.faction] || {}).color || "#557fab", now);
   }
   function loop(now) {
