@@ -33,6 +33,15 @@ Two modes:
   battle fought and each unit's honours (battles fought and enemy models slain). Progress
   is saved in the browser.
 
+## Clearer overhead artwork
+
+All 81 faction/unit definitions now have replacement high-contrast overhead sprites,
+with distinct equipment and faction colours. Infantry use compact rank spacing, and
+labels avoid covering neighbouring figures. All six battlefields have richer ground
+materials, fine grass and gravel, tracks and terrain-edge detail.
+See [the visual review](docs/visual-review.md) for before/after screenshots and the full
+roster and battlefield checks.
+
 ## Illustrated tactical edition
 
 The title screen now opens on an original battlefield painting. **Take the field**

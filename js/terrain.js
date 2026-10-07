@@ -450,9 +450,11 @@
   // Distinct traversable obstacles for the dry country, sharing the heightmap lighting.
   GEN.dunes = function (F, t, nz, rnd) {
     each(F, function(i,x,y) {
-      var edge=1-smooth(-0.35,0.25,sdShape(x,y,t,nz,0.45)); if(edge<=0)return;
+      var edge=1-smooth(-0.65,0.25,sdShape(x,y,t,nz,0.85,0.43)); if(edge<=0)return;
       var ridge=Math.sin(y*2.1+Math.sin(x*.65)*1.6+nz.n(x*.5,y*.5)), n=nz.fbm(x*7,y*7,2);
-      F.H[i]=(0.12+(ridge+1)*.16)*edge; F.A[i]=edge;F.R[i]=.72+n*.1;F.G[i]=.55+n*.08;F.B[i]=.32+n*.05;
+      var ripple=Math.sin(y*31+x*3+nz.n(x*2,y*2)*3),grain=nz.n(x*55,y*55);
+      F.H[i]=(0.10+(ridge+1)*.14+ripple*.007+grain*.004)*edge;F.A[i]=edge;
+      F.R[i]=.69+n*.12+ripple*.012+grain*.025;F.G[i]=.54+n*.09+ripple*.009+grain*.019;F.B[i]=.33+n*.06+grain*.014;
     });
   };
   GEN.scree = function(F,t,nz,rnd) {
@@ -469,7 +471,12 @@
     var F = new Field(t), nz = makeNoise(seed), rnd = makeRng(seed ^ 0x5bd1e995);
     GEN[t.kind](F, t, nz, rnd);
     if (t.biome && t.biome !== 'borderlands' && /cliff|building|lake/.test(t.kind)) {
-      for (var i=0;i<F.R.length;i++) { if(F.W[i]>.2) continue; var v=F.R[i]*.4+F.G[i]*.4+F.B[i]*.2; if(t.biome==='ashlands'){F.R[i]=v*.87;F.G[i]=v*.88;F.B[i]=v*.94;}else{F.R[i]=v*1.19;F.G[i]=v*.94;F.B[i]=v*.63;} }
+      for (var i=0;i<F.R.length;i++) {
+        if(t.biome!=='oasis' && t.biome!=='plains')F.Moss[i]=0;
+        if(F.W[i]>.2)continue;
+        var v=F.R[i]*.4+F.G[i]*.4+F.B[i]*.2;
+        if(t.biome==='ashlands'){F.R[i]=v*.87;F.G[i]=v*.88;F.B[i]=v*.94;}else{F.R[i]=v*1.19;F.G[i]=v*.94;F.B[i]=v*.63;}
+      }
     }
     return shade(F, nz);
   }

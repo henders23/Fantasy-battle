@@ -1,7 +1,7 @@
 # Original game artwork
 
 Created for this project with the built-in image generation tool. These are original
-illustrations, not copied SOVL game artwork. Final game assets are WebP. The five realistic
+illustrations, not copied SOVL game artwork. Final game assets are WebP. The five overhead
 unit atlases retain transparent backgrounds and cover all 81 named definitions, including
 commanders, mounts, monsters and machines. Source rectangles and ID mappings are in
 `js/realistic-art.js`; companion JSON files record the prepared atlas bounds. They use one
@@ -12,7 +12,8 @@ sprites in `js/visuals.js` and the procedural model painter remain as loading fa
 | File | Use |
 | --- | --- |
 | `title-battle.webp` | Title screen, campaign atmosphere, battle briefs and results |
-| `battlefield-ground.webp` | Clear overhead ground; all actual obstacles come from the battle state |
+| `ground/biomes.webp` | Six ground material tiles, assembled into 1800 × 1200 seeded battlefield textures with fine procedural dressing |
+| `battlefield-ground.webp` | Legacy overhead ground used by the original presentation layer |
 | `faction-portraits.webp` | Five faction illustrations in human/dwarf/elf/orc/undead order |
 | `units/empire.webp`, `units/dwarves.webp`, `units/elves.webp`, `units/orcs.webp`, `units/undead.webp` | Dedicated realistic unit sprites, commanders and faction standards |
 | `campaign/borderlands.webp` | Forested valley and northern fortress, Act I |
@@ -28,8 +29,8 @@ sprites in `js/visuals.js` and the procedural model painter remain as loading fa
 ## Prompt briefs
 
 - **Realistic unit atlases:** One faction per transparent five-column, four-row sheet.
-  Full bodies and equipment, realistic proportions and anatomy, weathered steel, cloth,
-  leather and natural creature textures. Consistent elevated tabletop view and soft light,
+  Compact overhead bodies and complete equipment, bright metal highlights, dark contours,
+  and strong faction cloth colours. Consistent elevated tabletop view and foreshortening,
   with separated silhouettes and no bases, text, labels or background. Each slot specifies
   its named unit, weapon, armour, mount or machine; spare slots provide standard bearers
   and veterans. Human steel and blue cloth; dwarven iron, bronze and russet; elven silver
@@ -64,6 +65,19 @@ sprites in `js/visuals.js` and the procedural model painter remain as loading fa
 - **Terrain:** A transparent strip of overhead painted objects: dense forest cluster,
   rock outcrop, ruined stone building, small blue lake with reed-lined rocky banks, and
   dark marsh pools and reeds. Muted greens and ochres; no background, labels or grid.
+
+## Overhead art revision
+
+All five unit sheets were replaced in the October 2026 visual pass. Exact prompts are in
+`art-prompts.json`; preparation is handled by `tools/pack-unit-atlas.cjs`. Generated art
+retains alpha and is packed with transparent gutters into 1600 × 1280 atlases.
+The sprites use a more compact overhead perspective and bold equipment silhouettes.
+The renderer handles the source-facing correction for the dwarf machines. Ground uses
+feathered patches instead of enlarged or mirrored tiles, then adds grass, litter, grit and
+subtle tracks. Rules-bearing obstacles remain generated from the battle state.
+
+See `docs/visual-review.md` for before/after screenshots, complete unit coverage,
+formation checks, all six environments and validation results.
 
 ## Music
 
