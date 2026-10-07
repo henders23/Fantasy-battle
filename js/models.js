@@ -386,10 +386,10 @@
     if (!silCv) silCv = document.createElement("canvas");
     grow(silCv, w, h);
     var sc = src.getContext("2d"), sil = silCv.getContext("2d");
-    sc.save(); sc.globalCompositeOperation = "source-atop"; sc.fillStyle = "rgba(255,246,228,0.12)"; sc.fillRect(0, 0, w, h); sc.restore();
+    sc.save(); sc.globalCompositeOperation = "source-atop"; sc.fillStyle = "rgba(255,246,228,0.04)"; sc.fillRect(0, 0, w, h); sc.restore();
     function tint(col) { sil.save(); sil.setTransform(1, 0, 0, 1, 0, 0); sil.globalCompositeOperation = "copy"; sil.drawImage(src, 0, 0, w, h, 0, 0, w, h); sil.globalCompositeOperation = "source-in"; sil.fillStyle = col; sil.fillRect(0, 0, w, h); sil.restore(); }
     page.save(); page.beginPath(); page.rect(x, y, w, h); page.clip(); page.clearRect(x, y, w, h);
-    tint("rgba(236,228,206,1)"); page.globalAlpha = 0.16;
+    tint("rgba(236,228,206,1)"); page.globalAlpha = 0.10;
     RING.forEach(function (d) { page.drawImage(silCv, 0, 0, w, h, x + d[0] * px * 2.2, y + d[1] * px * 2.2, w, h); });
     tint("rgba(8,10,14,1)"); page.globalAlpha = 0.8;
     RING.forEach(function (d) { page.drawImage(silCv, 0, 0, w, h, x + d[0] * px, y + d[1] * px, w, h); });
@@ -397,6 +397,11 @@
     page.restore();
   }
   function spriteFor(u, role, v, rank, bw, bd, bucket, cmd, PPI) {
+    // Authored overhead art already contains its lighting. Reuse it across facings,
+    // ranks and pose seeds; the regiment transform supplies the actual direction.
+    var authored = SOVL.RealisticArt && SOVL.RealisticArt.resolve(u, role, cmd);
+    var overhead = !!(authored && authored.image.complete && authored.image.naturalWidth);
+    if (overhead) { v = 0; rank = 0; bucket = 0; }
     var base = [u.faction, cmd ? "c:" + cmd.def.id + cmd.weapon : u.id + u.weapon + (u.ranged || ""), role, v, rank >= 2 ? 2 : rank].join("|"), tail = [bw.toFixed(2), bd.toFixed(2), u.banner ? 1 : 0, PPI].join("|");
     tail += "|" + (SOVL.RealisticArt ? SOVL.RealisticArt.revision() : 0);
     var key = base + "|" + bucket + "|" + tail;
@@ -423,7 +428,7 @@
     try { if (!SOVL.RealisticArt || !SOVL.RealisticArt.draw(g, u, bw, bd, role, cmd)) paintModel(u, role, v, rank, bw, bd, cmd); } catch (e) { g.restore(); cache[key] = "failed"; c = null; return "failed"; }
     g.restore(); c = null;
     standOut(page, scratch, slot.x, slot.y, sw, sh, Math.max(1, PPI * 0.018));
-    hit = { cv: slot.page, sx: slot.x, sy: slot.y, sw: sw, sh: sh, ox: bw / 2 + padX, oy: front, w: sw / PPI, h: sh / PPI, bucket: bucket };
+    hit = { cv: slot.page, sx: slot.x, sy: slot.y, sw: sw, sh: sh, ox: bw / 2 + padX, oy: front, w: sw / PPI, h: sh / PPI, bucket: bucket, overhead: overhead };
     cache[key] = hit; cacheCount++;
     spent += performance.now() - t0;
     return hit;
@@ -494,11 +499,11 @@
     var ppi = levelFor(r); // the sprite resolution closest above what the screen shows, like a mipmap
     var sp = spriteFor(u, role, v, rank, bw, bd, bucket, cmd && (cmdOnly || role === "cmd") ? { def: cmd.def, weapon: cmd.weapon, ranged: cmd.ranged, props: cmd.props || [], mount: cmdOnly && /Cavalry/.test(cmd.def.type) } : null, ppi);
     if (sp === "failed") return null;
-    var jr = (hash(seed, 13) - 0.5) * 0.14;
+    var jr = (hash(seed, 13) - 0.5) * 0.05;
     if (u.fleeing) jr += (hash(seed, 17) - 0.5) * 0.8;
-    var jx = (hash(seed, 7) - 0.5) * bw * 0.08, jy = (hash(seed, 11) - 0.5) * bd * 0.06;
+    var jx = (hash(seed, 7) - 0.5) * bw * 0.04, jy = (hash(seed, 11) - 0.5) * bd * 0.03;
     if (SOVL.FX && SOVL.FX.animating(u)) { var po = SOVL.FX.pose(u, rank, file, bw, bd); jx += po.x; jy += po.y; jr += po.r; }
-    return { sp: sp, jx: jx, jy: jy, jr: jr, exact: sp.bucket === bucket };
+    return { sp: sp, jx: jx, jy: jy, jr: jr, exact: sp.overhead || sp.bucket === bucket };
   }
   function stamp(ctx, m) {
     ctx.save(); ctx.translate(m.jx, m.jy); ctx.rotate(m.jr);

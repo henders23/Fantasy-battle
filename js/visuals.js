@@ -248,6 +248,14 @@
     var list = b.units.filter(function (u) {
       return u.placed && !u.removed && u.side !== st.hideSide;
     });
+    // Labels must avoid the figures as well as other labels. Otherwise a rear
+    // regiment's name can cover the front ranks of its neighbour at close zoom.
+    var figures = list.map(function(u) {
+      var corners=G.corners({x:u._rx==null?u.x:u._rx,y:u._ry==null?u.y:u._ry,a:u._ra==null?u.a:u._ra,w:u.w,d:u.d});
+      var pts=corners.map(function(p){return self.toScreen(p.x,p.y);});
+      var x=Math.min.apply(null,pts.map(function(p){return p.x;}))-4,y=Math.min.apply(null,pts.map(function(p){return p.y;}))-4;
+      return {x:x,y:y,w:Math.max.apply(null,pts.map(function(p){return p.x;}))+4-x,h:Math.max.apply(null,pts.map(function(p){return p.y;}))+4-y,uid:u.uid};
+    });
     list.sort(function (a, c) {
       return (
         (c.uid === st.selected ? 2 : c.uid === st.hover ? 1 : 0) -
@@ -298,20 +306,20 @@
         'px "Segoe UI", Arial, sans-serif';
       var w = Math.ceil(ctx.measureText(text).width) + 18,
         h = selected && state ? 39 : 26;
+      var bounds=figures.filter(function(q){return q.uid===u.uid;})[0];
       var x = G.clamp(p.x - w / 2, 3, Math.max(3, self.cw - w - 3)),
-        half = (Math.max(u.w, u.d) * self.scale) / 2,
-        below = p.y + half + 5,
-        above = p.y - half - h - 5,
+        below = bounds.y + bounds.h + 5,
+        above = bounds.y - h - 5,
         bottom = Math.min(self.ch - 40, self.toScreen(0, SOVL.TABLE.h).y + 4),
         y = null;
       // below the regiment first, then above it, then stepping further out on both sides
       var tries = [];
-      for (var step = 0; step < 4; step++) {
+      for (var step = 0; step < 6; step++) {
         tries.push(below + step * (h + 3), above - step * (h + 3));
       }
       if (below + h > bottom) tries.sort(function (m, n) { return (m + h > bottom) - (n + h > bottom); });
       var hits = function (tx, ty) {
-        return self.labelRects.filter(function (r) {
+        return self.labelRects.concat(figures).filter(function (r) {
           return (
             tx < r.x + r.w + 2 &&
             tx + w > r.x - 2 &&
