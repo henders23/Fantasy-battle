@@ -61,10 +61,10 @@
   // ---------- interface ----------
   if (typeof document === "undefined" || !SOVL.UI) return;
   var UI = SOVL.UI, C = SOVL.Campaign, $ = function (id) { return document.getElementById(id); };
-  function kindOf(opts) { return opts.campaign ? "campaign" : opts.hotseat ? "hotseat" : opts.quick ? "quick" : "skirmish"; }
+  function kindOf(opts) { return opts.campaign ? "campaign" : opts.conquest ? "conquest" : opts.hotseat ? "hotseat" : opts.quick ? "quick" : "skirmish"; }
   // what is needed to start the same battle again, minus the armies (the snapshot has them)
   function metaOf(opts) {
-    return { kind: kindOf(opts), scenario: opts.scenario, names: opts.names, biome: opts.biome || null, fieldName: opts.fieldName || null, aggression: opts.aggression || 0.5, hotseat: !!opts.hotseat, quick: !!opts.quick, campaign: !!opts.campaign };
+    return { kind: kindOf(opts), scenario: opts.scenario, names: opts.names, biome: opts.biome || null, fieldName: opts.fieldName || null, aggression: opts.aggression || 0.5, hotseat: !!opts.hotseat, quick: !!opts.quick, campaign: !!opts.campaign, conquest: opts.conquest ? opts.conquest.no : null };
   }
   UI.saveBattle = function () {
     var b = UI.battle, opts = UI.battleOpts;
@@ -97,7 +97,7 @@
     save = save || read(); if (!save) return false;
     var m = save.meta, b;
     try { b = restore(save.battle); } catch (e) { clear(); UI.hint && UI.hint("The saved battle could not be restored."); return false; }
-    var opts = { armies: b.armies, terrain: b.terrain, scenario: m.scenario, names: m.names, biome: m.biome, fieldName: m.fieldName, aggression: m.aggression, campaign: m.campaign, quick: m.quick, hotseat: m.hotseat, restore: b,
+    var opts = { armies: b.armies, terrain: b.terrain, scenario: m.scenario, names: m.names, biome: m.biome, fieldName: m.fieldName, aggression: m.aggression, campaign: m.campaign, quick: m.quick, hotseat: m.hotseat, conquest: m.conquest != null ? { no: m.conquest } : undefined, restore: b,
       onEnd: onEndFn || function (bb) { UI.showResult(bb, { onDone: toMenu }); } };
     UI.resuming = true;
     try { UI.startBattle(opts); } finally { UI.resuming = false; }
@@ -128,7 +128,7 @@
   }
   function resumeCard() {
     var btn = $("btn-resume"), save = read(); if (!btn) return;
-    var show = !!save && save.meta.kind !== "campaign";
+    var show = !!save && save.meta.kind !== "campaign" && save.meta.kind !== "conquest";
     btn.style.display = show ? "" : "none";
     if (show) { var sub = btn.querySelector("small"); if (sub) sub.textContent = describe(save); }
     var cont = $("btn-continue"), csub = cont && cont.querySelector("small");

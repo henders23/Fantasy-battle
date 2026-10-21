@@ -18,6 +18,7 @@
 <link rel="stylesheet" href="css/audiobar.css">
 <link rel="stylesheet" href="css/storyscreens.css">
 <link rel="stylesheet" href="css/combatdesk.css">
+<link rel="stylesheet" href="css/conquest.css">
 <link rel="stylesheet" href="css/laptop.css">
 <link rel="preload" href="assets/fonts/marcellus-sc-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="assets/fonts/barlow-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
@@ -36,6 +37,7 @@
     <button class="primary" id="btn-quick"><span>Take the field</span><small>A ready-made army. Your first battle.</small><b aria-hidden="true">↗</b></button>
     <button id="btn-resume" style="display:none"><span>Resume battle</span><small></small></button>
     <button id="btn-continue" style="display:none">Continue Campaign</button>
+    <button id="btn-conquest"><span>The Broken March</span><small>Win back a province, one battle at a time.</small></button>
     <button id="btn-campaign"><span>Trail of Death</span><small>Lead a warband through three acts.</small></button>
     <button id="btn-skirmish"><span>Custom battle</span><small>Choose your faction and build an army.</small></button>
     <div class="menu-utilities"><button id="btn-rules">Field manual</button><button id="btn-settings">Settings</button></div>
@@ -121,6 +123,17 @@
   </div>
 </div></div>
 
+<div id="screen-conquest" class="screen"><div class="page">
+  <div class="topbar"><h2 id="cq-title">The Broken March</h2><span id="cq-turn" class="cq-turn"></span><div class="spacer"></div><span class="cq-treasury">Gold <span class="gold" id="cq-gold"></span><span id="cq-net" class="cq-net"></span></span><button id="cq-help" class="small" aria-label="How the March works">Guide</button><button id="cq-menu">Menu</button><button class="primary" id="cq-end">End turn</button></div>
+  <div class="body cq-body">
+    <div class="cq-left">
+      <div id="cq-mapwrap"><canvas id="cq-map" aria-label="Map of the March"></canvas><div id="cq-toast" role="status" aria-live="polite"></div><div id="cq-banner" aria-live="polite"></div><div id="cq-zoom"><button id="cq-zin" class="small" aria-label="Zoom in">+</button><button id="cq-zout" class="small" aria-label="Zoom out">−</button><button id="cq-zfit" class="small">Fit</button></div></div>
+      <div class="panel" id="cq-log"></div>
+    </div>
+    <div id="cq-side"><div class="panel" id="cq-panel"></div></div>
+  </div>
+</div></div>
+
 <div id="screen-rules" class="screen"><div class="page">
   <div class="topbar"><h2>Field Manual</h2><div class="spacer"></div><button id="rules-back">← Back</button></div>
   <div class="panel rules" id="rules-body" style="flex:1"></div>
@@ -138,6 +151,8 @@
 <script src="js/ai.js"></script>
 <script src="js/biomes.js"></script>
 <script src="js/campaign.js"></script>
+<script src="js/conquest-data.js"></script>
+<script src="js/conquest.js"></script>
 <script src="js/render.js"></script>
 <script src="js/fx.js"></script>
 <script src="js/spellfx.js"></script>
@@ -165,5 +180,7 @@
 <script src="js/audiobar.js"></script>
 <script src="js/storyscreens.js"></script>
 <script src="js/combatdesk.js"></script>
+<script src="js/conquestmap.js"></script>
+<script src="js/conquestui.js"></script>
 </body>
 </html>

@@ -257,7 +257,7 @@
     if (UI.aiTimer) { clearTimeout(UI.aiTimer); UI.aiTimer = null; }
     R.setSeed(null);
     // opts.restore: a battle saved mid-fight (js/battlesave.js), resumed where it stood
-    var b = opts.restore || new SOVL.Battle({ armies: opts.armies, terrain: opts.terrain, scenario: opts.scenario, names: opts.names, sides: ['bottom', 'top'], scoreMode: opts.campaign ? 'ratio' : 'points', interactive: true, interactiveCombat: true });
+    var b = opts.restore || new SOVL.Battle({ armies: opts.armies, terrain: opts.terrain, scenario: opts.scenario, names: opts.names, sides: ['bottom', 'top'], scoreMode: opts.campaign || opts.conquest ? 'ratio' : 'points', interactive: true, interactiveCombat: true });
     UI.dice = { title: '', sub: '', rows: [], pending: null, banner: null }; UI.diceSeqId = 0; UI.deployDone = !!opts.restore && b.phase !== 'deploy'; UI.renderDice(); $('dice-panel').classList.remove('on');
     b.biome = opts.biome || 'borderlands'; b.fieldName = opts.fieldName || 'The Borderlands';
     UI.battle = b; UI.battleOpts = opts; UI.ai = new SOVL.AI(b, UI.aiSide, { aggression: opts.aggression || 0.5 });

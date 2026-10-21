@@ -6,7 +6,7 @@ server: open `index.html` (or serve the folder statically) and play. Every attac
 break test and flight move is rolled by hand: the dice appear on the battlefield and you
 click to roll them.
 
-Two modes:
+Three modes:
 
 - **Skirmish** — build a 500 / 1000 / 1500 point army from one of five factions in the
   army builder, then fight the AI in a Pitched Battle, a Meeting Engagement (deep
@@ -32,6 +32,48 @@ Two modes:
   Legend any lost battle or a fallen commander ends it. The run-over screen lists every
   battle fought and each unit's honours (battles fought and enemy models slain). Progress
   is saved in the browser.
+- **The Broken March** — a story campaign for the Empire, about an evening long: take a
+  province of 24 territories back, turn by turn, from three named lords. See below.
+
+## The Broken March
+
+The Margrave is dead. His cousin Count Ottokar has seized Highmoor Keep, Gorrak Broken-Tusk's
+greenskins hold the Red Reaches, and in the Ashen Waste something a hundred years dead is
+stirring. You lead Aldric of the Border Guard, Warden of the March, from Harrowgate.
+
+- **The map** joins the three landscape paintings into one country, the green March, the Red
+  Reaches and the Ashen Waste, divided into 24 provinces with ragged borders tinted by their
+  owner. Each province pays gold every turn, and some have features: towns raise armies and
+  recruits, stud farms open up knights, Dunmar's forges open war machines, the market at
+  Ambergate sells relics, shrines speed recovery, fortresses are stormed as objective battles.
+  Holding a whole region pays a bonus. Wheel or pinch to zoom, drag to pan.
+- **Your turn:** click an army (or pick it in the side panel) and then a glowing province:
+  blue to march through your own land, red to attack, gold to parley. Each army has two
+  moves; attacking ends its march. Recruit regiments and refill ranks in towns you hold.
+- **Armies:** up to three, each led by a commander you hire in a town (a Captain, an Imperial
+  Wizard or a Knight Commander, with a company of their own), and each costing upkeep. An army
+  that stays put recovers its wounded. Every province has a levy that defends it and fights
+  beside an army quartered there; the levy can be strengthened.
+- **Battles** are fought on the province's own battlefield. Lead any battle yourself, or let
+  the army's commander fight it: the game then plays the whole battle out with the AI on both
+  sides, using the same rules, and reports the result regiment by regiment. Casualties,
+  veterancy and commander traits carry over. A battle you lead is saved mid-fight like any other.
+- **The other powers** move when you end your turn. Count Ottokar keeps to his walls unless
+  provoked, his vassals raid; Gorrak's raiders strike from the start and the Warboss himself
+  comes out from turn 8; the dead wake on turn 7 (sooner if you go near the Waste) and mend
+  their losses every turn. They fight each other and the free provinces too. When they attack
+  one of your armies, you choose whether to lead the defence.
+- **The story** runs through scenes with the characters' portraits: Ottokar's letter (defy
+  him, stall him, or turn his vassal), the siege of Dunmar (keep the promise and the dwarfs
+  join you), Lady Sylvaine of the Elder Glade (swear the oath, or fell the wood), the council
+  of Ambergate (buy it or take it), the barrow-lights, the first snow, and each lord's fall,
+  where you decide their fate: hang, pardon or ransom Ottokar; slay Gorrak, set him on the
+  dead, or take his tribute. The ending is written from what you chose.
+- **Winning:** take Highmoor Keep, Redfang Hold and the Ashen Spire within 24 turns. When the
+  year runs out, two lords fallen or 14 provinces held is a partial victory. Lose Harrowgate and
+  the March is lost. Three difficulties change the enemy's strength, aggression and recruiting
+  and your income. In automated playthroughs that let the AI fight every battle, Recruit is won
+  or partly won about 23 times in 24, Veteran about 2 times in 3 and Legend about 2 times in 5.
 
 ## Clearer overhead artwork
 
@@ -335,6 +377,12 @@ js/battle.js      the battle engine (state machine, no DOM)
 js/army.js        army costs, validation, random armies, terrain generation
 js/ai.js          the AI opponent
 js/campaign.js    Trail of Death campaign model
+js/conquest-data.js The Broken March: provinces, powers, lords, story scenes and epilogue
+js/conquest.js    The Broken March rules: map geometry, armies, income, recruiting, movement,
+                  battles (led or fought out by the AI), the other powers' turns, story, saving
+js/conquestmap.js the March's map drawn over the three paintings, tokens, zoom and pan
+js/conquestui.js  the March's screen, side panel, battle prompts, scenes and ending
+                  (css/conquest.css)
 js/render.js      canvas renderer
 js/fx.js          battle animation and effects (tweens, strides, lunges, casualties, missiles, particles)
 js/spellfx.js     spell effects (casting circles, per-spell missiles and impacts, auras, summoning)
@@ -387,6 +435,9 @@ test/expansion.js camp rewards, repeat claims, legacy saves and seeded terrain l
 test/expansion-browser.js unit art, sound removal, world maps, camp choices and mobile layout
 test/save.js      saved and restored battles play out identically (node test/save.js [games] [seed])
 test/hotseat-browser.js a whole hot-seat battle with handovers, resume and result
+test/conquest.js  the Broken March headless: map, economy, battles, story branches, and whole
+                  campaigns played by a bot (node test/conquest.js [campaigns] [seed])
+test/conquest-browser.js the Broken March in a browser, from the title screen to the ending
 ```
 
 ## Controls
@@ -426,12 +477,14 @@ node test/sim.js 80          # rules unit tests + 80 simulated battles + campaig
 node test/tactical.js        # 20 automatic/manual battles with matching seeded outcomes
 node test/expansion.js       # campaign rewards, terrain and removed sound contracts
 node test/save.js 12         # 12 battles saved and restored after every step, unchanged
+node test/conquest.js 6      # the Broken March: rules, story branches, 6 whole campaigns
 python3 -m http.server 8123  # then, in another shell:
 node test/browser.js http://127.0.0.1:8123/index.html
 node test/interact.js
 node test/features.js
 node test/expansion-browser.js http://127.0.0.1:8123/index.html
 node test/hotseat-browser.js http://127.0.0.1:8123/index.html
+node test/conquest-browser.js http://127.0.0.1:8123/index.html
 ```
 
 `test/interface.js` uses `linkedom` and `@napi-rs/canvas` as optional test-only

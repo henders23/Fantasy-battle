@@ -117,7 +117,7 @@
   var startBattle = UI.startBattle;
   UI.startBattle = function (opts) {
     var r = startBattle.apply(UI, arguments), b = UI.battle;
-    if (opts && !opts.restore && !opts.campaign && b && opts.armies && opts.armies.length === 2) {
+    if (opts && !opts.restore && !opts.campaign && !opts.conquest && b && opts.armies && opts.armies.length === 2) {
       var story = battleStory(opts, b);
       if (story) UI.showStory(story);
     }
